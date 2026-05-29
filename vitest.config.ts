@@ -5,9 +5,10 @@ export default defineConfig({
     tsconfigPaths: true,
   },
   test: {
-    environment: 'node',
+    environment: 'jsdom',
     globals: true,
     clearMocks: true,
     restoreMocks: true,
+    setupFiles: ['./vitest.setup.ts'],
   },
 })
