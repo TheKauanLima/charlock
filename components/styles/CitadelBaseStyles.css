@@ -1,0 +1,3151 @@
+/*
+ * citadel_base_styles.css
+ * Translated from Valve Panorama CSS to standard CSS for use in Preact + Vite.
+ *
+ * Translation notes:
+ *   - @define variables converted to CSS custom properties (--var-name) on :root
+ *   - Color shorthand alpha suffix  (#RRGGBB&AA) expanded to 8-digit hex (#RRGGBBAA)
+ *   - Panorama-only layout properties:
+ *       flow-children: right   → display: flex; flex-direction: row
+ *       flow-children: down    → display: flex; flex-direction: column
+ *       horizontal-align       → align-items / justify-content (context-dependent; see inline comments)
+ *       vertical-align         → align-items / justify-content (context-dependent; see inline comments)
+ *       fill-parent-flow(1.0)  → flex: 1 (or width/height: 100% where appropriate)
+ *       fit-children           → fit-content
+ *       overflow: squish scroll→ overflow-y: auto
+ *       overflow: noclip       → overflow: visible
+ *       layout-position: fixed → position: fixed
+ *       ignore-parent-flow     → position: absolute (removed from flow)
+ *       align: center center   → margin: auto
+ *       text-overflow: shrink  → text-overflow: ellipsis; overflow: hidden; white-space: nowrap
+ *       ui-scale               → transform: scale() (percentage converted to decimal)
+ *       x / y positional props → left / top
+ *       world-blur / wash-color/ brightness / saturation / img-shadow /
+ *       background-img-opacity / background-texture-size / pre-transform-*
+ *       / opacity-mask / sound / tooltip-position  → dropped (no CSS equivalent;
+ *         brightness/saturation approximated via filter where meaningful)
+ *   - Panorama gradient syntax: gradient(linear, x1 y1, x2 y2, from(c), to(c))
+ *       → standard linear-gradient()
+ *     Panorama radial gradient syntax: gradient(radial, cx cy, …, from(c), to(c))
+ *       → standard radial-gradient()
+ *   - box-shadow "fill" keyword (Panorama inset spread) → inset box-shadow
+ *   - Custom element names (Label, Button, DropDown, etc.) kept as-is; they will
+ *     match only if you use matching HTML tag/component names.  Map them to your
+ *     component class names as needed.
+ *   - s2r:// image URLs kept verbatim; replace with your own asset paths.
+ *   - @keyframes quoted names ('Name') → unquoted names (Name) per CSS spec.
+ *   - font-weight values: "semi-bold" → 600, "medium" → 500 (CSS spec keywords).
+ *   - Panorama's "border: Npx solid color&00" alpha-zero borders are preserved
+ *     purely for layout spacing parity; they are visually transparent.
+ */
+
+/* ─────────────────────────────────────────────
+   CSS Custom Properties  (formerly @define)
+   ───────────────────────────────────────────── */
+:root {
+  /* Typography stacks */
+  --sans: "Retail Demo", "Noto Sans", sans-serif;
+  --sansMono: "Retail Text Demo", "Noto Sans";
+  --serif: Reaver, serif;
+  --block: VALVEPulp, "Noto Sans", sans-serif;
+  --oracle: VALVEOccult, Reaver, sans-serif;
+  --numericSans: MingLiu, "Retail Demo", "Noto Sans", sans-serif;
+  --numericSerif: Gulim, Reaver, serif;
+
+  /* Core palette */
+  --baseText: #FFEFD7;
+  --baseBorder: #444444ff;
+  --selectedTextBackgroundColor: #66666633;
+  --colorEnemy: #FF410D;
+  --goldColor: #FFED79;
+  --blueAPTextColor: #80EEFF;
+  --colorCommonOffWhite: rgb(243, 240, 231);
+  --colorCommonOffWhiteA35: rgba(243, 240, 231, 0.35);
+  --colorCommonDarkGray: #2e2c27;
+  --colorCommonDarkestGray: #1a1a1a;
+  --colorGold: #FFED79;
+  --offWhite: #FFEFD7;
+  --offBlack: #10130D;
+  --silvered: #C6C6C6;
+  --soulColor: #70F8C1;
+  --shardColor: #99FFD6;
+  --brandGreen: #5FE69E;
+  --ritualGreen: #65951D;
+  --ritualGreenLight: #7CBC1D;
+  --geistBookColor: #33A357;
+  --geistBookDarkColor: #0E381B;
+  --buildsColor: #4D7EC8;
+  --buildsDarkColor: #365B92;
+  --buildsDarkerColor: #243650;
+  --buildsLightColor: #85B5FF;
+  --steamBlue: #1A9FFF;
+  --colorUpgrades: #00FFFF;
+  --apCurrencyColor: #d8b8ff;
+
+  /* Team colors */
+  --team1Color: #BF9A53;
+  --team1ColorBright: #FBDCA0;
+  --team1ColorDark: #937600;
+  --team1ColorDarker: #423A1D;
+  --team1ColorNeutral: #55503E;
+  --team2Color: #5B79E6;
+  --team2ColorBright: #BDCBFF;
+  --team2ColorDark: #4156A0;
+  --team2ColorDarker: #243265;
+  --team2ColorNeutral: #54596C;
+
+  /* Attribute colors */
+  --courageLightColor: #FFD18D;
+  --courageBrightColor: #EC9719;
+  --courageColor: #9D620B;
+  --courageDarkColor: #7F540E;
+  --courageDarkerColor: #302306;
+  --fortitudeLightColor: #D3FC96;
+  --fortitudeBrightColor: #7BBA1D;
+  --fortitudeColor: #649717;
+  --fortitudeDarkColor: #4C7113;
+  --fortitudeDarkerColor: #1F3400;
+  --spiritLightColor: #E7C8FF;
+  --spiritBrightColor: #CE90FF;
+  --spiritColor: #8A55B3;
+  --spiritDarkColor: #613484;
+  --spiritDarkerColor: #362147;
+
+  /* Item category colors */
+  --weaponColor: #E58A00;
+  --weaponColorFaded: #FFA82622;
+  --armorColor: #00FF99;
+  --armorColorFaded: #00FF9922;
+  --techColor: #00DDFF;
+  --techColorFaded: #245359;
+  --favColor: #FFDB4C;
+  --weaponColorBright: #E58A00;
+  --weaponColorMedium: #C87903;
+  --weaponColorDark: #7F4F05;
+  --armorColorBright: #00F794;
+  --armorColorMedium: #00A664;
+  --armorColorDark: #274C3D;
+  --techColorBright: #00DDFF;
+  --techColorMedium: #009BB2;
+  --techColorDark: #245359;
+
+  /* Default BG */
+  --defaultBGColor1: #333333;
+  --defaultBGColor2: #404040;
+  --defaultBGColor3: #4D4D4D;
+  --defaultBGColor4: #595959;
+
+  /* Rank colors */
+  --rank0Color: #333333;
+  --rank1Color: #6A3E1E;
+  --rank2Color: #882355;
+  --rank3Color: #5C6DAB;
+  --rank4Color: #719C47;
+  --rank5Color: #DDA326;
+  --rank6Color: #EE4F57;
+  --rank7Color: #B47FEB;
+  --rank8Color: #955138;
+  --rank9Color: #7C7C7C;
+  --rank10Color: #C39751;
+  --rank11Color: #5CE9A9;
+
+  /* Hero colors */
+  --abramsColor: #2092AE;
+  --bookwormColor: #258F63;
+  --priestColor: #7354CA;
+  --frankColor: #658B6F;
+  --drifterColor: #9D2C2B;
+  --doormanColor: #B77528;
+  --magicianColor: #6B6B6B;
+  --vampirebatColor: #A9171E;
+  --vampirebatColorDk: #200B0B;
+  --viperColor: #A7AD00;
+  --punkgoatColor: #D4AD0E;
+  --atlasColor: #2092AE;
+  --astroColor: #A35A1B;
+  --bebopColor: #9F4734;
+  --chronoColor: #983952;
+  --forgeColor: #23549D;
+  --ghostColor: #218440;
+  --gigawattColor: #CC861E;
+  --hazeColor: #AC6133;
+  --hazeColorDk: #20130A;
+  --hornetColor: #A2C7E5;
+  --infernoColor: #C93C26;
+  --tenguColor: #9D8CA9;
+  --kelvinColor: #74ABBC;
+  --lashColor: #4174BB;
+  --mirageColor: #6A2E68;
+  --krillColor: #C58428;
+  --orionColor: #5EB083;
+  --synthColor: #858617;
+  --nanoColor: #572798;
+  --shivColor: #E52A68;
+  --dynamoColor: #D0B945;
+  --viscousColor: #319826;
+  --wardenColor: #4D68A3;
+  --wraithColor: #944D78;
+  --wreckerColor: #7F2DB1;
+  --yamatoColor: #625789;
+
+  /* Lane colors */
+  --laneYellowColor: #F9D506;
+  --laneBlueColor: #437CDC;
+  --lanePurpleColor: #C241A8;
+  --laneGreenColor: #309746;
+
+  /* Additional hero colors */
+  --akimboColor: #C7B4AB;
+  --ballistaColor: #BD63A4;
+  --kaliColor: #D7AE61;
+
+  /* UI colors */
+  --keybindBGColor: #e8e4ea;
+  --keybindHousingBGColor: #ACA395;
+  --ominousGreen: #69e799;
+  --deeplyOminousGreen: #47A36C;
+  --alternateProgressBarYellow: #9DCF40;
+  --vivaciousGreen: #142304;
+  --debuffColor: #D74949;
+  --silencedDebuffColor: #bc1dca;
+  --stunnedDebuffColor: #ff0000;
+  --stunnedColor: #5e3a3a;
+
+  /* Timing */
+  --ContextMenuFadoutTime: 0.2s;
+  --contextmenu_zindex: 10000100;
+  --toastExitDuration: 0.1s;
+  --mousepanningcursorsize: 64px;
+}
+
+/* ─────────────────────────────────────────────
+   Base element defaults
+   ───────────────────────────────────────────── */
+
+Label {
+  color: var(--offWhite);
+  font-size: 18px;
+  font-family: var(--sans);
+}
+
+/* ─────────────────────────────────────────────
+   Layout utility classes
+   ───────────────────────────────────────────── */
+
+.LeftRightFlow {
+  display: flex;
+  flex-direction: row;
+}
+
+.TopBottomFlow {
+  display: flex;
+  flex-direction: column;
+}
+
+/* horizontal-align: center on a flex container = justify-content: center
+   on a block element it maps to text-align: center + margin: auto */
+.AlignHorizontalCenter {
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.AlignVerticalCenter {
+  align-items: center;
+}
+
+/* fill-parent-flow(1.0) → flex: 1 (takes up remaining space in flex parent) */
+.FillWidth {
+  flex: 1;
+  width: 100%;
+}
+
+.FillHeight {
+  flex: 1;
+  height: 100%;
+}
+
+.Hidden {
+  visibility: collapse;
+}
+
+/* ─────────────────────────────────────────────
+   Typography utility classes
+   ───────────────────────────────────────────── */
+
+.display {
+  font-family: var(--serif);
+}
+
+.silvered {
+  color: var(--silvered);
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.align_center {
+  text-align: center;
+  justify-content: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.h1 {
+  font-size: 70px;
+  font-weight: bold;
+}
+
+/* offWhite&88 → #FFEFD788 */
+.h2 {
+  font-size: 40px;
+  font-weight: bold;
+  font-family: var(--block);
+  color: #FFEFD788;
+}
+
+.h3 {
+  font-size: 30px;
+  font-weight: bold;
+}
+
+.h4 {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.body_lg {
+  font-size: 26px;
+  font-weight: 500;
+}
+
+/* offWhite&44 → #FFEFD744 */
+.body_md {
+  font-size: 18px;
+  font-weight: 500;
+  color: #FFEFD744;
+}
+
+.body_sm {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.body_xs {
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+/* offWhite&aa → #FFEFD7AA */
+#TitleLabel {
+  max-width: 600px;
+  color: #FFEFD7AA;
+}
+
+/* ─────────────────────────────────────────────
+   Button: sound declarations
+   (sound: is a Panorama-only property; dropped)
+   ───────────────────────────────────────────── */
+
+/* Button:hover  { sound: "UI.MainMenu.Hover"; }     — dropped */
+/* Button:active { sound: "UI.MainMenu.Activate"; }  — dropped */
+
+/* ─────────────────────────────────────────────
+   PrimaryButton
+   ───────────────────────────────────────────── */
+
+.PrimaryButton {
+  background-size: cover;
+  /* border-image using Panorama s2r:// asset kept verbatim; replace path as needed */
+  border: 15px solid #C6C6C600;
+  border-image: url("s2r://panorama/images/global/btn_primary_frame.vsvg");
+  border-image-slice: 20 fill;
+  border-image-width: 20px;
+  border-image-outset: 8px;
+  border-image-repeat: repeat;
+  padding: 0px 10px;
+  height: 70px;
+  margin: 8px;
+  transition-property: background-color;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+.PrimaryButton Label {
+  font-size: 34px;
+  color: var(--offBlack);
+  font-family: var(--serif);
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.PrimaryButton:enabled:hover {
+  /* wash-color has no CSS equivalent; brightness filter approximates highlight */
+  filter: brightness(1.15);
+}
+
+.PrimaryButton:disabled {
+  opacity: 0.3;
+  filter: brightness(0.3);
+}
+
+.PrimaryButton:active Label {
+  transform: translateY(1px);
+}
+
+.PrimaryButton:active {
+  filter: brightness(0.8);
+}
+
+.PrimaryButton.dark {
+  border: 15px solid #10130D00;
+  border-image: url("s2r://panorama/images/global/btn_primary_frame_drk.vsvg");
+}
+
+.PrimaryButton.dark Label {
+  color: var(--silvered);
+}
+
+/* .PrimaryButton:disabled duplicated in source; kept once above */
+
+.PrimaryButton.dark:hover Label {
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────
+   SecondaryButton
+   ───────────────────────────────────────────── */
+
+/* offWhite&44 → #FFEFD744 */
+.SecondaryButton {
+  border: 2px solid #FFEFD744;
+  padding: 6px 15px;
+  border-radius: 50px;
+  margin: 8px;
+  display: inline-flex;
+  align-items: center;
+  transition-property: background-color, border;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+.SecondaryButton Label {
+  font-size: 18px;
+  /* offWhite&44 */
+  color: #FFEFD744;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+  text-align: center;
+  font-family: var(--block);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition-property: color;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+/* offWhite&60 → #FFEFD760 */
+.SecondaryButton:enabled:hover {
+  background-color: #FFEFD760;
+}
+
+.SecondaryButton:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+.SecondaryButton:disabled {
+  opacity: 0.3;
+  filter: brightness(0.3);
+}
+
+.SecondaryButton:active Label {
+  transform: translateY(1px);
+}
+
+.SecondaryButton:active {
+  filter: brightness(0.8);
+}
+
+.SecondaryButton.hasIcon {
+  display: flex;
+  flex-direction: row;
+}
+
+.SecondaryButton.small Label {
+  font-size: 16px;
+}
+
+/* offWhite&60 defined above on hover */
+
+/* silvered&50 → #C6C6C680 */
+.SecondaryButton.light {
+  border: 2px solid #C6C6C680;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.SecondaryButton.light Label {
+  color: #C6C6C6E6;
+}
+
+.SecondaryButton.light:enabled:hover {
+  background-color: var(--silvered);
+  border: 2px solid #C6C6C600;
+}
+
+.SecondaryButton.light:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+/* offBlack&50 → #10130D80 */
+.SecondaryButton.dark {
+  border: 2px solid #10130D80;
+}
+
+/* offBlack&90 → #10130DE6 */
+.SecondaryButton.dark Label {
+  color: #10130DE6;
+}
+
+.SecondaryButton.dark:enabled:hover {
+  background-color: var(--offBlack);
+}
+
+.SecondaryButton.dark:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+.SecondaryButton.green {
+  border: 2px solid var(--ritualGreen);
+}
+
+.SecondaryButton.green Label {
+  color: var(--offWhite);
+}
+
+.SecondaryButton.green:enabled:hover {
+  background-color: var(--ritualGreen);
+}
+
+.SecondaryButton.green:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* offWhite&44 → #FFEFD744 */
+.SecondaryButton.light.fill {
+  background-color: #FFEFD744;
+  border: 2px solid #FFEFD700;
+}
+
+.SecondaryButton.light.fill Label {
+  color: var(--offBlack);
+}
+
+/* offWhite&88 → #FFEFD788 */
+.SecondaryButton.light.fill:enabled:hover {
+  background-color: #FFEFD788;
+}
+
+.SecondaryButton.light.fill:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+/* offBlack&50 → #10130D80 */
+.SecondaryButton.dark.fill {
+  background-color: #10130D80;
+  border: 0px solid #10130D00;
+}
+
+.SecondaryButton.dark.fill Label {
+  color: var(--offWhite);
+}
+
+.SecondaryButton.dark.fill:enabled:hover {
+  background-color: var(--offBlack);
+}
+
+.SecondaryButton.dark.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* colorEnemy&50 → #FF410D80 */
+.SecondaryButton.red {
+  border: 2px solid #FF410D80;
+}
+
+/* colorEnemy&90 → #FF410DE6 */
+.SecondaryButton.red.dark {
+  border: 2px solid #FF410DE6;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.SecondaryButton.red Label {
+  color: #C6C6C6E6;
+}
+
+.SecondaryButton.red.dark Label {
+  color: var(--offBlack);
+}
+
+/* Second :hover rule from source overrides first (kept as-is) */
+.SecondaryButton.red:enabled:hover {
+  border: 2px solid #FF410DE6;
+  background-color: var(--colorEnemy);
+}
+
+.SecondaryButton.red:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* colorEnemy&70 → #FF410DB3 */
+.SecondaryButton.red.fill {
+  background-color: #FF410DB3;
+  border: 0px solid #FF410D00;
+}
+
+.SecondaryButton.red.fill Label {
+  color: var(--offWhite);
+}
+
+.SecondaryButton.red.fill:enabled:hover {
+  background-color: var(--colorEnemy);
+}
+
+.SecondaryButton.red.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* ritualGreen&50 → #65951D80 */
+.SecondaryButton.green.fill {
+  background-color: #65951D80;
+  border: 0px solid #65951D00;
+}
+
+.SecondaryButton.green.fill Label {
+  color: var(--offWhite);
+}
+
+.SecondaryButton.green.fill:enabled:hover {
+  background-color: var(--ritualGreen);
+}
+
+.SecondaryButton.green.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* ─────────────────────────────────────────────
+   TertiaryButton
+   ───────────────────────────────────────────── */
+
+/* silvered&50 → #C6C6C680 */
+.TertiaryButton {
+  border: 2px solid #C6C6C680;
+  padding: 6px 15px;
+  border-radius: 50px;
+  margin: 8px;
+  display: inline-flex;
+  align-items: center;
+  transition-property: background-color, border;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.TertiaryButton Label {
+  font-size: 18px;
+  color: #C6C6C6E6;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition-property: color;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+/* offWhite&60 → #FFEFD760 */
+.TertiaryButton:enabled:hover {
+  background-color: #FFEFD760;
+}
+
+.TertiaryButton:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+.TertiaryButton:disabled {
+  opacity: 0.3;
+  filter: brightness(0.3);
+}
+
+.TertiaryButton:active Label {
+  transform: translateY(1px);
+}
+
+.TertiaryButton:active {
+  filter: brightness(0.8);
+}
+
+/* sound: "ui_quit_menu_fadeout" — dropped */
+.TertiaryButton.Activated {
+}
+
+.TertiaryButton.hasIcon {
+  display: flex;
+  flex-direction: row;
+}
+
+.TertiaryButton.small Label {
+  font-size: 16px;
+}
+
+/* silvered&50 → #C6C6C680 */
+.TertiaryButton.light {
+  border: 2px solid #C6C6C680;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.TertiaryButton.light Label {
+  color: #C6C6C6E6;
+}
+
+.TertiaryButton.light:enabled:hover {
+  background-color: var(--silvered);
+  border: 2px solid #C6C6C600;
+}
+
+.TertiaryButton.light:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+/* offBlack&50 → #10130D80 */
+.TertiaryButton.dark {
+  border: 2px solid #10130D80;
+}
+
+/* offBlack&90 → #10130DE6 */
+.TertiaryButton.dark Label {
+  color: #10130DE6;
+}
+
+.TertiaryButton.dark:enabled:hover {
+  background-color: var(--offBlack);
+}
+
+.TertiaryButton.dark:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+.TertiaryButton.green {
+  border: 2px solid var(--ritualGreen);
+}
+
+.TertiaryButton.green Label {
+  color: var(--offWhite);
+}
+
+.TertiaryButton.green:enabled:hover {
+  background-color: var(--ritualGreen);
+}
+
+.TertiaryButton.green:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* silvered&aa → #C6C6C6AA */
+.TertiaryButton.light.fill {
+  background-color: #C6C6C6AA;
+  border: 2px solid #C6C6C600;
+}
+
+.TertiaryButton.light.fill Label {
+  color: var(--offBlack);
+}
+
+.TertiaryButton.light.fill:enabled:hover {
+  background-color: var(--offWhite);
+}
+
+.TertiaryButton.light.fill:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+/* offBlack&50 → #10130D80 */
+.TertiaryButton.dark.fill {
+  background-color: #10130D80;
+  border: 0px solid #10130D00;
+}
+
+.TertiaryButton.dark.fill Label {
+  color: var(--offWhite);
+}
+
+.TertiaryButton.dark.fill:enabled:hover {
+  background-color: var(--offBlack);
+}
+
+.TertiaryButton.dark.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* colorEnemy&50 → #FF410D80 */
+.TertiaryButton.red {
+  border: 2px solid #FF410D80;
+}
+
+/* colorEnemy&90 → #FF410DE6 */
+.TertiaryButton.red.dark {
+  border: 2px solid #FF410DE6;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.TertiaryButton.red Label {
+  color: #C6C6C6E6;
+}
+
+.TertiaryButton.red.dark Label {
+  color: var(--offBlack);
+}
+
+/* Second :hover rule from source overrides first */
+.TertiaryButton.red:enabled:hover {
+  border: 2px solid #FF410DE6;
+  background-color: var(--colorEnemy);
+}
+
+.TertiaryButton.red:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* colorEnemy&70 → #FF410DB3 */
+.TertiaryButton.red.fill {
+  background-color: #FF410DB3;
+  border: 0px solid #FF410D00;
+}
+
+.TertiaryButton.red.fill Label {
+  color: var(--offWhite);
+}
+
+.TertiaryButton.red.fill:enabled:hover {
+  background-color: var(--colorEnemy);
+}
+
+.TertiaryButton.red.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* ritualGreen&50 → #65951D80 */
+.TertiaryButton.green.fill {
+  background-color: #65951D80;
+  border: 0px solid #65951D00;
+}
+
+.TertiaryButton.green.fill Label {
+  color: var(--offWhite);
+}
+
+.TertiaryButton.green.fill:enabled:hover {
+  background-color: var(--ritualGreen);
+}
+
+.TertiaryButton.green.fill:enabled:hover Label {
+  color: var(--offWhite);
+}
+
+/* ─────────────────────────────────────────────
+   Shared icon + button helpers
+   ───────────────────────────────────────────── */
+
+.buttonIcon {
+  margin-right: 5px;
+  width: 15px;
+  height: 15px;
+  background-repeat: no-repeat;
+}
+
+.iconOnly .buttonIcon {
+  margin-right: 0px;
+}
+
+/* SecondaryButton.light icon tint (wash-color → filter approximation) */
+.SecondaryButton.light .buttonIcon {
+  /* wash-color: silvered — approximated */
+  filter: brightness(0.78);
+}
+
+.SecondaryButton.light.outline:hover .buttonIcon {
+  filter: none;
+}
+
+.TertiaryButton.light .buttonIcon {
+  filter: brightness(0.78);
+}
+
+.TertiaryButton.light.outline:hover .buttonIcon {
+  filter: none;
+}
+
+.TertiaryButton.light.fill .buttonIcon {
+  filter: none;
+}
+
+.TertiaryButton.light.fill:hover .buttonIcon {
+  filter: none;
+}
+
+.SecondaryButton.light.fill .buttonIcon {
+  filter: none;
+}
+
+.SecondaryButton.light.fill:hover .buttonIcon {
+  filter: none;
+}
+
+.SecondaryButton.red .buttonIcon {
+  filter: brightness(0.78);
+}
+
+.SecondaryButton.red:hover .buttonIcon {
+  filter: brightness(0.78);
+}
+
+.TertiaryButton.red .buttonIcon {
+  filter: brightness(0.78);
+}
+
+.TertiaryButton.red:hover .buttonIcon {
+  filter: brightness(0.78);
+}
+
+/* ─────────────────────────────────────────────
+   LinkButton
+   ───────────────────────────────────────────── */
+
+.LinkButton {
+  display: inline-flex;
+  align-items: center;
+  transition-property: background-color, border;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+/* silvered&90 → #C6C6C6E6 */
+.LinkButton Label {
+  font-size: 18px;
+  color: #C6C6C6E6;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 2px solid #C6C6C6E6;
+  margin-bottom: 2px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition-property: color;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+.LinkButton:hover Label {
+  color: var(--offWhite);
+}
+
+/* ─────────────────────────────────────────────
+   Gold / Soul icon
+   ───────────────────────────────────────────── */
+
+.goldIcon {
+  background-image: url("s2r://panorama/images/hud/icons/icon_soul.vsvg");
+  height: 26px;
+  width: 15px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+/* ─────────────────────────────────────────────
+   Info icon
+   ───────────────────────────────────────────── */
+
+/* tooltip-position: right — dropped */
+#InfoIcon,
+.InfoIcon {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  width: 18px;
+  background-size: 100% 100%;
+  background-image: url("s2r://panorama/images/control_icons/info_icon.vsvg");
+  z-index: 3;
+  transition-property: filter;
+  filter: brightness(0.2);
+  transition-duration: 0.2s;
+}
+
+#InfoIcon:hover,
+.InfoIcon:hover {
+  filter: brightness(0.7);
+}
+
+/* ─────────────────────────────────────────────
+   Page title
+   ───────────────────────────────────────────── */
+
+.PageTitle Label {
+  font-size: 48px;
+  font-family: var(--block);
+  color: var(--offWhite);
+  text-align: center;
+  display: flex;
+  justify-content: center;
+}
+
+/* ─────────────────────────────────────────────
+   Unlocalized text warning
+   ───────────────────────────────────────────── */
+
+Label.ProbablyUnlocalizedText {
+  background-color: red;
+  color: yellow;
+  animation-name: ProbablyUnlocalizedAnimation;
+  animation-duration: 0.4s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* ─────────────────────────────────────────────
+   TextEntry
+   ───────────────────────────────────────────── */
+
+TextEntry {
+  border: 1px solid var(--baseBorder);
+  width: 352px;
+  height: 36px;
+  padding: 4px 7px 3px 7px;
+  background-color: #00000050;
+  font-size: 18px;
+  color: var(--offWhite);
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+TextEntry:disabled {
+  border-color: #44444440;
+  background: linear-gradient(to bottom, #11111140, #22222240);
+  color: #999999ff;
+}
+
+TextEntry #PlaceholderText {
+  opacity: 0.3;
+  transition-property: opacity;
+  transition-duration: 0.2s;
+  margin-top: 2px;
+  color: var(--offWhite);
+  font-size: 18px;
+  font-weight: 500;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+TextEntry:focus #PlaceholderText,
+TextEntry.HasInput #PlaceholderText {
+  opacity: 0;
+}
+
+/* ─────────────────────────────────────────────
+   IME candidate rows
+   ───────────────────────────────────────────── */
+
+.TextEntryIMECandidateRow {
+  display: flex;
+  flex-direction: row;
+  background-color: #000000;
+}
+
+.TextEntryIMECandidateRowPrefix {
+  font-size: 20px;
+  font-weight: normal;
+  color: #FFFFFF;
+  background-color: #000000;
+  display: flex;
+  align-items: center;
+}
+
+.TextEntryIMECandidateRowSuffix {
+  font-size: 25px;
+  font-weight: normal;
+  color: #FFFFFF;
+  background-color: #333333;
+  display: flex;
+  align-items: center;
+}
+
+.TextEntryIMECandidateRow.Highlight .TextEntryIMECandidateRowSuffix {
+  background-color: #4444FF;
+}
+
+.TextEntryIMEReadingString {
+  font-size: 20px;
+  font-weight: normal;
+  color: #DDDDDD;
+  background-color: #333333;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  padding: 5px;
+  border: 1px solid #FFFFFF;
+}
+
+.TextEntryIMEReadingString.NoReadingString {
+  visibility: collapse;
+}
+
+.TextEntryIMECandidateList {
+  color: #DDDDDD;
+  background-color: #333333;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #FFFFFF;
+}
+
+TextEntryIMEControls {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─────────────────────────────────────────────
+   TextEntryAutocomplete
+   ───────────────────────────────────────────── */
+
+TextEntryAutocomplete {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  background-color: #3d4448;
+  color: #e1e1e1;
+  font-size: 28px;
+  overflow-y: auto;
+  z-index: 0;
+  opacity: 1;
+  box-shadow: 0px 0px 6px 0px #00000066;
+}
+
+TextEntryAutocomplete > Label {
+  width: 100%;
+  padding: 6px 0px 2px 16px;
+  margin: 0px;
+  color: #ffffff99;
+  background-color: #3d4448;
+  font-size: 18px;
+  font-weight: normal;
+  z-index: 0;
+  border-top: 1px solid #00000066;
+  border-bottom: 1px solid #00000066;
+  transition-property: background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-in-out;
+}
+
+TextEntryAutocomplete > Label:hover {
+  background-color: #585e62;
+}
+
+TextEntryAutocomplete > Label:focus {
+  background-color: #585e62;
+}
+
+TextEntry.ThinTextEntry {
+  height: 32px;
+  font-size: 18px;
+}
+
+/* ─────────────────────────────────────────────
+   PopupButton
+   ───────────────────────────────────────────── */
+
+/* offWhite&44 → #FFEFD744 */
+.PopupButton {
+  border: 2px solid #FFEFD744;
+  padding: 0px 10px;
+  border-radius: 50px;
+  margin: 8px;
+  display: inline-flex;
+  align-items: center;
+  transition-property: background-color, border;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+/* offWhite&44 → #FFEFD744 */
+.PopupButton Label {
+  font-size: 18px;
+  color: #FFEFD744;
+  font-family: var(--block);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px 4px;
+  margin-bottom: 2px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition-property: color;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+/* offWhite&60 → #FFEFD760 */
+.PopupButton:enabled:hover {
+  background-color: #FFEFD760;
+}
+
+.PopupButton:enabled:hover Label {
+  color: var(--offBlack);
+}
+
+.PopupButton:disabled {
+  opacity: 0.3;
+  filter: brightness(0.3);
+}
+
+.PopupButton:active Label {
+  transform: translateY(1px);
+}
+
+.PopupButton:active {
+  filter: brightness(0.8);
+}
+
+/* ─────────────────────────────────────────────
+   DropDown / CitadelSettingsEnumDropDown
+   ───────────────────────────────────────────── */
+
+DropDown,
+CitadelSettingsEnumDropDown {
+  background: linear-gradient(to bottom, #292e2e, #191e1e);
+  background-image: url("s2r://panorama/images/control_icons/arrow_dropdown_png.vtex");
+  background-repeat: no-repeat;
+  background-position: right 38px center;
+  background-size: 32px 32px;
+  box-shadow: 0px 0px 1px 3px #00000055;
+  border: 2px solid #5e686966;
+  font-size: 24px;
+  width: 352px;
+  height: 36px;
+  padding: 4px 8px;
+  z-index: 1;
+  transition-property: background-color, border;
+  transition-duration: 0.15s;
+  transition-timing-function: linear;
+}
+
+DropDown:enabled:hover,
+CitadelSettingsEnumDropDown:enabled:hover {
+  background: linear-gradient(to bottom, #393e3e, #292e2e);
+}
+
+DropDown:focus .TickBox,
+CitadelSettingsEnumDropDown:focus .TickBox {
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+DropDown:disabled {
+  background: linear-gradient(to bottom, #292e2e, #191e1e);
+  border: 2px solid #3b414266;
+  background-image: url("s2r://panorama/images/control_icons/arrow_dropdown_disabled_png.vtex");
+}
+
+DropDown.DropDownMenuVisible:focus,
+CitadelSettingsEnumDropDown.DropDownMenuVisible:focus {
+  animation-name: none;
+}
+
+DropDown Label,
+CitadelSettingsEnumDropDown Label {
+  width: 100%;
+  margin: 0px 29px 0px 6px;
+  font-size: 18px;
+  color: var(--offWhite);
+  transition-property: color;
+  transition-duration: 0.15s;
+  transition-timing-function: linear;
+}
+
+DropDown:focus Label,
+CitadelSettingsEnumDropDown:focus Label {
+  color: white;
+}
+
+DropDown:disabled Label {
+  color: #444444;
+}
+
+DropDown.DropDownMenuVisible:focus Label,
+CitadelSettingsEnumDropDown.DropDownMenuVisible:focus Label {
+  color: white;
+}
+
+/* ─────────────────────────────────────────────
+   DropDownMenu
+   ───────────────────────────────────────────── */
+
+DropDownMenu {
+  width: 352px;
+  display: flex;
+  flex-direction: column;
+  background-color: #3d4448;
+  color: #e1e1e1;
+  font-size: 28px;
+  overflow-y: auto;
+  z-index: 0;
+  transform: translateY(-40px);
+  opacity: 0;
+  transition-property: opacity, transform;
+  transition-duration: 0.15s;
+  transition-timing-function: ease-in;
+  box-shadow: inset 0px 0px 6px 0px #00000066;
+}
+
+DropDownMenu Label {
+  width: 100%;
+  padding: 6px 0px 2px 16px;
+  margin: 0px;
+  font-family: var(--sans);
+  background-color: #3d4448;
+  font-size: 18px;
+  font-weight: 500;
+  opacity: 0.9;
+  z-index: 0;
+  border-top: 1px solid #00000066;
+  border-bottom: 1px solid #00000066;
+  transition-property: background-color;
+  transition-duration: 0.2s;
+  transition-timing-function: ease-in-out;
+}
+
+DropDownMenu Label:hover {
+  background-color: #585e62;
+}
+
+DropDownMenu.DropDownMenuVisible {
+  opacity: 1;
+  max-height: 444px;
+  transform: translateY(0px);
+}
+
+DropDown.ThinDropDown {
+  height: 32px;
+  background-size: 24px 24px;
+  background-position: right 32px center;
+}
+
+.ThinDropDown Label {
+  font-size: 18px;
+}
+
+/* ─────────────────────────────────────────────
+   ToggleButton / CitadelSettingsCheckbox
+   ───────────────────────────────────────────── */
+
+ToggleButton,
+CitadelSettingsCheckbox {
+  display: flex;
+  flex-direction: row;
+  padding: 1px 4px;
+  color: white;
+  transition-property: background-color, box-shadow, color;
+  transition-duration: 0.25s;
+  transition-timing-function: ease-in-out;
+}
+
+ToggleButton .TickBox,
+CitadelSettingsCheckbox .TickBox {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  background-color: black;
+  border: 2px solid #5e686966;
+  box-shadow: 0px 0px 1px 3px #00000055;
+  transition-property: background-color, box-shadow, color, border;
+  transition-duration: 0.20s;
+  transition-timing-function: ease-in-out;
+}
+
+ToggleButton:is([aria-checked="true"]) .TickBox,
+CitadelSettingsCheckbox:is([aria-checked="true"]) .TickBox,
+ToggleButton:checked .TickBox,
+CitadelSettingsCheckbox:checked .TickBox {
+  background: linear-gradient(to bottom, #e7f6f5, #a0d6d7);
+  border: 3px solid #000000;
+  box-shadow: 0px 0px 8px 0px #5b62bf77;
+}
+
+ToggleButton:hover .TickBox,
+CitadelSettingsCheckbox:hover .TickBox {
+  border: 2px solid #697879;
+}
+
+ToggleButton Label,
+CitadelSettingsCheckbox Label {
+  font-size: 16px;
+  margin-left: 8px;
+  color: var(--baseText);
+  transition-property: color;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+ToggleButton:enabled:hover Label,
+CitadelSettingsCheckbox:enabled:hover Label {
+  color: #d2d6d1;
+}
+
+ToggleButton:is([aria-checked="true"]) Label,
+CitadelSettingsCheckbox:is([aria-checked="true"]) Label,
+ToggleButton:checked Label,
+CitadelSettingsCheckbox:checked Label {
+  color: white;
+}
+
+ToggleButton:disabled Label,
+CitadelSettingsCheckbox:disabled Label {
+  color: #333333;
+}
+
+ToggleButton:disabled .TickBox,
+CitadelSettingsCheckbox:disabled .TickBox {
+  border-color: #333333;
+}
+
+ToggleButton:disabled:is([aria-checked="true"]) .TickBox,
+CitadelSettingsCheckbox:disabled:is([aria-checked="true"]) .TickBox,
+ToggleButton:disabled:checked .TickBox,
+CitadelSettingsCheckbox:disabled:checked .TickBox {
+  background: linear-gradient(to bottom, #222222, #333333);
+  border: 3px solid #000000;
+  box-shadow: 0px 0px 8px 0px #33333377;
+}
+
+/* ─────────────────────────────────────────────
+   RadioButton
+   ───────────────────────────────────────────── */
+
+RadioButton {
+  background-color: transparent;
+  display: flex;
+  flex-direction: row;
+  color: white;
+  transition-property: background-color, box-shadow, color, filter;
+  transition-duration: 0.25s;
+  transition-timing-function: ease-in-out;
+}
+
+RadioButton > .RadioBox {
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #000000 0%, #000000 100%);
+  border: 2px solid #8c7e7022;
+  box-shadow: 0px 0px 1px 3px #00000055;
+  transition-property: background-color, box-shadow, color, border;
+  transition-duration: 0.20s;
+  transition-timing-function: ease-in-out;
+}
+
+RadioButton:is([aria-checked="true"]) > .RadioBox,
+RadioButton:checked > .RadioBox {
+  background: radial-gradient(circle at 50% 50%, var(--offWhite) 0%, #8c7e70 100%);
+  background-color: var(--offWhite);
+  border: 3px solid #000000;
+  box-shadow: 0px 0px 6px 0px #8c7e7033;
+  transition-property: background-color;
+  transition-duration: 0.5s;
+  transition-timing-function: ease-in-out;
+}
+
+RadioButton:enabled:hover > .RadioBox {
+  border: 2px solid #8c7e7044;
+}
+
+RadioButton:enabled:is([aria-checked="true"]):hover > .RadioBox,
+RadioButton:enabled:checked:hover > .RadioBox {
+  border: 3px solid #000000;
+}
+
+/* offWhite&44 → #FFEFD744 */
+RadioButton > Label {
+  color: #FFEFD744;
+  margin-left: 8px;
+  font-size: 16px;
+  transition-property: color;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+CitadelSettingsEnum RadioButton > Label {
+  font-size: 18px;
+  color: #7d8688;
+}
+
+RadioButton:is([aria-checked="true"]) > Label,
+RadioButton:checked > Label {
+  color: var(--offWhite);
+  transition-property: color, text-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+RadioButton:enabled:hover > Label {
+  color: var(--offWhite);
+  transition-property: color;
+  transition-duration: 0.2s;
+  transition-timing-function: linear;
+}
+
+RadioButton:disabled > .RadioBox {
+  color: transparent;
+  box-shadow: 0px 0px 8px 0px #33333377;
+  background-color: #00000000;
+}
+
+RadioButton:disabled:is([aria-checked="true"]) > .RadioBox,
+RadioButton:disabled:checked > .RadioBox {
+  background: radial-gradient(circle at 50% 50%, #e7f6f533 0%, #33339933 100%);
+}
+
+RadioButton:disabled > Label {
+  color: #333333;
+}
+
+/* ─────────────────────────────────────────────
+   Slider
+   ───────────────────────────────────────────── */
+
+Slider {
+  width: 30px;
+  height: 130px;
+  margin-bottom: 20px;
+}
+
+#ReticleSection Slider {
+  margin-bottom: 10px;
+}
+
+/* align: center center → margin: auto */
+#SliderTrack {
+  height: 120px;
+  width: 16px;
+  background-color: black;
+  margin: auto;
+  border: 2px solid #5e686966;
+  box-shadow: 0px 0px 1px 3px #00000055;
+  z-index: 2;
+}
+
+SlottedSlider.HorizontalSlider .SliderNotch {
+  margin-top: 14px;
+  border-bottom: 2px solid #5e686966;
+  border-left: 2px solid #5e686966;
+  border-right: 2px solid #5e686966;
+  background-color: black;
+  width: 12px;
+  height: 12px;
+  align-self: flex-end;
+  z-index: 3;
+}
+
+#SliderTrackProgress {
+  width: 10px;
+  height: 99%;
+  background: linear-gradient(to top, #222222FF, #444f52FF);
+  margin: auto;
+  border-radius: 3px;
+  z-index: 3;
+}
+
+#SliderThumb {
+  background: radial-gradient(ellipse at 45% 45%, #91a5b9, #444f52);
+  border-radius: 13%;
+  width: 30px;
+  height: 16px;
+  box-shadow: 7px 1px 11px 0px black;
+  z-index: 4;
+}
+
+ClientUIDialogPanel #SliderThumb {
+  box-shadow: none;
+}
+
+#SliderThumb:hover {
+  background: radial-gradient(ellipse at 45% 45%, #b8c5d3, #444f52);
+}
+
+Slider.HorizontalSlider,
+SlottedSlider.HorizontalSlider {
+  width: 420px;
+  height: 30px;
+}
+
+Slider.HorizontalSlider #SliderTrack,
+SlottedSlider.HorizontalSlider #SliderTrack {
+  height: 16px;
+  width: 100%;
+  padding: 10px;
+}
+
+Slider.HorizontalSlider #SliderTrackProgress,
+SlottedSlider.HorizontalSlider #SliderTrackProgress {
+  width: 100%;
+  height: 10px;
+  background: linear-gradient(to right, #222222FF, #444f52FF);
+  box-shadow: inset -2px 1px 3px 0px black;
+  margin-left: 1px;
+}
+
+Slider.HorizontalSlider #SliderTrackProgress:disabled,
+SlottedSlider.HorizontalSlider #SliderTrackProgress:disabled {
+  width: 100%;
+  height: 10px;
+  background: linear-gradient(to right, #010101FF, #333333FF);
+  box-shadow: inset -2px 1px 3px 0px black;
+  margin-left: 1px;
+}
+
+Slider.HorizontalSlider #SliderThumb,
+SlottedSlider.HorizontalSlider #SliderThumb {
+  background: radial-gradient(ellipse at 45% 45%, #91a5b9, #444f52);
+  border-radius: 13%;
+  width: 16px;
+  height: 30px;
+}
+
+Slider.HorizontalSlider #SliderThumb:hover,
+SlottedSlider.HorizontalSlider #SliderThumb:hover {
+  background: radial-gradient(ellipse at 45% 45%, #b8c5d3, #444f52);
+}
+
+Slider.HorizontalSlider #SliderThumb:disabled,
+SlottedSlider.HorizontalSlider #SliderThumb:disabled {
+  background-color: #333333;
+}
+
+.SliderTick {
+  width: 4px;
+  height: 14px;
+  background-color: #3B4242;
+}
+
+/* ─────────────────────────────────────────────
+   ButtonBevel
+   ───────────────────────────────────────────── */
+
+.ButtonBevel {
+  background: linear-gradient(to bottom, #373d45, #4d5860);
+  border-style: solid;
+  border-width: 1px;
+  padding: 4px 10px;
+  transition-property: background-color, opacity;
+  transition-duration: 0.05s;
+  transition-timing-function: linear;
+  box-shadow: 0px 0px 4px 0px #00000055;
+  min-width: 192px;
+  min-height: 36px;
+  border-radius: 8px;
+}
+
+.ButtonBevel.Green {
+  background: linear-gradient(to bottom, #2a481f, #226326);
+}
+
+.ButtonBevel.DarkGreen {
+  background: linear-gradient(to bottom, #1a2c13, #18441b);
+  border-top-color: #223524;
+  border-left-color: #2c4d30;
+  border-bottom-color: #091009;
+  border-right-color: #132615;
+}
+
+.ButtonBevel.Bronze {
+  background: linear-gradient(to bottom, #b9894c, #dca157);
+  border-top-color: #e0a75e;
+  border-left-color: #dca35b;
+  border-bottom-color: #8d683a;
+  border-right-color: #8f6b3c;
+}
+
+.ButtonBevel.Plus {
+  background: linear-gradient(to bottom, #877f4f, #a79c5b);
+  border-top-color: #b4a442;
+  border-left-color: #aea463;
+  border-bottom-color: #635e3b;
+  border-right-color: #756f45;
+}
+
+.ButtonBevel:enabled:hover {
+  background: linear-gradient(to bottom, #4c5561, #6c7d88);
+}
+
+.ButtonBevel.Green:enabled:hover {
+  background: linear-gradient(to bottom, #226528, #288a36);
+}
+
+.ButtonBevel.DarkGreen:enabled:hover {
+  background: linear-gradient(to bottom, #17421b, #185321);
+  border-top-color: #000000;
+  border-left-color: #000000;
+  border-bottom-color: #172a16;
+  border-right-color: #152716;
+}
+
+.ButtonBevel.Bronze:enabled:hover {
+  background: linear-gradient(to bottom, #dda45a, #fcb965);
+  border-top-color: #f2b362;
+  border-left-color: #edb062;
+  border-bottom-color: #966f3e;
+  border-right-color: #966f3e;
+}
+
+.ButtonBevel.Plus:enabled:hover {
+  background: linear-gradient(to bottom, #a79d63, #c2b56b);
+  border-top-color: #cab84b;
+  border-left-color: #c6bb72;
+  border-bottom-color: #7c764b;
+  border-right-color: #8e8755;
+}
+
+.ButtonBevel:disabled {
+  filter: grayscale(1);
+}
+
+.ButtonBevel.Bronze:disabled {
+  filter: grayscale(0.25);
+}
+
+.ButtonBevel.Plus:disabled {
+  filter: grayscale(0.25);
+}
+
+.ButtonBevel:disabled Label {
+  color: #333333;
+}
+
+/* sound: "ui_generic_button_click" — dropped */
+.ButtonBevel:active {
+  background: linear-gradient(to bottom, #393939, #555555);
+}
+
+.ButtonBevel.Green:active {
+  background: linear-gradient(to bottom, #1f3d25, #2b562c);
+}
+
+.ButtonBevel.DarkGreen:active {
+  background: linear-gradient(to bottom, #132416, #183019);
+  border-top-color: #09110a;
+  border-left-color: #0f1b10;
+  border-bottom-color: #1f3820;
+  border-right-color: #172c19;
+}
+
+.ButtonBevel.Bronze:active {
+  background: linear-gradient(to bottom, #4d391f, #9b713c);
+  border-top-color: #684e2d;
+  border-left-color: #6d522f;
+  border-bottom-color: #977242;
+  border-right-color: #906c3f;
+}
+
+.ButtonBevel.Plus:active {
+  color: #DCD086;
+  background: linear-gradient(to bottom, #877f4f, #a79c5b);
+  border-top-color: #635e3b;
+  border-left-color: #756f45;
+  border-bottom-color: #b4a442;
+  border-right-color: #aea463;
+}
+
+.ButtonBevel Label {
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #FFFFFF;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 2px 2px 0px #000000;
+  transition-property: color;
+  transition-duration: 0.35s;
+  transition-timing-function: ease-in-out;
+}
+
+.ButtonBevel:active Label {
+  transform: translateY(1px);
+}
+
+/* ─────────────────────────────────────────────
+   BlueButton
+   ───────────────────────────────────────────── */
+
+.BlueButton {
+  margin: 8px;
+  border: 1px solid #3366aa55;
+  height: 34px;
+  background-color: #3366aa11;
+}
+
+.BlueButton Label {
+  margin: 0px 24px;
+  color: #66aadd;
+  font-size: 16px;
+  letter-spacing: normal;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+}
+
+.BlueButton:enabled:hover Label {
+  color: white;
+}
+
+.BlueButton:enabled:hover {
+  border: 1px solid #22aaffaa;
+  background-color: #3366aa44;
+}
+
+/* sound: "ui_select_blue" — dropped */
+.BlueButton:active {
+  background-color: #23468a44;
+}
+
+.BlueButton:active Label {
+  color: #76baed;
+}
+
+.BlueButton:disabled {
+  filter: grayscale(1) brightness(0.15);
+}
+
+/* ─────────────────────────────────────────────
+   Scrollbars
+   ───────────────────────────────────────────── */
+
+VerticalScrollBar,
+HTMLVerticalScrollBar {
+  width: 8px;
+  margin: 0px 8px;
+  border-radius: 0px;
+  height: 100%;
+  /* layout-position: fixed → position: fixed; right-align handled by parent */
+  position: fixed;
+  right: 0;
+  background-color: #00000070;
+  transition-property: transform;
+}
+
+VerticalScrollBar .ScrollThumb,
+HTMLVerticalScrollBar .ScrollThumb {
+  transform-origin: 0% 50%;
+  transform: scale3d(1, 1, 1);
+  min-height: 32px;
+  background-color: #96908733;
+  border-radius: 4px;
+  transition-property: background-color, transform;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+VerticalScrollBar:hover .ScrollThumb,
+HTMLVerticalScrollBar:hover .ScrollThumb {
+  background-color: #96908788;
+}
+
+VerticalScrollBar:active .ScrollThumb,
+HTMLVerticalScrollBar:active .ScrollThumb {
+  background-color: #969087;
+}
+
+HorizontalScrollBar,
+HTMLHorizontalScrollBar {
+  height: 12px;
+  margin: 0px;
+  width: 100%;
+  background-color: rgba(0, 0, 0, 0);
+  border-radius: 0px;
+  /* layout-position: fixed + bottom */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  box-shadow: inset 2px -1px 3px 1px #00000055;
+  transition-property: transform;
+}
+
+HorizontalScrollBar .ScrollThumb,
+HTMLHorizontalScrollBar .ScrollThumb {
+  height: 12px;
+  min-width: 32px;
+  border-top: 1px solid #aaaaaa22;
+  border-bottom: 1px solid #000000aa;
+  background-color: #566767;
+  transition-property: background-color, transform;
+  transition-duration: 0.1s;
+  transition-timing-function: linear;
+}
+
+HorizontalScrollBar:hover .ScrollThumb,
+HTMLHorizontalScrollBar:hover .ScrollThumb {
+  background-color: #566767;
+}
+
+HorizontalScrollBar:active .ScrollThumb,
+HTMLHorizontalScrollBar:active .ScrollThumb {
+  background-color: #566767;
+}
+
+VerticalScrollBar,
+VerticalScrollBar .ScrollThumb,
+HorizontalScrollBar,
+HorizontalScrollBar .ScrollThumb,
+HTMLHorizontalScrollBar,
+HTMLHorizontalScrollBar .ScrollThumb,
+HTMLVerticalScrollBar,
+HTMLVerticalScrollBar .ScrollThumb {
+  transition-duration: 0.20s;
+  transition-timing-function: ease-in-out;
+}
+
+VerticalScrollBar.MouseDown,
+VerticalScrollBar.MouseDown .ScrollThumb,
+HorizontalScrollBar.MouseDown,
+HorizontalScrollBar.MouseDown .ScrollThumb,
+HTMLHorizontalScrollBar.MouseDown,
+HTMLHorizontalScrollBar.MouseDown .ScrollThumb,
+HTMLVerticalScrollBar.MouseDown,
+HTMLVerticalScrollBar.MouseDown .ScrollThumb {
+  transition-duration: 0.01s;
+}
+
+/* ─────────────────────────────────────────────
+   ContextMenu
+   ───────────────────────────────────────────── */
+
+.ContextMenu {
+  width: 100%;
+  height: 100%;
+  transition-property: opacity, transform;
+  transition-duration: var(--ContextMenuFadoutTime);
+  transition-timing-function: ease-in-out;
+  opacity: 1;
+  z-index: var(--contextmenu_zindex);
+  visibility: visible;
+  overflow: visible;
+}
+
+.ContextMenu.Destructing {
+  transform: translateX(0px);
+  opacity: 0;
+}
+
+/* box-shadow "fill N N N color" → inset box-shadow */
+SimpleContextMenu .ContextMenuBody {
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  width: 230px;
+  opacity: 1;
+  background-color: #212828;
+  border: 2px solid black;
+  box-shadow: inset 4px 4px 4px #0009;
+}
+
+SimpleContextMenu.Wider .ContextMenuBody {
+  width: 250px;
+}
+
+SimpleContextMenu.ExtraWide .ContextMenuBody {
+  width: 300px;
+}
+
+SimpleContextMenu .ContextMenuBody Button {
+  width: 100%;
+  padding: 6px 10px;
+  margin: 0px;
+  border: 1px solid black;
+  background-color: #00000040;
+}
+
+SimpleContextMenu .ContextMenuBody Label {
+  font-size: 20px;
+  font-weight: bold;
+  text-align: left;
+}
+
+SimpleContextMenu .ContextMenuBody Button:enabled:hover {
+  background-color: #00000080;
+}
+
+SimpleContextMenu .ContextMenuBody Button:enabled:hover Label {
+  color: white;
+}
+
+SimpleContextMenu .ContextMenuBody Button:disabled Label {
+  color: #444444;
+}
+
+SimpleContextMenu.BuildContextMenu .ContextMenuBody Label {
+  font-size: 20px;
+  color: white;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────
+   ProgressBar
+   ───────────────────────────────────────────── */
+
+ProgressBar {
+  width: 320px;
+  height: 22px;
+  border-radius: 50px;
+  background-color: #000000ff;
+}
+
+.ProgressBarLeft {
+  background: linear-gradient(to right, #222222FF, #444f52FF);
+}
+
+/* ─────────────────────────────────────────────
+   CitadelTooltipProfileCard
+   ───────────────────────────────────────────── */
+
+CitadelTooltipProfileCard #Contents {
+  background-color: transparent;
+  padding: 0px;
+  border: 0px solid transparent;
+  box-shadow: none;
+  transition-delay: 0.2s;
+}
+
+/* ─────────────────────────────────────────────
+   Inline glyph
+   ───────────────────────────────────────────── */
+
+/* background-texture-size → no CSS equivalent; dropped */
+.InlineGlyph {
+  height: 40px;
+  width: 40px;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+/* ─────────────────────────────────────────────
+   Keybind
+   ───────────────────────────────────────────── */
+
+.keybind {
+  background-color: #000000;
+  border-radius: 3px;
+  color: #fff;
+  padding: 3px;
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────
+   Mouse glyph images
+   ───────────────────────────────────────────── */
+
+.light .MouseGlyphBackground {
+  background-color: var(--offWhite);
+}
+
+.light .MouseButton1 {
+  background-image: url("s2r://panorama/images/glyphs/mouse1.vsvg");
+}
+
+.light .MouseButton2 {
+  background-image: url("s2r://panorama/images/glyphs/mouse2.vsvg");
+}
+
+.light .MouseButton3 {
+  background-image: url("s2r://panorama/images/glyphs/mouse3.vsvg");
+}
+
+.light .MouseButton4 {
+  background-image: url("s2r://panorama/images/glyphs/mouse4.vsvg");
+}
+
+.light .MouseButton5 {
+  background-image: url("s2r://panorama/images/glyphs/mouse5.vsvg");
+}
+
+.light .MouseWheelUp {
+  background-image: url("s2r://panorama/images/glyphs/mousewheelup.vsvg");
+}
+
+.light .MouseWheelDown {
+  background-image: url("s2r://panorama/images/glyphs/mousewheeldown.vsvg");
+}
+
+.dark .MouseButton1 {
+  background-image: url("s2r://panorama/images/glyphs/mouse1_dark.vsvg");
+}
+
+.dark .MouseButton2 {
+  background-image: url("s2r://panorama/images/glyphs/mouse2_dark.vsvg");
+}
+
+.dark .MouseButton3 {
+  background-image: url("s2r://panorama/images/glyphs/mouse3_dark.vsvg");
+}
+
+.dark .MouseButton4 {
+  background-image: url("s2r://panorama/images/glyphs/mouse4_dark.vsvg");
+}
+
+.dark .MouseButton5 {
+  background-image: url("s2r://panorama/images/glyphs/mouse5_dark.vsvg");
+}
+
+.dark .MouseWheelUp {
+  background-image: url("s2r://panorama/images/glyphs/mousewheelup_dark.vsvg");
+}
+
+.dark .MouseWheelDown {
+  background-image: url("s2r://panorama/images/glyphs/mousewheeldown_dark.vsvg");
+}
+
+.KeyboardArrowUp {
+  background-image: url("s2r://panorama/images/glyphs/keyboard_arrow_up.vsvg");
+}
+
+.KeyboardArrowDown {
+  background-image: url("s2r://panorama/images/glyphs/keyboard_arrow_down.vsvg");
+}
+
+.KeyboardArrowLeft {
+  background-image: url("s2r://panorama/images/glyphs/keyboard_arrow_left.vsvg");
+}
+
+.KeyboardArrowRight {
+  background-image: url("s2r://panorama/images/glyphs/keyboard_arrow_right.vsvg");
+}
+
+/* ─────────────────────────────────────────────
+   Player feedback / report / commend
+   ───────────────────────────────────────────── */
+
+.PlayerFeedbackContainer {
+  margin-top: 10px;
+  width: 100%;
+  height: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.PlayerFeedbackContainer:hover {
+  filter: brightness(1.5);
+}
+
+/* offWhite&30 → #FFEFD74D */
+.PlayerFeedbackButton {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  padding: 3px 10px;
+  border-radius: 3px;
+  background-color: #00000080;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #FFEFD74D;
+  opacity: 1;
+  filter: brightness(0.5);
+}
+
+.PlayerFeedbackButton:hover {
+  filter: brightness(1.3);
+  opacity: 1;
+  border: 1px solid #FFEFD700;
+}
+
+#PlayerReportContainer {
+  visibility: collapse;
+}
+
+.CanReportPlayers #PlayerReportContainer {
+  visibility: visible;
+}
+
+#PlayerReportContainer,
+.localplayer #PlayerReportContainer,
+.CanReportPlayers .localplayer #PlayerReportContainer,
+.CanReportPlayers .localplayer.PlayerSnippet:hover #PlayerReportContainer,
+.CanReportPlayers .localplayer.Selected #PlayerReportContainer,
+.ReportedPlayer #PlayerReportContainer,
+.ReportedPlayer.PlayerSnippet:hover #PlayerReportContainer {
+  opacity: 1;
+  filter: brightness(0.5);
+}
+
+.CanReportPlayers #ReportPlayerButton {
+  opacity: 0.4;
+}
+
+.botplayer #ReportPlayerButton,
+.localplayer #ReportPlayerButton {
+  visibility: collapse;
+}
+
+.ReportedPlayer #ReportPlayerButton,
+.IsInParty #ReportPlayerButton {
+  opacity: 0;
+}
+
+#ReportPlayerButton:hover {
+  background-color: rgb(149, 43, 43);
+}
+
+/* offWhite&70 → #FFEFD7B3 */
+.reportLabel {
+  font-weight: 600;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+  color: #FFEFD7B3;
+}
+
+.reportedLabel {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 2px;
+  color: var(--offWhite);
+  visibility: collapse;
+}
+
+#reportIcon {
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  background-image: url("s2r://panorama/images/icons/icon_report.vsvg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.7;
+}
+
+#ReportedPlayerLabel,
+.ReportedPlayer #ReportPlayerButton {
+  visibility: collapse;
+}
+
+.ReportedPlayer #ReportedPlayerLabel {
+  visibility: visible;
+}
+
+/* ignore-parent-flow: true → position: absolute */
+#PlayerCommendContainer {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  visibility: collapse;
+}
+
+.CanCommendPlayers #PlayerCommendContainer {
+  visibility: visible;
+}
+
+/* offWhite&30 → #FFEFD74D */
+#CommendPlayerButton {
+  width: 35px;
+  height: 35px;
+  border-radius: 100px;
+  display: flex;
+  justify-content: center;
+  border: 2px solid #FFEFD74D;
+}
+
+.CanCommendPlayers .localplayer #PlayerCommendContainer,
+.CanCommendPlayers .localplayer.PlayerSnippet:hover #PlayerCommendContainer,
+.CanCommendPlayers .localplayer.Selected #PlayerCommendContainer {
+  opacity: 1;
+  filter: brightness(0.5);
+}
+
+.CanReportPlayers #CommendPlayerButton {
+  opacity: 1;
+}
+
+.botplayer #CommendPlayerButton,
+.localplayer #CommendPlayerButton {
+  visibility: collapse;
+}
+
+.CommendedPlayer #CommendPlayerButton {
+  opacity: 0;
+}
+
+#CommendPlayerButton:hover {
+  background-color: var(--offWhite);
+}
+
+#commendIcon {
+  background-image: url("s2r://panorama/images/icons/icon_thumbsup.vsvg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  opacity: 0.5;
+  margin-bottom: 1px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-self: center;
+  justify-self: center;
+}
+
+#CommendPlayerButton:hover #commendIcon {
+  opacity: 0.9;
+}
+
+#CommendedPlayerLabel,
+.CommendedPlayer #CommendPlayerButton {
+  visibility: collapse;
+}
+
+.CommendedPlayer #CommendedPlayerLabel {
+  visibility: visible;
+}
+
+/* ─────────────────────────────────────────────
+   Toast notifications
+   ───────────────────────────────────────────── */
+
+#ToastManager {
+  position: fixed;
+  top: 400px;
+  right: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#ToastManager > .ToastPanel {
+  opacity: 0;
+  transform: translateX(40px);
+  transition-property: opacity, transform;
+  transition-duration: var(--toastExitDuration);
+}
+
+#ToastManager > .ToastPanel.ToastVisible {
+  opacity: 1;
+  transform: none;
+}
+
+.ExampleToast {
+  background: linear-gradient(to right, #595959, #444);
+  box-shadow: 4px 4px 12px #00000044;
+  margin-bottom: 8px;
+  padding: 0px 20px 0px 0px;
+  border-radius: 5px 0px 0px 5px;
+  display: flex;
+  flex-direction: row;
+}
+
+.ExampleToast:active {
+  background: linear-gradient(to right, #595959, #444);
+}
+
+.ExampleToast CitadelHeroImage,
+.ExampleToast img {
+  display: flex;
+  align-items: center;
+  width: 100px;
+  height: 40px;
+}
+
+.ExampleToast Label {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--offWhite);
+}
+
+.ExampleToastTextContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.ToastPanel #DismissToast {
+  margin-left: 0px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background-size: auto 50%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-image: url("s2r://panorama/images/icons/icon_x.vsvg");
+}
+
+.CommendToast {
+  padding-right: 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.CommendToast Label {
+  margin-right: 8px;
+}
+
+.CommendToast #CommendPlayerButton {
+  visibility: collapse;
+  display: flex;
+  align-items: center;
+  margin: 4px;
+  margin-right: 6px;
+}
+
+.CommendToast:not(.AlreadyCommended) #CommendPlayerButton {
+  visibility: visible;
+}
+
+.CommendToast #HeroImage {
+  width: 60px;
+  height: 60px;
+  border-radius: 5px 0px 0px 5px;
+  background-color: #00000090;
+}
+
+.CommendToast .commendIcon {
+  background-color: black;
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  background-size: 80% 80%;
+  visibility: collapse;
+}
+
+.commendIcon {
+  width: 70px;
+  height: 70px;
+  display: flex;
+  justify-content: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 1;
+  background-image: url("s2r://panorama/images/icons/icon_thumbsup.vsvg");
+}
+
+.Friendly .commendIcon {
+  background-image: url("s2r://panorama/images/main_menu/menu_images/commend_friendly_png.vtex");
+}
+
+.Teamwork .commendIcon {
+  background-image: url("s2r://panorama/images/main_menu/menu_images/commend_teamwork_png.vtex");
+}
+
+.Skilled .commendIcon {
+  background-image: url("s2r://panorama/images/main_menu/menu_images/commend_skilled_png.vtex");
+}
+
+/* shardColor&70 → #99FFD6B3 */
+/* ui-scale: 120% → transform: scale(1.2) */
+/* opacity-mask → dropped */
+.QuickbuyPurchaseToast {
+  display: flex;
+  justify-content: flex-end;
+  width: fit-content;
+  flex-direction: row;
+  padding: 6px;
+  background: linear-gradient(to bottom right, #259776, #99FFD6B3);
+  opacity: 1;
+  transform: scale(1.2);
+  transform-origin: top right;
+}
+
+.QuickbuyPurchaseToast .QuickbuyItem {
+  opacity: 1;
+}
+
+.QuickbuyPurchaseToast .QuickbuyItem #ItemContentPanel {
+  display: flex;
+  flex-direction: row;
+}
+
+.QuickbuyPurchaseToast .QuickbuyItem .QuickbuyLabel {
+  opacity: 1;
+  color: var(--offBlack);
+  font-size: 12px;
+  margin-left: 0px;
+}
+
+.HeroReleaseVotesRemainingToast {
+  display: flex;
+  justify-content: flex-end;
+  width: fit-content;
+  flex-direction: row;
+  padding: 6px 16px 6px 2px;
+  background: linear-gradient(to bottom right, #259776, #99FFD6B3);
+  opacity: 1;
+  transform: scale(1.2);
+  transform-origin: top right;
+}
+
+.AchievementToast {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  flex-direction: row;
+}
+
+/* background-img-opacity → opacity on pseudo-element workaround not included;
+   kept as comment. radial gradient from source preserved. */
+.AchievmentToastContainer {
+  border-radius: 3px 0px 0px 3px;
+  background-image: url("s2r://panorama/images/textures/diagonal_stripes.vsvg");
+  background-color: #78191B;
+  background: radial-gradient(ellipse at 45% 45%, #FF5656, #78191B);
+  display: flex;
+  flex-direction: row;
+  padding: 0px 20px 0px 0px;
+  box-shadow: 4px 4px 12px #00000044;
+}
+
+.AchievementToast #HeroImage {
+  width: 60px;
+  height: 60px;
+  background-color: #00000090;
+  border-radius: 5px 0px 0px 5px;
+}
+
+.AchievementToast Label {
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
+  font-size: 15px;
+  font-weight: bold;
+  color: #fff6e9;
+  text-shadow: 0px 0px 4px #000000cc;
+}
+
+.AchievementToastTextContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+/* img-shadow → drop-shadow filter approximation */
+.AchievementImage {
+  background-image: url("s2r://panorama/images/seasonal/2024/achievement_icon_psd.vtex");
+  background-size: contain;
+  width: 60px;
+  height: 60px;
+  margin-right: 8px;
+  filter: drop-shadow(0px 0px 20px #00000088);
+  display: flex;
+  align-self: center;
+  z-index: 2;
+}
+
+/* world-blur → dropped (backdrop-filter: blur(2px) is the closest web equivalent) */
+.ToastPanel.SeasonalKillToast {
+  width: 420px;
+  height: 100px;
+  margin: 5px 0px;
+  background-image: url("s2r://panorama/images/seasonal/2025/snowball_toast_bg_psd.vtex");
+  background-size: 100% 100%;
+  border-radius: 5px 0px 0px 5px;
+  display: flex;
+  flex-direction: row;
+  /* offBlack&90 → #10130DE6 */
+  box-shadow: 3px 3px 0px #10130DE6;
+  /* offBlack&10 → #10130D1A */
+  border-top: 2px solid #10130D1A;
+  border-left: 2px solid #10130D1A;
+  border-bottom: 2px solid #10130D1A;
+}
+
+.SeasonalKillToast .Left {
+  background-color: #00000062;
+  height: 100%;
+  width: 150px;
+  padding: 10px 10px 10px 15px;
+}
+
+.SeasonalKillToast CitadelHeroImage {
+  width: 46px;
+  height: 46px;
+}
+
+/* y: 25px → top: 25px (positioned child) */
+/* ui-scale: 120% → transform: scale(1.2) */
+.SeasonalKillToast #KillerHeroImage {
+  position: relative;
+  top: 25px;
+  transform: scale(1.2);
+  animation-name: SnowballKillerDance;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+}
+
+/* x: 82px → left: 82px (positioned child) */
+.SeasonalKillToast #VictimHeroImage {
+  position: relative;
+  left: 82px;
+  transform: rotateZ(10deg);
+  animation-name: SnowballVictimDance;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+}
+
+/* x: 52px / y: 15px → left / top */
+/* pre-transform-rotate2d: 15deg → rotate(15deg) in transform */
+.SeasonalKillToast #SnowballImage {
+  width: 36px;
+  height: 36px;
+  position: relative;
+  left: 52px;
+  top: 15px;
+  z-index: 5;
+  transform: rotate(15deg);
+  animation-name: SnowballDance;
+  animation-duration: 1s;
+  animation-iteration-count: infinite;
+}
+
+.SeasonalKillToast .Right {
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  margin-left: 30px;
+  max-width: 220px;
+}
+
+.SeasonalKillToast .Right .snowballLine1 {
+  font-family: var(--block);
+  color: var(--silvered);
+  text-shadow: 2px 2px 3px #00000080;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: -2px;
+}
+
+.SeasonalKillToast .Right .snowballLine2 {
+  font-family: var(--oracle);
+  font-size: 30px;
+  font-weight: bold;
+  text-shadow: 2px 2px 3px #00000080;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.SeasonalKillToast .Right .team1 .Emphasis {
+  color: var(--team1Color);
+}
+
+.team1 .SeasonalKillToast .Right .team1 .Emphasis {
+  color: var(--team1Color);
+}
+
+.SeasonalKillToast .team1 .Emphasis {
+  color: var(--team1Color);
+}
+
+/* ─────────────────────────────────────────────
+   Second SimpleContextMenu block
+   (duplicate in source with additional transition)
+   ───────────────────────────────────────────── */
+
+/* This block appears a second time in the source with an added
+   transition-property on Button. Both blocks kept for fidelity. */
+SimpleContextMenu .ContextMenuBody Button {
+  transition-property: background-color;
+  transition-duration: 0.2s;
+}
+
+SimpleContextMenu .ContextMenuBody Label {
+  text-align: left;
+}
+
+/* ─────────────────────────────────────────────
+   Mouse panning image
+   ───────────────────────────────────────────── */
+
+#MousePanningImage {
+  visibility: visible;
+  width: var(--mousepanningcursorsize);
+  height: var(--mousepanningcursorsize);
+  z-index: 10;
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0.4s;
+  transition-timing-function: ease-in-out;
+}
+
+.MousePanning #MousePanningImage {
+  opacity: 0.5;
+}
+
+/* ─────────────────────────────────────────────
+   CitadelHTMLPanel tooltip
+   ───────────────────────────────────────────── */
+
+CitadelHTMLPanel TextTooltip {
+  opacity: 0;
+}
+
+/* ─────────────────────────────────────────────
+   Inline attribute icons
+   ───────────────────────────────────────────── */
+
+.InlineAttributeIcon {
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.InlineAttributeIcon.Fortitude {
+  background-image: url("s2r://panorama/images/shop/keystat_fortitude_png.vtex");
+}
+
+.InlineAttributeIcon.Courage {
+  background-image: url("s2r://panorama/images/shop/keystat_courage_png.vtex");
+}
+
+/* wash-color: spiritBrightColor → filter hue approximation not included; kept as comment */
+.InlineAttributeIcon.Spirit {
+  background-image: url("s2r://panorama/images/icons/properties/spirit.vsvg");
+}
+
+.InlineAttributeIcon.Slow,
+.InlineAttributeIcon.Slowing,
+.InlineAttributeIcon.SlowResistance {
+  background-image: url("s2r://panorama/images/upgrades/property_slow_large_psd.vtex");
+}
+
+.InlineAttributeIcon.Stun {
+  background-image: url("s2r://panorama/images/hud/modifiers/icon_stun.vsvg");
+}
+
+.InlineAttributeIcon.DamageAmp {
+  background-image: url("s2r://panorama/images/damage_psd.vtex");
+}
+
+.InlineAttributeIcon.SpiritDamage,
+.InlineAttributeIcon.BonusSpiritDamage,
+.InlineAttributeIcon.SpiritDPS,
+.InlineAttributeIcon.SpiritIcon {
+  background-image: url("s2r://panorama/images/icons/properties/damage_magic_color.vsvg");
+}
+
+.InlineAttributeIcon.Heals,
+.InlineAttributeIcon.Healing,
+.InlineAttributeIcon.Heal,
+.InlineAttributeIcon.Regen,
+.InlineAttributeIcon.MaxHealth {
+  background-image: url("s2r://panorama/images/icons/properties/heal.vsvg");
+}
+
+.InlineAttributeIcon.Debuff {
+  background-image: url("s2r://panorama/images/hud/modifiers/icon_toxic.vsvg");
+}
+
+.InlineAttributeIcon.MeleeDamage {
+  background-image: url("s2r://panorama/images/hud/core/icon_damage_melee_psd.vtex");
+}
+
+.InlineAttributeIcon.ReducedFireRate,
+.InlineAttributeIcon.BonusFireRate,
+.InlineAttributeIcon.FireRate {
+  background-image: url("s2r://panorama/images/icons/properties/fire_rate.vsvg");
+}
+
+.InlineAttributeIcon.BonusMoveSpeed,
+.InlineAttributeIcon.MoveSpeed,
+.InlineAttributeIcon.BonusSprintSpeed {
+  background-image: url("s2r://panorama/images/icons/properties/move_speed.vsvg");
+}
+
+.InlineAttributeIcon.WeaponDamage,
+.InlineAttributeIcon.BonusWeaponDamage,
+.InlineAttributeIcon.BulletDamage {
+  background-image: url("s2r://panorama/images/icons/properties/damage_bullet_color.vsvg");
+}
+
+.InlineAttributeIcon.BulletResist {
+  background-image: url("s2r://panorama/images/upgrades/property_bullet_armor_psd.vtex");
+}
+
+.InlineAttributeIcon.SpiritResist {
+  background-image: url("s2r://panorama/images/upgrades/property_tech_armor_psd.vtex");
+}
+
+.InlineAttributeIcon.CombatBarrier {
+  background-image: url("s2r://panorama/images/upgrades/property_bullet_armor_psd.vtex");
+}
+
+.InlineAttributeIcon.Immobilize {
+  background-image: url("s2r://panorama/images/hud/modifiers/immobilize_psd.vtex");
+}
+
+.InlineAttributeIcon.StaminaRegenPerSecond {
+  background-image: url("s2r://panorama/images/hud/modifiers/immobilize_psd.vtex");
+  /* wash-color: #a9f0a1 → tint filter not applied; add if needed */
+}
+
+.InlineAttributeIcon.KnockBack,
+.InlineAttributeIcon.KnockUp,
+.InlineAttributeIcon.Pull,
+.InlineAttributeIcon.Pulls,
+.InlineAttributeIcon.Pulling,
+.InlineAttributeIcon.Drag {
+  background-image: url("/panorama/images/icons/properties/condition_knockdown.vsvg");
+}
+
+.InlineAttributeIcon.PureDamage {
+  background-image: url("/panorama/images/hud/core/icon_damage_force.vsvg");
+}
+
+.InlineAttributeIcon.Silence {
+  background-image: url("/panorama/images/icons/properties/condition_silence.vsvg");
+}
+
+/* ─────────────────────────────────────────────
+   Inline attribute names
+   ───────────────────────────────────────────── */
+
+.InlineAttributeName {
+  font-weight: bold;
+}
+
+.InlineAttributeName.Fortitude {
+  color: #7bb02a;
+}
+
+.InlineAttributeName.Courage {
+  color: #9d620b;
+}
+
+.InlineAttributeName.Spirit {
+  color: #e1a0ff;
+}
+
+.InlineAttributeName.Slow,
+.InlineAttributeName.Slowing,
+.InlineAttributeName.SlowResistance,
+.InlineAttributeName.Debuff,
+.InlineAttributeName.ReducedFireRate,
+.InlineAttributeName.BonusMoveSpeed,
+.InlineAttributeName.MoveSpeed,
+.InlineAttributeName.FireRate,
+.InlineAttributeName.BonusFireRate,
+.InlineAttributeName.BonusSprintSpeed {
+  color: var(--offWhite);
+}
+
+.InlineAttributeName.Stun,
+.InlineAttributeName.Immobilize {
+  color: var(--offWhite);
+}
+
+.InlineAttributeName.DamageAmp {
+  color: var(--offWhite);
+}
+
+.InlineAttributeName.SpiritDamage,
+.InlineAttributeName.SpiritDPS,
+.InlineAttributeName.BonusSpiritDamage,
+.InlineAttributeName.SpiritResist {
+  color: var(--spiritBrightColor);
+}
+
+.InlineAttributeName.Heals,
+.InlineAttributeName.Healing,
+.InlineAttributeName.Heal,
+.InlineAttributeName.Regen,
+.InlineAttributeName.MaxHealth {
+  color: #99f051;
+}
+
+.InlineAttributeName.MeleeDamage,
+.InlineAttributeName.WeaponDamage,
+.InlineAttributeName.BonusWeaponDamage,
+.InlineAttributeName.BulletResist,
+.InlineAttributeName.BulletDamage {
+  color: var(--courageBrightColor);
+}
+
+.InlineAttributeName.StaminaRegenPerSecond {
+  color: #a9f0a1;
+}
+
+.InlineAttributeName.KnockBack,
+.InlineAttributeName.KnockUp,
+.InlineAttributeName.Pull,
+.InlineAttributeName.Pulls,
+.InlineAttributeName.Pulling,
+.InlineAttributeName.Drag {
+  color: var(--offWhite);
+}
+
+.InlineAttributeName.PureDamage {
+  color: white;
+}
+
+.InlineAttributeName.Silence {
+  color: #e1a0ff;
+}
+
+/* ─────────────────────────────────────────────
+   Inline hero icon
+   ───────────────────────────────────────────── */
+
+.InlineHeroIcon {
+  width: 32px;
+  height: 32px;
+}
+
+/* ─────────────────────────────────────────────
+   AsyncDataPanel
+   ───────────────────────────────────────────── */
+
+AsyncDataPanel > .AsyncContainer {
+  width: 100%;
+  height: 100%;
+  visibility: collapse;
+}
+
+AsyncDataPanel.AsyncFailureState > .AsyncFailureContainer,
+AsyncDataPanel.AsyncLoadingState > .AsyncLoadingContainer,
+AsyncDataPanel.AsyncSuccessState > .AsyncSuccessContainer {
+  visibility: visible;
+}
+
+AsyncDataPanel > .AsyncFailureContainer Label {
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0px 8px;
+}
+
+AsyncDataPanel > .AsyncLoadingContainer {
+  display: flex;
+  justify-content: center;
+}
+
+AsyncDataPanel > .AsyncLoadingContainer .Wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+AsyncDataPanel > .AsyncLoadingContainer .Spinner {
+  display: flex;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-image: url("s2r://panorama/images/control_icons/spinner_png.vtex");
+  background-size: contain;
+  animation-name: RotateIcon;
+  animation-duration: 2s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+AsyncDataPanel > .AsyncLoadingContainer Label {
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 18px;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  padding: 0px 8px;
+  margin-top: 6px;
+}
+
+/* ─────────────────────────────────────────────
+   Miscellaneous
+   ───────────────────────────────────────────── */
+
+.outdated_build_label {
+  color: red;
+}
+
+/* ─────────────────────────────────────────────
+   NumberEntry
+   ───────────────────────────────────────────── */
+
+NumberEntry {
+  display: flex;
+  flex-direction: row;
+  width: 100px;
+  height: 36px;
+}
+
+NumberEntry #TextEntry {
+  flex: 1;
+  height: 100%;
+  background-color: black;
+}
+
+NumberEntry .ChangeValueButtons {
+  display: flex;
+  flex-direction: column;
+  margin-left: 2px;
+}
+
+NumberEntry .ChangeValueButtons .ChangeValueButton {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--baseBorder);
+  background: linear-gradient(to bottom, #111111FF, #222222FF);
+}
+
+NumberEntry .ChangeValueButtons .ChangeValueButton:disabled {
+  filter: brightness(0.5);
+}
+
+NumberEntry .ChangeValueButtons .ChangeValueButton:hover:enabled {
+  filter: brightness(2.0);
+}
+
+NumberEntry .ChangeValueButtons .ChangeValueButton:active {
+  filter: brightness(1.5);
+}
+
+NumberEntry .ChangeValueButtons .ChangeValueButton .ChangeValueButtonLabel {
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -3px;
+}
+
+/* ─────────────────────────────────────────────
+   @keyframes
+   ───────────────────────────────────────────── */
+
+@keyframes RotateIcon {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes RotateInner {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes RotateOuter {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+/* pre-transform-scale2d → scale() in transform */
+@keyframes WaitingPulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes WaitingPulseMid {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.8); }
+  100% { transform: scale(1); }
+}
+
+@keyframes WaitingPulseEye {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.7); }
+  100% { transform: scale(1); }
+}
+
+@keyframes WaitingPulseLight {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.94); }
+  100% { transform: scale(1); }
+}
+
+@keyframes TagGroove1 {
+  0%   { transform: rotateZ(-3deg); }
+  25%  { transform: rotateZ(-3deg); }
+  26%  { transform: rotateZ(2deg); }
+  50%  { transform: rotateZ(2deg); }
+  51%  { transform: rotateZ(-1deg); }
+  75%  { transform: rotateZ(-1deg); }
+  76%  { transform: rotateZ(0deg); }
+  100% { transform: rotateZ(0deg); }
+}
+
+/* pre-transform-scale2d combined with translateX */
+@keyframes UIGroove {
+  0%   { transform: scale(1) translateX(0px); }
+  50%  { transform: scale(1.05) translateX(3px) rotateZ(-1deg); }
+  100% { transform: scale(1) translateX(0px); }
+}
+
+@keyframes ProbablyUnlocalizedAnimation {
+  0%   { transform: scale(0.95); }
+  50%  { transform: scale(1.05); }
+  100% { transform: scale(0.95); }
+}
+
+@keyframes SnowballKillerDance {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-4px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes SnowballDance {
+  0%   { transform: translateX(0px); }
+  50%  { transform: translateX(8px) translateY(-3px); }
+  100% { transform: translateX(0px); }
+}
+
+/* pre-transform-rotate2d + wash-color (wash-color dropped; rotate preserved) */
+@keyframes SnowballVictimDance {
+  0%   { transform: rotate(0deg); }
+  50%  { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
+}

@@ -4,29 +4,55 @@ import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
 import HeroInfoCluster from '@/components/hero-info-cluster'
+import HeroInfoEditor from '@/components/hero-info-editor'
 import styles from '@/components/hero-grid.module.css'
+import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
+import type { EditorRenderSelection } from '@/lib/editor-assets'
 import { HEROES } from '@/lib/hero-data'
+import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 
 interface TabItem {
-  label: 'Select' | 'Browse' | 'Create'
+  label: PrimaryTab
   disabled?: boolean
 }
+
+type PrimaryTab = 'Select' | 'Browse' | 'Create'
 
 const TAB_ITEMS: TabItem[] = [
   { label: 'Select' },
   { label: 'Browse', disabled: true },
-  { label: 'Create', disabled: true },
+  { label: 'Create' },
 ]
 
 const GRID_SIZE = 40
+const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
+
+function cloneHeroInfo(heroInfo: HeroInfoDefinition): HeroInfoDefinition {
+  return {
+    ...heroInfo,
+  }
+}
+
+function getEditorBackgroundForHero(hero: HeroDefinition) {
+  const assetMatch = HERO_BACKGROUND_OPTIONS.find(option => option.path.endsWith(`/${hero.assetSlug}_bg_psd.png`))
+  const slugMatch = HERO_BACKGROUND_OPTIONS.find(option => option.path.endsWith(`/${hero.slug}_bg_psd.png`))
+
+  return assetMatch?.path ?? slugMatch?.path ?? FALLBACK_EDITOR_BACKGROUND
+}
 
 export default function HeroGrid() {
+  const [activeTab, setActiveTab] = useState<PrimaryTab>('Select')
   const [activeHeroSlug, setActiveHeroSlug] = useState(HEROES[0]?.slug ?? '')
   const [renderHeroSlug, setRenderHeroSlug] = useState(activeHeroSlug)
   const [pendingRenderHeroSlug, setPendingRenderHeroSlug] = useState<string | null>(null)
   const [renderPhase, setRenderPhase] = useState<'idle' | 'fade-out' | 'fade-in'>('idle')
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
   const renderHero = HEROES.find(hero => hero.slug === renderHeroSlug) ?? activeHero
+  const [editorDraft, setEditorDraft] = useState<HeroInfoDefinition>(() => cloneHeroInfo(activeHero.heroInfo))
+  const [editorBackground, setEditorBackground] = useState(() => getEditorBackgroundForHero(activeHero))
+  const [editorRenderSelection, setEditorRenderSelection] = useState<EditorRenderSelection>({ mode: 'background', src: null })
+  const isCreateMode = activeTab === 'Create'
+  const editorRenderImage = editorRenderSelection.mode === 'hero' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
 
   useEffect(() => {
     if (renderPhase === 'idle' || !pendingRenderHeroSlug) {
@@ -52,6 +78,14 @@ export default function HeroGrid() {
       return
     }
 
+    const nextHero = HEROES.find(hero => hero.slug === heroSlug)
+
+    if (nextHero) {
+      setEditorDraft(cloneHeroInfo(nextHero.heroInfo))
+      setEditorBackground(getEditorBackgroundForHero(nextHero))
+      setEditorRenderSelection({ mode: 'background', src: null })
+    }
+
     setActiveHeroSlug(heroSlug)
     setPendingRenderHeroSlug(heroSlug)
     setRenderPhase('fade-out')
@@ -66,19 +100,29 @@ export default function HeroGrid() {
       <div className={styles.renderLayer}>
         <div className={styles.renderFade} />
         <div
-          key={renderHero.slug}
+          key={isCreateMode ? editorBackground : renderHero.slug}
           className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
           role="img"
-          aria-label={`${activeHero.displayName} render`}
+          aria-label={isCreateMode ? (editorRenderSelection.mode === 'hero' ? 'Selected editor hero render' : 'Selected editor background') : `${activeHero.displayName} render`}
           aria-hidden={renderPhase === 'fade-out'}
-          style={{ backgroundImage: `url('${renderHero.render}')` }}
+          data-testid="hero-render-layer"
+          style={{ backgroundImage: `url('${isCreateMode ? editorRenderImage : renderHero.render}')` }}
         />
+        {isCreateMode && editorRenderSelection.mode === 'custom' && editorRenderSelection.src ? (
+          <div
+            className={styles.renderFrame}
+            role="img"
+            aria-label="Custom editor hero render"
+            data-testid="editor-custom-render-layer"
+            style={{ backgroundImage: `url('${editorRenderSelection.src}')` }}
+          />
+        ) : null}
       </div>
 
       <div className={styles.content}>
         <nav aria-label="Hero picker tabs" className={styles.tabs}>
           {TAB_ITEMS.map(tab => {
-            const isActive = tab.label === 'Select'
+            const isActive = tab.label === activeTab
 
             return (
               <button
@@ -88,6 +132,7 @@ export default function HeroGrid() {
                 aria-current={isActive ? 'page' : undefined}
                 className={`${styles.tabsButton} ${isActive ? styles.tabsButtonActive : ''} ${tab.disabled ? styles.tabsButtonDisabled : ''}`}
                 title={tab.disabled ? 'Coming soon' : undefined}
+                onClick={() => setActiveTab(tab.label)}
               >
                 {tab.label}
               </button>
@@ -95,47 +140,62 @@ export default function HeroGrid() {
           })}
         </nav>
 
-        <main className={styles.main}>
-          <section className={styles.grid}>
-            {Array.from({ length: GRID_SIZE }).map((_, index) => {
-              const hero = HEROES[index]
+        {!isCreateMode ? (
+          <main className={styles.main}>
+            <section className={styles.grid}>
+              {Array.from({ length: GRID_SIZE }).map((_, index) => {
+                const hero = HEROES[index]
 
-              if (!hero) {
-                return <div key={`empty-${index}`} data-testid="hero-empty-slot" aria-hidden="true" className={styles.emptySlot} />
-              }
+                if (!hero) {
+                  return <div key={`empty-${index}`} data-testid="hero-empty-slot" aria-hidden="true" className={styles.emptySlot} />
+                }
 
-              const isSelected = hero.slug === activeHero.slug
+                const isSelected = hero.slug === activeHero.slug
 
-              return (
-                <button
-                  key={hero.slug}
-                  type="button"
-                  data-testid="hero-card"
-                  aria-label={`Select hero ${hero.displayName}`}
-                  aria-pressed={isSelected}
-                  onClick={() => handleHeroSelect(hero.slug)}
-                  className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
-                >
-                  <span className={styles.heroBacker} />
-                  <span className={styles.heroPortraitWrap}>
-                    <Image
-                      src={hero.portrait}
-                      alt={hero.displayName}
-                      fill
-                      className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
-                      sizes="(max-width: 1024px) 25vw, 12vw"
-                    />
-                  </span>
-                  <span className={styles.heroBorder} />
-                  <span className={styles.heroTint} />
-                </button>
-              )
-            })}
-          </section>
-        </main>
+                return (
+                  <button
+                    key={hero.slug}
+                    type="button"
+                    data-testid="hero-card"
+                    aria-label={`Select hero ${hero.displayName}`}
+                    aria-pressed={isSelected}
+                    onClick={() => handleHeroSelect(hero.slug)}
+                    className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
+                  >
+                    <span className={styles.heroBacker} />
+                    <span className={styles.heroPortraitWrap}>
+                      <Image
+                        src={hero.portrait}
+                        alt={hero.displayName}
+                        fill
+                        className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
+                        sizes="(max-width: 1024px) 25vw, 12vw"
+                      />
+                    </span>
+                    <span className={styles.heroBorder} />
+                    <span className={styles.heroTint} />
+                  </button>
+                )
+              })}
+            </section>
+          </main>
+        ) : null}
       </div>
 
-      {activeHero ? <HeroInfoCluster hero={activeHero} /> : null}
+      {isCreateMode ? (
+        <HeroInfoEditor
+          hero={activeHero}
+          draft={editorDraft}
+          backgroundOptions={HERO_BACKGROUND_OPTIONS}
+          selectedBackground={editorBackground}
+          renderSelection={editorRenderSelection}
+          onBackgroundChange={setEditorBackground}
+          onRenderSelectionChange={setEditorRenderSelection}
+          onDraftChange={setEditorDraft}
+        />
+      ) : (
+        <HeroInfoCluster hero={activeHero} />
+      )}
     </div>
   )
 }
