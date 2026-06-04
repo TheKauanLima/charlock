@@ -21,6 +21,7 @@ export interface HeroInfoDefinition {
   ability4Icon: string
   abilityCircleColor: string
   abilityIconColor: string
+  backstory?: string
 }
 
 export interface HeroDefinition {

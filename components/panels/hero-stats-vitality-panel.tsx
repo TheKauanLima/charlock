@@ -30,16 +30,16 @@ interface IconAsset {
 
 const VITALITY_PANEL_BACKGROUND = '/panorama/images/shop/catalog/catalog_tooltip_bg_modifies_vitality_psd.png'
 const ICON_ASSETS: Record<string, IconAsset> = {
-  bulletResist: { url: '/panorama/images/icons/properties/resist_bullet_color.svg' },
+  bulletResist: { url: '/panorama/images/icons/properties/armor_bullet_color.svg' },
   critReduction: { url: '/panorama/images/icons/properties/damage_crit_color.svg' },
   debuffResist: { maskUrl: '/panorama/images/icons/properties/debuff_remove.svg' },
   healAmp: { maskUrl: '/panorama/images/icons/properties/healing_booster.svg' },
   healthRegen: { maskUrl: '/panorama/images/icons/properties/health_regen.svg' },
   maxHealth: { maskUrl: '/panorama/images/icons/properties/health.svg' },
-  meleeResist: { url: '/panorama/images/icons/properties/resist_melee_color.svg' },
+  meleeResist: { url: '/panorama/images/icons/properties/armor_melee_color.svg' },
   moveSpeed: { maskUrl: '/panorama/images/icons/properties/move_speed.svg' },
   moveSprint: { maskUrl: '/panorama/images/icons/properties/move_sprint.svg' },
-  spiritResist: { url: '/panorama/images/icons/properties/resist_spirit_color.svg' },
+  spiritResist: { url: '/panorama/images/icons/properties/armor_spirit_color.svg' },
   stamina: { maskUrl: '/panorama/images/icons/properties/move_stamina.svg' },
   staminaRecovery: { maskUrl: '/panorama/images/icons/properties/move_stamina_recharge.svg' },
 }

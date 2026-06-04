@@ -567,7 +567,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
       ) : null}
 
       <div
-        className="pointer-events-auto absolute top-[88px] left-[clamp(18px,2vw,36px)] max-h-[calc(100vh-122px)] w-[min(30vw,360px)] overflow-y-auto rounded border border-[#ffefd6]/14 bg-[#061d27]/80 p-4 text-[#ffefd6] shadow-[0_20px_70px_rgba(0,0,0,0.46)] backdrop-blur-xl max-lg:w-[min(34vw,340px)] max-sm:left-3 max-sm:w-[min(88vw,360px)]"
+        className="pointer-events-auto absolute top-[88px] left-[clamp(18px,2vw,36px)] max-h-[calc(100vh-122px)] w-[min(30vw,360px)] overflow-x-hidden overflow-y-auto rounded border border-[#ffefd6]/14 bg-[#061d27]/80 p-4 text-[#ffefd6] shadow-[0_20px_70px_rgba(0,0,0,0.46)] backdrop-blur-xl max-lg:w-[min(34vw,340px)] max-sm:left-3 max-sm:w-[min(88vw,360px)]"
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -671,6 +671,19 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
               </label>
             )}
           </div>
+
+          <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor="editor-backstory">
+            Backstory
+            <textarea
+              id="editor-backstory"
+              value={draft.backstory ?? ''}
+              onChange={event => updateDraft({ backstory: event.target.value })}
+              rows={6}
+              wrap="soft"
+              className="min-h-32 resize-y overflow-x-hidden overflow-y-auto rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.78rem] leading-5 tracking-[0.03em] break-words text-[#ffefd6] outline-none transition [overflow-wrap:anywhere] placeholder:text-[#ffefd6]/28 focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+              placeholder="Write this character's story..."
+            />
+          </label>
 
           <div className="grid gap-3">
             <span className="text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75">Tags</span>

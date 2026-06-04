@@ -77,6 +77,7 @@ describe('HeroGrid', () => {
     expect(screen.getByTestId('hero-info-editor')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-card')).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Selected editor background' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View Abrams character backstory' })).toBeInTheDocument()
 
     await user.selectOptions(screen.getByTestId('editor-background-select'), '/panorama/images/heroes/backgrounds/yamato_bg_psd.png')
 
@@ -140,6 +141,16 @@ describe('HeroGrid', () => {
     await user.clear(screen.getByLabelText('Hero Name hex value'))
     await user.type(screen.getByLabelText('Hero Name hex value'), '#123456')
     expect(screen.getByTestId('editor-name-text')).toHaveStyle({ color: '#123456' })
+
+    const backstoryInput = screen.getByLabelText('Backstory')
+
+    expect(backstoryInput).toHaveAttribute('wrap', 'soft')
+    expect(backstoryInput).toHaveClass('overflow-y-auto')
+    expect(backstoryInput).toHaveClass('overflow-x-hidden')
+
+    await user.type(backstoryInput, 'Raised under neon rooftops, Arc Light learned to bottle thunder.')
+    await user.click(screen.getByRole('button', { name: 'View Abrams character backstory' }))
+    expect(within(screen.getByRole('dialog', { name: 'BACKSTORY:' })).getByText('Raised under neon rooftops, Arc Light learned to bottle thunder.')).toBeInTheDocument()
   })
 
   it('selects an ability icon from the create editor modal', async () => {

@@ -1,8 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/hero-info-cluster'
 import HeroInfoEditor from '@/components/hero-info-editor'
 import styles from '@/components/hero-grid.module.css'
@@ -53,6 +54,16 @@ export default function HeroGrid() {
   const [editorRenderSelection, setEditorRenderSelection] = useState<EditorRenderSelection>({ mode: 'background', src: null })
   const isCreateMode = activeTab === 'Create'
   const editorRenderImage = editorRenderSelection.mode === 'hero' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
+  const backstoryHero = useMemo(
+    () =>
+      isCreateMode
+        ? {
+            ...activeHero,
+            heroInfo: editorDraft,
+          }
+        : activeHero,
+    [activeHero, editorDraft, isCreateMode],
+  )
 
   useEffect(() => {
     if (renderPhase === 'idle' || !pendingRenderHeroSlug) {
@@ -196,6 +207,8 @@ export default function HeroGrid() {
       ) : (
         <HeroInfoCluster hero={activeHero} />
       )}
+
+      <BackstoryModule hero={backstoryHero} />
     </div>
   )
 }

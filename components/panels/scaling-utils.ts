@@ -1,4 +1,4 @@
-export const SCALING_TYPES = ['none', 'spirit', 'courage', 'boon'] as const
+export const SCALING_TYPES = ['none', 'spirit', 'courage', 'melee', 'boon'] as const
 
 export type ScalingType = (typeof SCALING_TYPES)[number]
 
@@ -23,12 +23,14 @@ export const SCALING_ICONS: Record<ScalingType, string | null> = {
   none: null,
   spirit: '/icon/spirit_scaling.png',
   courage: '/icon/weapon_scaling.png',
+  melee: '/icon/melee_scaling.png',
   boon: '/icon/boon_scaling.png',
 }
 
 export const SCALING_VALUE_COLORS: Record<Exclude<ScalingType, 'none'>, { fill: string; border: string }> = {
   boon: { fill: '#99ffd6', border: '#0f5b3d' },
   courage: { fill: '#de972d', border: '#322309' },
+  melee: { fill: '#de972d', border: '#322309' },
   spirit: { fill: '#e1a0ff', border: '#2c1139' },
 }
 
@@ -136,6 +138,7 @@ export function mapStatScaling(row: StatsRow | undefined, base: string): Scaling
 
   const spirit = parseScalingValue(row[`${base}_spirit_scaling`])
   const weapon = parseScalingValue(row[`${base}_weapon_scaling`])
+  const melee = parseScalingValue(row[`${base}_weapon_scaling`])
   const boon = parseScalingValue(row[`${base}_boon_scaling`])
 
   if (spirit !== null) {
@@ -144,6 +147,10 @@ export function mapStatScaling(row: StatsRow | undefined, base: string): Scaling
 
   if (weapon !== null) {
     return { scaling: 'courage', scalingValue: String(weapon) }
+  }
+
+  if (melee !== null) {
+    return { scaling: 'melee', scalingValue: String(melee) }
   }
 
   if (boon !== null) {
