@@ -5,7 +5,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import HeroInfoCluster from '@/components/hero-info-cluster'
+import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import { buildHeroStatsSeed } from '@/lib/hero-stats-shared'
 import type { HeroDefinition } from '@/lib/hero-data'
 
@@ -64,6 +64,7 @@ describe('HeroInfoCluster', () => {
     expect(tag3.style.transform).toMatch(/^translateY\(-?\d+px\) rotate\(-?\d+(?:\.\d+)?deg\)$/)
     expect(screen.getByTestId('hero-info-ability-1')).toHaveAttribute('style', expect.stringContaining('background-color: rgb(240, 173, 95)'))
     expect(screen.getByTestId('hero-info-ability-1').querySelector('[aria-hidden="true"]')).toHaveStyle({ backgroundColor: '#ffe5b8' })
+    expect(screen.getByRole('button', { name: 'View Grey Talon character backstory' })).toBeInTheDocument()
   })
 
   it('supports the text name mode', () => {

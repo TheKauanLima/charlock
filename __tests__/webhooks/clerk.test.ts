@@ -80,7 +80,7 @@ describe('Clerk webhook route', () => {
       type: 'user.created',
       data: {
         id: 'clerk_123',
-        email_addresses: [{ email_address: 'test@example.com', id: 'email_1' }],
+        email_addresses: [{ email_address: 'test@example.com', id: 'email_1', verification: { status: 'verified' } }],
         primary_email_address_id: 'email_1',
         username: 'tester',
         first_name: 'Test',
@@ -103,6 +103,7 @@ describe('Clerk webhook route', () => {
         clerkId: 'clerk_123',
         email: 'test@example.com',
         username: 'tester',
+        emailVerified: true,
         firstName: 'Test',
         lastName: 'User',
       },
@@ -148,5 +149,36 @@ describe('Clerk webhook route', () => {
     expect(response.status).toBe(200)
     expect(mocks.deleteOneMock).toHaveBeenCalledWith({ clerkId: 'clerk_999' })
     expect(await response.json()).toEqual({ success: true })
+  })
+
+  it('uses unsafe metadata username when Clerk username is disabled', async () => {
+    mocks.verifyMock.mockReturnValue({
+      type: 'user.created',
+      data: {
+        id: 'clerk_meta',
+        email_addresses: [{ email_address: 'meta@example.com', id: 'email_meta', verification: { status: 'verified' } }],
+        primary_email_address_id: 'email_meta',
+        username: null,
+        unsafe_metadata: {
+          username: 'metadata_user',
+        },
+      },
+    })
+
+    mocks.findOneAndUpdateMock.mockResolvedValue({
+      _id: 'mongo_meta',
+    })
+
+    const { POST } = await importRoute()
+    const response = await POST(buildRequest())
+
+    expect(response.status).toBe(200)
+    expect(mocks.findOneAndUpdateMock).toHaveBeenCalledWith(
+      { clerkId: 'clerk_meta' },
+      expect.objectContaining({
+        username: 'metadata_user',
+      }),
+      expect.any(Object),
+    )
   })
 })

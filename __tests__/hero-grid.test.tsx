@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import HeroGrid from '@/components/hero-grid'
+import HeroGrid from '@/components/HeroGrid/HeroGrid'
 import { HEROES } from '@/lib/hero-data'
 import { buildHeroStatsSeed } from '@/lib/hero-stats-shared'
 

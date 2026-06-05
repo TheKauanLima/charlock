@@ -3,6 +3,8 @@ import type { CSSProperties, ChangeEvent, MouseEvent } from 'react'
 import { limitScalingValuePrecision, SCALING_ICONS, SCALING_VALUE_COLORS, SCALING_VALUE_CONFIG } from '@/components/panels/scaling-utils'
 import type { ScalingType } from '@/components/panels/scaling-utils'
 
+import styles from './ScalingValueEditor.module.css'
+
 interface ScalingValueEditorProps {
   scaling: ScalingType
   scalingValue: string
@@ -49,8 +51,8 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
   }
 
   return (
-    <span className="group/scaling relative mt-[-5px] mr-[-5px] block h-6 w-[34px] shrink-0" title={`${scaling} scaling ${scalingValue}`}>
-      <span className="block h-6 w-[34px] bg-contain bg-no-repeat" style={scalingIconStyle} aria-hidden="true" />
+    <span className={styles.root} title={`${scaling} scaling ${scalingValue}`}>
+      <span className={styles.icon} style={scalingIconStyle} aria-hidden="true" />
       {isEditable && scaling !== 'none' ? (
         <input
           type="text"
@@ -59,7 +61,7 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
           onClick={stopStatCellClick}
           onMouseDown={stopStatCellClick}
           aria-label={`${scaling} scaling value`}
-          className="pointer-events-auto absolute top-1/2 right-full z-20 w-14 -translate-y-1/2 border-0 bg-transparent px-0 py-0 text-center opacity-0 outline-none transition group-hover/scaling:opacity-100 hover:opacity-100 focus:opacity-100"
+          className={`${styles.input} border-0 bg-transparent`}
           style={getScalingValueStyle(scaling)}
         />
       ) : null}

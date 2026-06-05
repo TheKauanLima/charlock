@@ -1,7 +1,7 @@
 import { buildSpiritPowerStat, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'
 import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
-import { HEROES, type HeroDefinition } from '@/lib/hero-data'
+import { HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 
 interface HeroStatsHero {
@@ -33,6 +33,7 @@ export interface SpiritStatsPayload {
 
 export interface HeroStatsPayload {
   hero: HeroStatsHero
+  heroInfo?: HeroInfoDefinition
   weapon: WeaponStatsPayload
   vitality: VitalityStatsPayload
   spirit: SpiritStatsPayload
@@ -98,6 +99,8 @@ export function buildHeroStatsSource(hero: HeroDefinition): StatsRow {
     weapon_damage_percent: hash % 24,
     bullet_damage_spirit_scaling: hash % 2 === 0 ? 0.2 : 0,
     fire_rate_percent_weapon_scaling: hash % 3 === 0 ? 0.3 : 0,
+    heavy_melee_damage_weapon_scaling: hash % 4 === 0 ? 0.35 : 0,
+    light_melee_damage_weapon_scaling: hash % 3 === 0 ? 0.25 : 0,
     max_health_boon_scaling: hash % 4 === 0 ? 0.4 : 0,
     spirit_power_spirit_scaling: hash % 5 === 0 ? 0.5 : 0,
   }
@@ -115,6 +118,7 @@ export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
       portrait: hero.portrait,
       render: hero.render,
     },
+    heroInfo: hero.heroInfo,
     weapon: {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: `${hero.displayName} pressure profile generated from the seeded hero stat table.`,

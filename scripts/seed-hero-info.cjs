@@ -1,9 +1,9 @@
 const fs = require('fs')
 const path = require('path')
-const { Types } = require('mongoose')
 const mongoose = require('mongoose')
 
 const MONGODB_URI = process.env.MONGODB_URI
+const REFERENCE_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 
 if (!MONGODB_URI) {
   console.error('Please set MONGODB_URI environment variable')
@@ -142,6 +142,41 @@ function loadHeroInfoOverrides() {
   return Function(`return (${match[1]})`)()
 }
 
+function readOptionalTextFile(directory, baseName) {
+  const candidates = ['.txt', '.md'].map(extension => path.join(directory, `${baseName}${extension}`))
+  const filePath = candidates.find(candidate => fs.existsSync(candidate))
+
+  return filePath ? fs.readFileSync(filePath, 'utf8').trim() : ''
+}
+
+function loadReferenceData() {
+  const referencesDir = path.join(process.cwd(), 'references')
+
+  if (!fs.existsSync(referencesDir)) {
+    return {}
+  }
+
+  return fs
+    .readdirSync(referencesDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('!'))
+    .reduce((acc, entry) => {
+      const directory = path.join(referencesDir, entry.name)
+      const snapshotImages = fs
+        .readdirSync(directory, { withFileTypes: true })
+        .filter(file => file.isFile() && REFERENCE_IMAGE_EXTENSIONS.has(path.extname(file.name).toLowerCase()))
+        .map(file => path.join('references', entry.name, file.name))
+
+      acc[entry.name] = {
+        snapshotImages,
+        backstory: readOptionalTextFile(directory, 'backstory'),
+        // OCR/manual extraction should populate this object from snapshotImages.
+        extractedStats: {},
+      }
+
+      return acc
+    }, {})
+}
+
 function createHeroInfo(nameAssetSlug, abilityAssetSlug, heroIndex) {
   const seed = `${nameAssetSlug}:${abilityAssetSlug}`
   const theme = HERO_INFO_THEMES[heroIndex % HERO_INFO_THEMES.length]
@@ -192,8 +227,10 @@ function resolveMapping(hero) {
 async function run() {
   await mongoose.connect(MONGODB_URI, { bufferCommands: false })
 
+  const heroes = mongoose.connection.collection('heroes')
   const collection = mongoose.connection.collection('heroinfos')
   const overrides = loadHeroInfoOverrides()
+  const referencesBySlug = loadReferenceData()
 
   const mapping = {}
 
@@ -207,11 +244,42 @@ async function run() {
     }
 
     const now = new Date()
+    const { nameAssetSlug } = resolveMapping(hero)
 
-    const doc = Object.assign({ heroId: new Types.ObjectId(), createdAt: now, updatedAt: now }, heroInfo)
+    await heroes.updateOne(
+      { slug: hero.slug },
+      {
+        $set: {
+          name: hero.displayName,
+          slug: hero.slug,
+          portrait: `/panorama/images/heroes/${nameAssetSlug}.png`,
+          render: `/render/${hero.displayName.replaceAll(' ', '_').replaceAll('&', 'and')}_Render.png`,
+          createdByUserId: process.env.HERO_SEED_CREATED_BY_USER_ID || 'system',
+          status: 'published',
+          publishedAt: now,
+          updatedAt: now,
+        },
+        $setOnInsert: { createdAt: now },
+      },
+      { upsert: true },
+    )
 
-    // Upsert based on nameValue (hero name image path)
-    await collection.updateOne({ nameValue: heroInfo.nameValue }, { $set: doc }, { upsert: true })
+    const persistedHero = await heroes.findOne({ slug: hero.slug }, { projection: { _id: 1 } })
+    const referenceData = referencesBySlug[hero.slug]
+    const doc = Object.assign(
+      {
+        heroId: persistedHero._id,
+        tag1OffsetY: heroInfo.tag1OffsetY ?? 0,
+        tag2OffsetY: heroInfo.tag2OffsetY ?? 0,
+        tag3OffsetY: heroInfo.tag3OffsetY ?? 0,
+        backstory: referenceData?.backstory || heroInfo.backstory || '',
+        createdAt: now,
+        updatedAt: now,
+      },
+      heroInfo,
+    )
+
+    await collection.updateOne({ heroId: persistedHero._id }, { $set: doc }, { upsert: true })
 
     mapping[hero.slug] = true
   }

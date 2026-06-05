@@ -4,18 +4,20 @@ import { Upload } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, PointerEvent, WheelEvent } from 'react'
 
-import EditorAssetModal from '@/components/editor-asset-modal'
+import EditorAssetModal from '@/components/EditorAssetModal/EditorAssetModal'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
-import SidebarTabs from '@/components/sidebar-tabs'
-import type { SidebarTabId } from '@/components/sidebar-tabs'
+import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
+import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
 import type { EditorAssetGroup, EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import cn from '@/lib/utilsd'
+
+import styles from './HeroInfoEditor.module.css'
 
 interface HeroInfoEditorProps {
   hero: HeroDefinition
@@ -153,7 +155,7 @@ function ColorField({ label, value, onChange }: ColorFieldProps) {
   const inputId = `editor-${label.toLowerCase().replaceAll(' ', '-')}`
 
   return (
-    <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor={inputId}>
+    <label className={styles.fieldLabel} htmlFor={inputId}>
       {label}
       <span className="flex items-center gap-2">
         <input
@@ -168,7 +170,7 @@ function ColorField({ label, value, onChange }: ColorFieldProps) {
           type="text"
           value={value}
           onChange={event => onChange(event.target.value)}
-          className="min-w-0 flex-1 rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.74rem] tracking-[0.08em] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+          className={cn(styles.input, 'min-w-0 flex-1 text-[0.74rem] tracking-[0.08em]')}
           aria-label={`${label} hex value`}
         />
       </span>
@@ -401,17 +403,17 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
 
   return (
     <section
-      className="pointer-events-none absolute inset-0 z-30"
+      className={styles.editor}
       data-testid="hero-info-editor"
       aria-label="Character editor"
     >
       <SidebarTabs activeTabId={activeTabId} onSelect={setActiveTabId} overviewLabel="Hero render" />
 
-      <div className="pointer-events-auto absolute left-[clamp(100px,32vw,300px)] bottom-[clamp(280px,12vh,180px)] flex min-h-[230px] w-[min(52vw,780px)] flex-col justify-end p-4 max-lg:left-[clamp(360px,38vw,420px)] max-lg:w-[min(44vw,560px)] max-sm:left-3 max-sm:w-[min(92vw,520px)]">
-            <div className="flex justify-center">
+      <div className={styles.previewStage}>
+            <div className={styles.nameRow}>
               {draft.nameType === 'image' ? (
                 <span
-                  className="block aspect-[1701/564] w-full max-w-[360px] bg-[var(--hero-info-name-color)] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"
+                  className={styles.nameImage}
                   data-testid="editor-name-image"
                   aria-label="Uploaded hero name preview"
                   role="img"
@@ -422,20 +424,20 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                   }}
                 />
               ) : (
-                <span className="max-w-full text-center text-[clamp(1.5rem,3vw,3.3rem)] font-extrabold uppercase tracking-[0.08em] break-words" data-testid="editor-name-text" style={{ color: draft.nameColor }}>
+                <span className={styles.nameText} data-testid="editor-name-text" style={{ color: draft.nameColor }}>
                   {heroNamePreview}
                 </span>
               )}
             </div>
 
-            <div className="mt-5 mb-5 flex w-full flex-nowrap items-center justify-center gap-3 overflow-visible px-1" aria-label="Editable hero tags" data-testid="editor-tags-row">
+            <div className={cn(styles.tagsRow, 'flex-nowrap')} aria-label="Editable hero tags" data-testid="editor-tags-row">
               {tagPreview.map((tag, index) => (
                 <span
                   key={tag.label}
                   role="button"
                   tabIndex={0}
                   aria-label={`${tag.label} preview. Scroll or drag horizontally to rotate.`}
-                  className="inline-flex min-h-8 w-fit shrink-0 cursor-grab touch-none select-none items-center justify-center px-3 py-1 shadow-[0_4px_10px_rgba(0,0,0,0.18)] transition hover:brightness-110 active:cursor-grabbing"
+                  className={cn(styles.tagPreview, 'w-fit shrink-0')}
                   data-testid={`editor-tag-${index + 1}`}
                   onWheel={event => handleTagWheel(event, tag)}
                   onPointerDown={event => handleTagPointerDown(event, tag)}
@@ -448,24 +450,24 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                     color: draft.tagTextColor,
                   }}
                 >
-                  <span className="text-center font-['Valve_Pulp',sans-serif] text-[clamp(1.05rem,1.45vw,1.3rem)] leading-[0.92] font-black tracking-[0.06em] whitespace-nowrap">{tag.text || tag.label}</span>
+                  <span className={cn(styles.tagText, 'whitespace-nowrap')}>{tag.text || tag.label}</span>
                 </span>
               ))}
             </div>
 
-            <div className="flex justify-center gap-2.5" aria-label="Editable ability icons">
+            <div className={styles.abilitiesRow} aria-label="Editable ability icons">
               {ABILITY_CONTROLS.map((ability, index) => (
                 <button
                   key={ability.iconKey}
                   type="button"
-                  className="inline-flex aspect-square size-[clamp(54px,5vw,75px)] shrink-0 items-center justify-center rounded-full border border-[#ffefd6]/10 bg-transparent shadow-[0_4px_10px_rgba(0,0,0,0.18)] transition hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffefd6]"
+                  className={styles.abilityButton}
                   data-testid={`editor-ability-${index + 1}`}
                   aria-label={`Choose ${ability.label} icon`}
                   style={{ backgroundColor: draft.abilityCircleColor }}
                   onClick={() => setActiveAbilityIndex(index)}
                 >
                   <span
-                    className="size-[68%] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"
+                    className={styles.abilityIcon}
                     aria-hidden="true"
                     style={{
                       backgroundColor: draft.abilityIconColor,
@@ -479,65 +481,65 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
       </div>
 
       {activeTabId !== 'overview' ? (
-        <aside className="pointer-events-auto absolute right-[clamp(72px,5vw,120px)] bottom-[clamp(36px,4vw,60px)] z-30 w-[min(43vw,560px)] max-lg:w-[min(52vw,500px)] max-sm:right-3 max-sm:bottom-3 max-sm:w-[min(88vw,380px)]">
+        <aside className={styles.statsAside}>
           {activeTabId === 'weapon' ? (
-            <div className="flex flex-col gap-2.5">
-              <div className="grid gap-2 rounded border border-[#ffefd6]/14 bg-[#061d27]/82 p-3 text-[#ffefd6] shadow-[0_12px_34px_rgba(0,0,0,0.32)] backdrop-blur-xl" data-testid="weapon-mini-editor">
-                <span className="text-[0.62rem] font-black uppercase tracking-[0.22em] text-[#ffefd6]/72">Weapon Info</span>
-                <div className="grid grid-cols-1 gap-2">
-                  <label className="grid gap-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#ffefd6]/70" htmlFor="editor-weapon-name">
+            <div className={styles.weaponStack}>
+              <div className={styles.miniEditor} data-testid="weapon-mini-editor">
+                <span className={styles.miniEditorTitle}>Weapon Info</span>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.compactLabel} htmlFor="editor-weapon-name">
                     Name
                     <input
                       id="editor-weapon-name"
                       type="text"
                       value={statsDraft.weapon.weaponName}
                       onChange={event => updateWeaponDraft({ weaponName: event.target.value })}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.75rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
-                  <label className="grid gap-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#ffefd6]/70" htmlFor="editor-weapon-tags">
+                  <label className={styles.compactLabel} htmlFor="editor-weapon-tags">
                     Tags
                     <input
                       id="editor-weapon-tags"
                       type="text"
                       value={weaponTagsInput}
                       onChange={event => handleWeaponTagChange(event.target.value)}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.75rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="grid gap-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#ffefd6]/70" htmlFor="editor-weapon-min-range">
+                <div className={styles.twoColumnGrid}>
+                  <label className={styles.compactLabel} htmlFor="editor-weapon-min-range">
                     Min
                     <input
                       id="editor-weapon-min-range"
                       type="text"
                       value={statsDraft.weapon.weaponMinRange}
                       onChange={event => updateWeaponDraft({ weaponMinRange: parseEditableNumber(event.target.value) })}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.75rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
-                  <label className="grid gap-1 text-[0.6rem] font-bold uppercase tracking-[0.2em] text-[#ffefd6]/70" htmlFor="editor-weapon-max-range">
+                  <label className={styles.compactLabel} htmlFor="editor-weapon-max-range">
                     Max
                     <input
                       id="editor-weapon-max-range"
                       type="text"
                       value={statsDraft.weapon.weaponMaxRange}
                       onChange={event => updateWeaponDraft({ weaponMaxRange: parseEditableNumber(event.target.value) })}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.75rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={styles.weaponActionGrid}>
                   <button
                     type="button"
-                    className="self-end rounded border border-[#ffefd6]/15 bg-black/30 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#ffefd6]/78 transition hover:border-[#2fc890]/70 hover:text-[#bafbe0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffefd6]"
+                    className={styles.assetButton}
                     onClick={() => setIsWeaponAssetModalOpen(true)}
                   >
                     Asset
                   </button>
-                  <label className="flex cursor-pointer items-center justify-center gap-1 self-end rounded border border-dashed border-[#ffefd6]/20 bg-black/30 px-3 py-1.5 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#ffefd6]/78 transition hover:border-[#2fc890]/70 hover:text-[#bafbe0]">
-                    <Upload className="size-3.5" aria-hidden />
+                  <label className={styles.uploadButton}>
+                    <Upload className={styles.uploadIcon} aria-hidden />
                     Upload
                     <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleWeaponImageUpload} />
                   </label>
@@ -566,27 +568,25 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
         </aside>
       ) : null}
 
-      <div
-        className="pointer-events-auto absolute top-[88px] left-[clamp(18px,2vw,36px)] max-h-[calc(100vh-122px)] w-[min(30vw,360px)] overflow-x-hidden overflow-y-auto rounded border border-[#ffefd6]/14 bg-[#061d27]/80 p-4 text-[#ffefd6] shadow-[0_20px_70px_rgba(0,0,0,0.46)] backdrop-blur-xl max-lg:w-[min(34vw,340px)] max-sm:left-3 max-sm:w-[min(88vw,360px)]"
-      >
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <div className={styles.controlRail}>
+        <div className={styles.railHeader}>
           <div>
-            <h2 className="text-sm font-black uppercase tracking-[0.28em]">Create</h2>
-            <p className="mt-1 text-xs leading-5 text-[#ffefd6]/58">{hero.displayName} draft</p>
+            <h2 className={styles.railTitle}>Create</h2>
+            <p className={styles.railSubtitle}>{hero.displayName} draft</p>
           </div>
-          <span className="rounded-full border border-[#2fc890]/35 bg-[#2fc890]/10 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.22em] text-[#bafbe0]">Live</span>
+          <span className={styles.liveBadge}>Live</span>
         </div>
 
-        <div className="grid gap-4">
+        <div className={styles.railContent}>
           {activeTabId === 'overview' ? (
-            <div className="grid gap-3">
-              <span className="text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75">Hero Render</span>
-              <div className="grid grid-cols-3 gap-2">
+            <div className={styles.sectionGroup}>
+              <span className={styles.sectionTitle}>Hero Render</span>
+              <div className={styles.renderModeGrid}>
                 <button
                   type="button"
                   className={cn(
-                    'rounded border px-3 py-2 text-[0.62rem] font-black uppercase tracking-[0.14em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffefd6]',
-                    renderSelection.mode === 'background' ? 'border-[#2fc890] bg-[#2fc890]/18 text-[#bafbe0]' : 'border-[#ffefd6]/15 bg-black/30 text-[#ffefd6]/58 hover:text-[#ffefd6]',
+                    styles.segmentedButton,
+                    renderSelection.mode === 'background' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
                   )}
                   onClick={() => onRenderSelectionChange({ mode: 'background', src: null })}
                 >
@@ -595,8 +595,8 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                 <button
                   type="button"
                   className={cn(
-                    'rounded border px-3 py-2 text-[0.62rem] font-black uppercase tracking-[0.14em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffefd6]',
-                    renderSelection.mode === 'hero' ? 'border-[#2fc890] bg-[#2fc890]/18 text-[#bafbe0]' : 'border-[#ffefd6]/15 bg-black/30 text-[#ffefd6]/58 hover:text-[#ffefd6]',
+                    styles.segmentedButton,
+                    renderSelection.mode === 'hero' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
                   )}
                   onClick={() => setIsHeroRenderAssetModalOpen(true)}
                 >
@@ -604,11 +604,11 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                 </button>
                 <label
                   className={cn(
-                    'flex cursor-pointer items-center justify-center gap-1 rounded border px-3 py-2 text-[0.62rem] font-black uppercase tracking-[0.14em] transition hover:border-[#2fc890]/70 hover:text-[#bafbe0]',
-                    renderSelection.mode === 'custom' ? 'border-[#2fc890] bg-[#2fc890]/18 text-[#bafbe0]' : 'border-dashed border-[#ffefd6]/20 bg-black/30 text-[#ffefd6]/58',
+                    styles.uploadButton,
+                    renderSelection.mode === 'custom' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
                   )}
                 >
-                  <Upload className="size-3.5" aria-hidden />
+                  <Upload className={styles.uploadIcon} aria-hidden />
                   Upload
                   <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleHeroRenderUpload} />
                 </label>
@@ -616,13 +616,13 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             </div>
           ) : null}
 
-          <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor="editor-background">
+          <label className={styles.fieldLabel} htmlFor="editor-background">
             Background
             <select
               id="editor-background"
               value={selectedBackground}
               onChange={event => onBackgroundChange(event.target.value)}
-              className="rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.74rem] tracking-[0.08em] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+              className={styles.select}
               data-testid="editor-background-select"
             >
               {backgroundOptions.map(option => (
@@ -633,16 +633,16 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             </select>
           </label>
 
-          <div className="grid gap-2">
-            <span className="text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75">Hero Name</span>
-            <div className="grid grid-cols-2 gap-2" role="group" aria-label="Hero name mode">
+          <div className={styles.fieldGroup}>
+            <span className={styles.sectionTitle}>Hero Name</span>
+            <div className={styles.segmentedGrid} role="group" aria-label="Hero name mode">
               {(['text', 'image'] as const).map(mode => (
                 <button
                   key={mode}
                   type="button"
                   className={cn(
-                    'rounded border px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.18em] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ffefd6]',
-                    draft.nameType === mode ? 'border-[#2fc890] bg-[#2fc890]/18 text-[#bafbe0]' : 'border-[#ffefd6]/15 bg-black/30 text-[#ffefd6]/58 hover:text-[#ffefd6]',
+                    styles.segmentedButton,
+                    draft.nameType === mode ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
                   )}
                   aria-pressed={draft.nameType === mode}
                   onClick={() => updateDraft({ nameType: mode })}
@@ -653,26 +653,26 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             </div>
 
             {draft.nameType === 'text' ? (
-              <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor="editor-name-input">
+              <label className={styles.fieldLabel} htmlFor="editor-name-input">
                 Name Text
                 <input
                   id="editor-name-input"
                   type="text"
                   value={draft.nameValue}
                   onChange={event => updateDraft({ nameValue: event.target.value })}
-                  className="rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.8rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+                  className={styles.input}
                 />
               </label>
             ) : (
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded border border-dashed border-[#ffefd6]/20 bg-black/30 px-3 py-3 text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#ffefd6]/78 transition hover:border-[#2fc890]/70 hover:text-[#bafbe0]">
-                <Upload className="size-4" aria-hidden />
+              <label className={cn(styles.uploadButton, styles.uploadNameButton)}>
+                <Upload className={styles.uploadIcon} aria-hidden />
                 Upload name image
                 <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleNameUpload} />
               </label>
             )}
           </div>
 
-          <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor="editor-backstory">
+          <label className={styles.fieldLabel} htmlFor="editor-backstory">
             Backstory
             <textarea
               id="editor-backstory"
@@ -680,27 +680,27 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
               onChange={event => updateDraft({ backstory: event.target.value })}
               rows={6}
               wrap="soft"
-              className="min-h-32 resize-y overflow-x-hidden overflow-y-auto rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.78rem] leading-5 tracking-[0.03em] break-words text-[#ffefd6] outline-none transition [overflow-wrap:anywhere] placeholder:text-[#ffefd6]/28 focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+              className={cn(styles.textarea, 'overflow-y-auto overflow-x-hidden break-words')}
               placeholder="Write this character's story..."
             />
           </label>
 
-          <div className="grid gap-3">
-            <span className="text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75">Tags</span>
+          <div className={styles.sectionGroup}>
+            <span className={styles.sectionTitle}>Tags</span>
             {TAG_CONTROLS.map(tag => (
-              <div key={tag.textKey} className="grid gap-2 rounded border border-[#ffefd6]/10 bg-black/15 p-2.5">
-                <label className="grid gap-1.5 text-[0.64rem] font-bold uppercase tracking-[0.22em] text-[#ffefd6]/75" htmlFor={`editor-${tag.textKey}`}>
+              <div key={tag.textKey} className={styles.tagControl}>
+                <label className={styles.fieldLabel} htmlFor={`editor-${tag.textKey}`}>
                   {tag.label}
                   <input
                     id={`editor-${tag.textKey}`}
                     type="text"
                     value={draft[tag.textKey]}
                     onChange={event => updateDraft({ [tag.textKey]: event.target.value })}
-                    className="rounded border border-[#ffefd6]/15 bg-black/45 px-2.5 py-2 text-[0.8rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+                    className={styles.input}
                   />
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="grid gap-1.5 text-[0.56rem] font-bold uppercase tracking-[0.18em] text-[#ffefd6]/62" htmlFor={`editor-${tag.tiltKey}`}>
+                <div className={styles.twoColumnGrid}>
+                  <label className={cn(styles.compactLabel, styles.tinyLabel)} htmlFor={`editor-${tag.tiltKey}`}>
                     Tilt
                     <input
                       id={`editor-${tag.tiltKey}`}
@@ -711,10 +711,10 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                       value={draft[tag.tiltKey]}
                       aria-label={`${tag.label} tilt`}
                       onChange={event => updateTagTilt(tag, parseTagControlNumber(event.target.value, draft[tag.tiltKey]))}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.72rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
-                  <label className="grid gap-1.5 text-[0.56rem] font-bold uppercase tracking-[0.18em] text-[#ffefd6]/62" htmlFor={`editor-${tag.offsetKey}`}>
+                  <label className={cn(styles.compactLabel, styles.tinyLabel)} htmlFor={`editor-${tag.offsetKey}`}>
                     Vertical
                     <input
                       id={`editor-${tag.offsetKey}`}
@@ -725,7 +725,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                       value={draft[tag.offsetKey]}
                       aria-label={`${tag.label} vertical position`}
                       onChange={event => updateDraft({ [tag.offsetKey]: parseTagControlNumber(event.target.value, draft[tag.offsetKey]) })}
-                      className="rounded border border-[#ffefd6]/15 bg-black/45 px-2 py-1.5 text-[0.72rem] text-[#ffefd6] outline-none transition focus:border-[#2fc890] focus:shadow-[0_0_0_2px_rgba(47,200,144,0.25)]"
+                      className={cn(styles.input, styles.compactInput)}
                     />
                   </label>
                 </div>
@@ -733,7 +733,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className={styles.sectionGroup}>
             <ColorField label="Hero Name" value={draft.nameColor} onChange={value => updateDraft({ nameColor: value })} />
             <ColorField label="Tag Text" value={draft.tagTextColor} onChange={value => updateDraft({ tagTextColor: value })} />
             <ColorField label="Tag Rectangles" value={draft.tagColor} onChange={value => updateDraft({ tagColor: value })} />

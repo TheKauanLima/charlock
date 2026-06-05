@@ -1,0 +1,318 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #000;
+  color: #ffefd6;
+  font-family: Radiance, Arial, sans-serif;
+  transition: color 150ms ease-out;
+}
+
+.backgroundRender {
+  z-index: 0;
+  object-fit: contain;
+  object-position: right bottom;
+  opacity: 0.5;
+  filter: saturate(1.08) contrast(1.08);
+  transition: opacity 150ms ease-out, filter 150ms ease-out;
+}
+
+.noiseLayer,
+.washLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.noiseLayer {
+  z-index: 1;
+  background-image: url('/noise.png');
+  background-size: 220px 220px;
+  opacity: 0.05;
+}
+
+.washLayer {
+  z-index: 2;
+  background:
+    radial-gradient(circle at 84% 20%, color-mix(in srgb, var(--profile-accent) 34%, transparent), transparent 34%),
+    linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.88) 42%, rgba(0, 0, 0, 0.42) 100%);
+}
+
+.content {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 20px;
+  width: min(1120px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 96px 0 54px;
+}
+
+.identityPanel,
+.reportPanel,
+.ledgerPanel,
+.statBox {
+  border: 1px solid color-mix(in srgb, var(--profile-accent) 78%, #ffefd6 8%);
+  background:
+    linear-gradient(180deg, rgba(18, 19, 17, 0.92), rgba(8, 10, 9, 0.9)),
+    #111;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--profile-accent) 28%, transparent), inset 0 0 0 1px rgba(255, 239, 214, 0.06);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.identityPanel {
+  display: grid;
+  grid-template-columns: 156px minmax(0, 1fr) 220px;
+  gap: 24px;
+  align-items: center;
+  min-height: 220px;
+  padding: 28px;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 156px;
+  height: 156px;
+  clip-path: polygon(12% 0, 88% 0, 100% 18%, 100% 82%, 88% 100%, 12% 100%, 0 82%, 0 18%);
+  border: 3px solid var(--profile-accent);
+  background: #111;
+  overflow: hidden;
+}
+
+.avatar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(180deg, transparent 0 4px, rgba(255, 255, 255, 0.08) 5px);
+  mix-blend-mode: screen;
+  opacity: 0.26;
+}
+
+.avatarImage {
+  object-fit: cover;
+}
+
+.avatarFallback {
+  color: var(--profile-name);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 2.7rem;
+  letter-spacing: 0;
+}
+
+.identityCopy {
+  min-width: 0;
+}
+
+.eyebrow,
+.sectionHeader p,
+.statBox span,
+.heroSelect span {
+  margin: 0;
+  color: var(--profile-name);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  font-size: 1.02rem;
+}
+
+.identityCopy h1 {
+  margin: 4px 0 12px;
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: clamp(3.1rem, 8vw, 6.4rem);
+  line-height: 0.85;
+  text-transform: uppercase;
+}
+
+.rankLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--profile-rank);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.92rem;
+  text-transform: uppercase;
+}
+
+.timestamp {
+  display: block;
+  margin-top: 8px;
+  color: rgba(255, 239, 214, 0.66);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+}
+
+.heroSelect {
+  display: grid;
+  gap: 8px;
+}
+
+.heroSelect select {
+  width: 100%;
+  border: 1px solid rgba(255, 239, 214, 0.24);
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffefd6;
+  padding: 11px 12px;
+  font: inherit;
+  outline: none;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.heroSelect select:focus {
+  border-color: var(--profile-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--profile-accent) 26%, transparent);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.statBox {
+  display: grid;
+  gap: 8px;
+  min-height: 132px;
+  padding: 18px;
+}
+
+.statBox svg {
+  color: var(--profile-accent);
+}
+
+.statBox strong {
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 2.15rem;
+  line-height: 0.9;
+}
+
+.progressTrack {
+  height: 6px;
+  overflow: hidden;
+  background: rgba(255, 239, 214, 0.14);
+}
+
+.progressTrack span {
+  display: block;
+  height: 100%;
+  background: var(--profile-rank);
+  transition: width 150ms ease-out;
+}
+
+.reportPanel,
+.ledgerPanel {
+  padding: 22px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.sectionHeader p {
+  font-size: 1.48rem;
+}
+
+.sectionHeader a,
+.sectionHeader span {
+  color: rgba(255, 239, 214, 0.68);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.76rem;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.sectionHeader a:hover {
+  color: var(--profile-name);
+}
+
+.reportText {
+  max-width: 760px;
+  color: rgba(255, 239, 214, 0.86);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.95rem;
+  line-height: 1.75;
+}
+
+.reportText p {
+  margin: 0 0 12px;
+}
+
+.ledgerGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.heroCard {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 108px;
+  border: 1px solid rgba(255, 239, 214, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 12px;
+}
+
+.heroPortrait {
+  position: relative;
+  width: 74px;
+  height: 84px;
+  overflow: hidden;
+  background: rgba(255, 239, 214, 0.08);
+}
+
+.heroPortrait img {
+  object-fit: cover;
+}
+
+.heroCard h2 {
+  margin: 0;
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 1.4rem;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.statusBadge {
+  display: inline-block;
+  margin-top: 9px;
+  border: 1px solid color-mix(in srgb, var(--profile-accent) 54%, transparent);
+  color: var(--profile-name);
+  padding: 3px 8px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+}
+
+.emptyLedger {
+  margin: 0;
+  color: rgba(255, 239, 214, 0.7);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+}
+
+@media (max-width: 820px) {
+  .content {
+    width: min(100% - 28px, 1120px);
+    padding-top: 88px;
+  }
+
+  .identityPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+}

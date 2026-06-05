@@ -9,6 +9,9 @@ import User from '@/lib/models/User'
 interface ClerkEmailAddress {
   email_address: string
   id?: string
+  verification?: {
+    status?: string | null
+  } | null
 }
 
 interface ClerkUserPayload {
@@ -18,6 +21,7 @@ interface ClerkUserPayload {
   username?: string | null
   first_name?: string | null
   last_name?: string | null
+  unsafe_metadata?: Record<string, unknown> | null
 }
 
 interface ClerkWebhookEvent {
@@ -37,6 +41,36 @@ function getPrimaryEmailAddress(payload: ClerkUserPayload) {
   }
 
   return payload.email_addresses?.[0]?.email_address ?? null
+}
+
+function getPrimaryEmail(payload: ClerkUserPayload) {
+  const primaryEmailId = payload.primary_email_address_id
+
+  if (primaryEmailId && payload.email_addresses?.length) {
+    const primary = payload.email_addresses.find(email => email.id === primaryEmailId)
+
+    if (primary) {
+      return primary
+    }
+  }
+
+  return payload.email_addresses?.[0] ?? null
+}
+
+function getPrimaryEmailVerified(payload: ClerkUserPayload) {
+  const primaryEmail = getPrimaryEmail(payload)
+
+  return primaryEmail?.verification?.status === 'verified'
+}
+
+function getUsername(payload: ClerkUserPayload) {
+  if (payload.username) {
+    return payload.username
+  }
+
+  const metadataUsername = payload.unsafe_metadata?.username
+
+  return typeof metadataUsername === 'string' && metadataUsername.trim() ? metadataUsername.trim() : null
 }
 
 async function verifyWebhook(request: Request) {
@@ -93,7 +127,8 @@ export async function POST(request: Request) {
         {
           clerkId: evt.data.id,
           email,
-          username: evt.data.username ?? null,
+          username: getUsername(evt.data),
+          emailVerified: getPrimaryEmailVerified(evt.data),
           firstName: evt.data.first_name ?? null,
           lastName: evt.data.last_name ?? null,
         },

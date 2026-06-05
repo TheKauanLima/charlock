@@ -2,6 +2,7 @@ import { Schema, model, models, type Model, type Types } from 'mongoose'
 
 export interface IHeroInfo {
   heroId: Types.ObjectId
+  createdByUserId?: string | null
   nameType: 'image' | 'text'
   nameValue: string
   nameColor: string
@@ -13,12 +14,16 @@ export interface IHeroInfo {
   tag1Tilt: number
   tag2Tilt: number
   tag3Tilt: number
+  tag1OffsetY: number
+  tag2OffsetY: number
+  tag3OffsetY: number
   ability1Icon: string
   ability2Icon: string
   ability3Icon: string
   ability4Icon: string
   abilityCircleColor: string
   abilityIconColor: string
+  backstory?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -30,6 +35,11 @@ const heroInfoSchema = new Schema<IHeroInfo>(
       ref: 'Hero',
       required: true,
       unique: true,
+      index: true,
+    },
+    createdByUserId: {
+      type: String,
+      default: null,
       index: true,
     },
     nameType: {
@@ -77,6 +87,18 @@ const heroInfoSchema = new Schema<IHeroInfo>(
       type: Number,
       required: true,
     },
+    tag1OffsetY: {
+      type: Number,
+      required: true,
+    },
+    tag2OffsetY: {
+      type: Number,
+      required: true,
+    },
+    tag3OffsetY: {
+      type: Number,
+      required: true,
+    },
     ability1Icon: {
       type: String,
       required: true,
@@ -100,6 +122,9 @@ const heroInfoSchema = new Schema<IHeroInfo>(
     abilityIconColor: {
       type: String,
       required: true,
+    },
+    backstory: {
+      type: String,
     },
   },
   {

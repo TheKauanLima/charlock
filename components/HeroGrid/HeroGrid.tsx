@@ -4,13 +4,14 @@ import Image from 'next/image'
 import { useEffect, useMemo, useState } from 'react'
 
 import BackstoryModule from '@/components/backstory/BackstoryModule'
-import HeroInfoCluster from '@/components/hero-info-cluster'
-import HeroInfoEditor from '@/components/hero-info-editor'
-import styles from '@/components/hero-grid.module.css'
+import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
+import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
 import type { EditorRenderSelection } from '@/lib/editor-assets'
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
+
+import styles from './HeroGrid.module.css'
 
 interface TabItem {
   label: PrimaryTab
@@ -208,7 +209,7 @@ export default function HeroGrid() {
         <HeroInfoCluster hero={activeHero} />
       )}
 
-      <BackstoryModule hero={backstoryHero} />
+      {isCreateMode ? <BackstoryModule hero={backstoryHero} /> : null}
     </div>
   )
 }

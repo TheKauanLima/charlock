@@ -1,0 +1,148 @@
+.cluster {
+  pointer-events: none;
+  position: absolute;
+  right: clamp(72px, 5vw, 120px);
+  bottom: clamp(36px, 4vw, 60px);
+  z-index: 30;
+  display: flex;
+  width: min(43vw, 560px);
+  user-select: none;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panelContents {
+  display: contents;
+}
+
+.nameRow {
+  display: flex;
+  justify-content: center;
+}
+
+.nameImage {
+  display: block;
+  aspect-ratio: 1701 / 564;
+  width: 100%;
+  background: var(--hero-info-name-color);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.nameText {
+  color: var(--hero-info-name-color);
+  font-size: clamp(1.3rem, 2vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.tag {
+  display: inline-flex;
+  min-width: 0;
+  width: fit-content;
+  min-height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.tagText {
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.abilities {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.ability {
+  display: inline-flex;
+  aspect-ratio: 1;
+  width: clamp(54px, 4.5vw, 75px);
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--hero-info-ability-circle-color);
+  color: var(--hero-info-ability-circle-color);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+}
+
+.abilityIcon {
+  width: 68%;
+  height: 68%;
+  background: var(--hero-info-ability-icon-color);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.tabPanelVisible {
+  pointer-events: auto;
+  display: block;
+}
+
+.tabPanelHidden {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .cluster {
+    width: min(52vw, 500px);
+  }
+
+  .tagText {
+    font-size: 0.84rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .cluster {
+    right: 12px;
+    bottom: 12px;
+    width: min(88vw, 380px);
+  }
+
+  .tags {
+    gap: 6px;
+    margin-bottom: 4px;
+  }
+
+  .tag {
+    min-height: 24px;
+    padding: 4px 10px;
+  }
+
+  .tagText {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+  }
+
+  .ability {
+    width: 34px;
+  }
+}

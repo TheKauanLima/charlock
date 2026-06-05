@@ -22,10 +22,13 @@ describe('hero stat mappers', () => {
       bullet_damage_spirit_scaling: 0.2,
       fire_rate_percent: 18,
       fire_rate_percent_weapon_scaling: 0.4,
+      heavy_melee_damage: 122,
+      heavy_melee_damage_weapon_scaling: 0.6,
     })
 
     expect(stats[0]).toMatchObject({ label: 'Bullet Damage', value: '13.5', scaling: 'spirit', scalingValue: '0.2' })
     expect(stats[3]).toMatchObject({ label: 'Fire Rate', value: '18', scaling: 'courage', scalingValue: '0.4' })
+    expect(stats[13]).toMatchObject({ label: 'Heavy Melee', value: '122', scaling: 'melee', scalingValue: '0.6' })
   })
 
   it('falls back to defaults when optional rows are omitted', () => {

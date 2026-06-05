@@ -1,0 +1,122 @@
+import { describe, expect, it, vi } from 'vitest'
+
+const heroFindOneMock = vi.hoisted(() => vi.fn())
+const heroInfoFindOneMock = vi.hoisted(() => vi.fn())
+const weaponFindOneMock = vi.hoisted(() => vi.fn())
+const vitalityFindOneMock = vi.hoisted(() => vi.fn())
+const spiritFindOneMock = vi.hoisted(() => vi.fn())
+
+function createQueryMock<T>(value: T) {
+  return {
+    select: vi.fn().mockReturnThis(),
+    lean: vi.fn().mockResolvedValue(value),
+  }
+}
+
+vi.mock('@/lib/dbConnect', () => ({
+  default: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('server-only', () => ({}))
+
+vi.mock('@/lib/models/Hero', () => ({
+  default: {
+    findOne: heroFindOneMock,
+  },
+}))
+
+vi.mock('@/lib/models/HeroInfo', () => ({
+  default: {
+    findOne: heroInfoFindOneMock,
+  },
+}))
+
+vi.mock('@/lib/models/WeaponStats', () => ({
+  default: {
+    findOne: weaponFindOneMock,
+  },
+}))
+
+vi.mock('@/lib/models/VitalityStats', () => ({
+  default: {
+    findOne: vitalityFindOneMock,
+  },
+}))
+
+vi.mock('@/lib/models/SpiritStats', () => ({
+  default: {
+    findOne: spiritFindOneMock,
+  },
+}))
+
+import { getHeroStatsBySlug } from '@/lib/hero-stats'
+
+describe('getHeroStatsBySlug stat normalization', () => {
+  it('returns the standard stat rows when stored hero documents are partial or malformed', async () => {
+    heroFindOneMock.mockReturnValueOnce(createQueryMock({ _id: 'hero-1', slug: 'apollo', name: 'Apollo', portrait: '/portrait.png', render: '/render.png' }))
+    heroInfoFindOneMock.mockReturnValueOnce(createQueryMock(null))
+    weaponFindOneMock.mockReturnValueOnce(
+      createQueryMock({
+        weaponName: 'Dueling Rapier & Sidearm',
+        weaponDesc: '',
+        gunImageSrc: '',
+        weaponAttributes: [],
+        bulletDPS: 52,
+        weaponMinRange: 15,
+        weaponMaxRange: 45,
+        stats: [
+          { label: 'Bullet Damage', value: '18', unit: '', icon: 'damage', scaling: 'none', scalingValue: '0' },
+          { label: 'Ammo', value: '12', unit: '', icon: 'ammo', scaling: 'none', scalingValue: '0' },
+        ],
+      }),
+    )
+    vitalityFindOneMock.mockReturnValueOnce(
+      createQueryMock({
+        stats: [
+          { label: 'Max Health', value: '450', unit: '', icon: 'health', scaling: 'none', scalingValue: '0' },
+          { label: 'Stamina', value: '4', unit: '', icon: 'stamina', scaling: 'none', scalingValue: '0' },
+        ],
+      }),
+    )
+    spiritFindOneMock.mockReturnValueOnce(
+      createQueryMock({
+        topStats: [
+          { label: 'Radius', value: '6', unit: 'm', icon: 'radius', scaling: 'none', scalingValue: '0' },
+          { label: 'Burst Damage', value: '120', unit: '', icon: 'spirit_damage', scaling: 'spirit', scalingValue: '1.4' },
+        ],
+        spiritPowerStat: { label: 'Spirit Power', value: '0', unit: '', icon: 'spirit', scaling: 'none', scalingValue: '0' },
+      }),
+    )
+
+    const stats = await getHeroStatsBySlug('apollo')
+
+    expect(stats?.weapon.stats).toHaveLength(14)
+    expect(stats?.weapon.stats.map(stat => stat.label)).toEqual([
+      'Bullet Damage',
+      'Weapon Damage',
+      'Bullets per sec',
+      'Fire Rate',
+      'Ammo',
+      'Clip Size Increase',
+      'Reload Time',
+      'Reload Reduction',
+      'Bullet Velocity',
+      'Bullet Velocity Increase',
+      'Bullet Lifesteal',
+      'Crit Bonus Scale',
+      'Light Melee',
+      'Heavy Melee',
+    ])
+    expect(stats?.vitality.stats).toHaveLength(15)
+    expect(stats?.spirit.topStats.map(stat => stat.label)).toEqual([
+      'Ability Cooldown',
+      'Ability Duration',
+      'Ability Range',
+      'Spirit Lifesteal',
+      'Max Charges Increase',
+      'Charge Cooldown',
+    ])
+    expect(stats?.weapon.stats[0]).toMatchObject({ value: '18', icon: 'bulletDamage' })
+    expect(stats?.vitality.stats[14]).toMatchObject({ label: 'Dash Speed', value: '0' })
+  })
+})

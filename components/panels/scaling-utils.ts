@@ -138,19 +138,19 @@ export function mapStatScaling(row: StatsRow | undefined, base: string): Scaling
 
   const spirit = parseScalingValue(row[`${base}_spirit_scaling`])
   const weapon = parseScalingValue(row[`${base}_weapon_scaling`])
-  const melee = parseScalingValue(row[`${base}_weapon_scaling`])
+  const melee = parseScalingValue(row[`${base}_melee_scaling`] ?? (base.includes('melee') ? row[`${base}_weapon_scaling`] : undefined))
   const boon = parseScalingValue(row[`${base}_boon_scaling`])
 
   if (spirit !== null) {
     return { scaling: 'spirit', scalingValue: String(spirit) }
   }
 
-  if (weapon !== null) {
-    return { scaling: 'courage', scalingValue: String(weapon) }
-  }
-
   if (melee !== null) {
     return { scaling: 'melee', scalingValue: String(melee) }
+  }
+
+  if (weapon !== null) {
+    return { scaling: 'courage', scalingValue: String(weapon) }
   }
 
   if (boon !== null) {

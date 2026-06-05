@@ -9,6 +9,8 @@ import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 import cn from '@/lib/utilsd'
 import type { HeroDefinition } from '@/lib/hero-data'
 
+import styles from './HeroStatsVitalityPanel.module.css'
+
 interface HeroStatsVitalityPanelProps {
   hero?: HeroDefinition
   statsSource?: StatsRow
@@ -93,35 +95,35 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
     <button
       type="button"
       className={cn(
-        'relative z-[1] flex min-h-9 cursor-pointer items-center gap-1.5 overflow-visible rounded-[3px] border-0 bg-black/[0.22] px-2 py-1.5 text-left font-sans text-[#f3f7ef] hover:bg-white/[0.04]',
-        isBottom && 'bg-transparent before:pointer-events-none before:absolute before:inset-0 before:bg-black before:opacity-20',
+        styles.cell,
+        isBottom && styles.bottomCell,
       )}
       data-scaling={scaling}
       onClick={handleClick}
       aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
     >
       <span
-        className="relative z-[1] inline-block size-[18px] shrink-0 bg-center bg-contain bg-no-repeat [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] [-webkit-mask-position:center] [-webkit-mask-repeat:no-repeat] [-webkit-mask-size:contain]"
+        className={styles.icon}
         style={getIconStyle(icon)}
         aria-hidden="true"
       />
-      <span className="relative z-[1] flex w-full min-w-0 items-baseline gap-1 overflow-visible font-sans leading-tight">
+      <span className={styles.content}>
         {isEditable ? (
           <input
             type="text"
-            className="w-auto min-w-8 max-w-16 shrink-0 border-0 border-b border-dashed border-[#f3f7ef]/55 bg-transparent px-0 py-0 text-lg font-bold leading-none text-[#f3f7ef] outline-none transition focus:border-[#2fc890] focus:bg-transparent"
+            className={styles.input}
             value={value}
             onChange={handleValueChange}
             onClick={event => event.stopPropagation()}
             aria-label={`${label} value`}
           />
         ) : (
-          <span className="shrink-0 text-lg font-bold text-[#f3f7ef]">{formatPanelValue(value)}</span>
+          <span className={styles.value}>{formatPanelValue(value)}</span>
         )}
-        {unit ? <span className="shrink-0 text-[15px] font-semibold text-[#f3f7ef]/60">{unit}</span> : null}
-        <span className="min-w-0 whitespace-normal break-words text-sm leading-[1.05] font-medium text-[#f3f7ef]/90">{label}</span>
+        {unit ? <span className={styles.unit}>{unit}</span> : null}
+        <span className={styles.label}>{label}</span>
       </span>
-      <span className="relative z-[1]">
+      <span className={styles.scalingWrap}>
         <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
       </span>
     </button>
@@ -141,19 +143,19 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
 
   return (
     <section
-      className="relative isolate overflow-hidden rounded-lg bg-[rgba(12,10,8,0.86)] text-[#f3f7ef] before:pointer-events-none before:absolute before:inset-0 before:z-[-1] before:bg-[linear-gradient(rgb(255_255_255_/_2%)_1px,transparent_1px),linear-gradient(90deg,rgb(255_255_255_/_2%)_1px,transparent_1px)] before:bg-[length:18px_18px] before:opacity-40"
+      className={styles.panel}
       aria-label="Vitality stats"
       data-testid="hero-stats-vitality-panel"
     >
-      <span className="absolute inset-0 z-[-2] bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url('${VITALITY_PANEL_BACKGROUND}')` }} aria-hidden="true" />
+      <span className={styles.background} style={{ backgroundImage: `url('${VITALITY_PANEL_BACKGROUND}')` }} aria-hidden="true" />
 
-      <header className="relative z-[1] px-4 pt-3.5 pb-1.5">
-        <h2 className="block font-serif text-lg font-semibold uppercase tracking-[0.02em] opacity-70">Vitality Stats</h2>
+      <header className={styles.header}>
+        <h2 className={styles.title}>Vitality Stats</h2>
       </header>
 
-      <div className="relative z-[1] flex flex-col gap-1 px-4 pb-3.5">
+      <div className={styles.topStats}>
         {topRows.map((row, rowIndex) => (
-          <div key={`vitality-top-${rowIndex}`} className="grid grid-cols-1 gap-1 min-[900px]:grid-cols-2">
+          <div key={`vitality-top-${rowIndex}`} className={styles.row}>
             {row.map((stat, statIndex) => (
               <VitalityStatCell key={`vitality-top-${stat.label}`} {...stat} isEditable={isEditable} onChange={updates => handleStatChange(rowIndex * 2 + statIndex, updates)} />
             ))}
@@ -161,9 +163,9 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         ))}
       </div>
 
-      <div className="relative z-[1] mt-0.5 flex flex-col gap-1 overflow-hidden rounded-b-lg px-4 py-4 before:pointer-events-none before:absolute before:inset-0 before:bg-black before:opacity-20">
+      <div className={styles.bottomStats}>
         {bottomRows.map((row, rowIndex) => (
-          <div key={`vitality-bottom-${rowIndex}`} className="relative z-[1] grid grid-cols-1 gap-1 min-[900px]:grid-cols-2">
+          <div key={`vitality-bottom-${rowIndex}`} className={styles.bottomRow}>
             {row.map((stat, statIndex) => (
               <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
             ))}

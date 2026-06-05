@@ -67,6 +67,8 @@ const SPIRIT_POWER_DEFINITION = {
   description: 'Spirit Power increases the effectiveness of your Abilities and items.',
 }
 
+const REFERENCE_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+
 function readEnvLocal(pathFile = '.env.local') {
   if (!fs.existsSync(pathFile)) return {}
 
@@ -165,6 +167,54 @@ function loadHeroSeeds() {
   return Function(`return ([${arrayText}])`)()
 }
 
+function loadHeroInfoOverrides() {
+  const filePath = path.join(process.cwd(), 'lib', 'hero-info-overrides.ts')
+  const text = fs.readFileSync(filePath, 'utf8')
+  const match = text.match(/export const HERO_INFO_OVERRIDES:[\s\S]*?=\s*({[\s\S]*})\s*$/)
+
+  if (!match) {
+    throw new Error('Could not parse lib/hero-info-overrides.ts')
+  }
+
+  return Function(`return (${match[1]})`)()
+}
+
+function readOptionalTextFile(directory, baseName) {
+  const candidates = ['.txt', '.md'].map(extension => path.join(directory, `${baseName}${extension}`))
+  const filePath = candidates.find(candidate => fs.existsSync(candidate))
+
+  return filePath ? fs.readFileSync(filePath, 'utf8').trim() : ''
+}
+
+function loadReferenceData() {
+  const referencesDir = path.join(process.cwd(), 'references')
+
+  if (!fs.existsSync(referencesDir)) {
+    return {}
+  }
+
+  return fs
+    .readdirSync(referencesDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('!'))
+    .reduce((acc, entry) => {
+      const directory = path.join(referencesDir, entry.name)
+      const snapshotImages = fs
+        .readdirSync(directory, { withFileTypes: true })
+        .filter(file => file.isFile() && REFERENCE_IMAGE_EXTENSIONS.has(path.extname(file.name).toLowerCase()))
+        .map(file => path.join('references', entry.name, file.name))
+
+      acc[entry.name] = {
+        snapshotImages,
+        backstory: readOptionalTextFile(directory, 'backstory'),
+        // OCR/manual extraction should populate this object from snapshotImages.
+        // Example shape: { bullet_damage: 13.5, heavy_melee_damage_weapon_scaling: 0.6 }
+        extractedStats: {},
+      }
+
+      return acc
+    }, {})
+}
+
 function hashHero(hero) {
   return Array.from(`${hero.slug}:${hero.assetSlug || hero.slug}:${hero.displayName}`).reduce((hash, char) => hash + char.charCodeAt(0), 0)
 }
@@ -213,6 +263,8 @@ function buildHeroStatsSource(hero) {
     weapon_damage_percent: hash % 24,
     bullet_damage_spirit_scaling: hash % 2 === 0 ? 0.2 : 0,
     fire_rate_percent_weapon_scaling: hash % 3 === 0 ? 0.3 : 0,
+    heavy_melee_damage_weapon_scaling: hash % 4 === 0 ? 0.35 : 0,
+    light_melee_damage_weapon_scaling: hash % 3 === 0 ? 0.25 : 0,
     max_health_boon_scaling: hash % 4 === 0 ? 0.4 : 0,
     spirit_power_spirit_scaling: hash % 5 === 0 ? 0.5 : 0,
   }
@@ -231,9 +283,11 @@ function parseScalingValue(value) {
 function mapScaling(row, base) {
   const spirit = parseScalingValue(row[`${base}_spirit_scaling`])
   const weapon = parseScalingValue(row[`${base}_weapon_scaling`])
+  const melee = parseScalingValue(row[`${base}_melee_scaling`] ?? (base.includes('melee') ? row[`${base}_weapon_scaling`] : undefined))
   const boon = parseScalingValue(row[`${base}_boon_scaling`])
 
   if (spirit !== null) return { scaling: 'spirit', scalingValue: String(spirit) }
+  if (melee !== null) return { scaling: 'melee', scalingValue: String(melee) }
   if (weapon !== null) return { scaling: 'courage', scalingValue: String(weapon) }
   if (boon !== null) return { scaling: 'boon', scalingValue: String(boon) }
 
@@ -255,8 +309,8 @@ function removeUndefinedValues(stat) {
   return Object.fromEntries(Object.entries(stat).filter(([, value]) => value !== undefined))
 }
 
-function buildStatsPayload(hero, heroIndex) {
-  const statsSource = buildHeroStatsSource(hero)
+function buildStatsPayload(hero, heroIndex, referenceData) {
+  const statsSource = { ...buildHeroStatsSource(hero), ...(referenceData?.extractedStats ?? {}) }
   const bulletDamage = Number(statsSource.bullet_damage ?? 0)
   const bulletsPerSecond = Number(statsSource.bullets_per_sec ?? 0)
   const theme = HERO_INFO_THEMES[heroIndex % HERO_INFO_THEMES.length]
@@ -290,7 +344,10 @@ async function run() {
   const weaponStats = mongoose.connection.collection('weaponstats')
   const vitalityStats = mongoose.connection.collection('vitalitystats')
   const spiritStats = mongoose.connection.collection('spiritstats')
+  const heroInfos = mongoose.connection.collection('heroinfos')
   const heroSeeds = loadHeroSeeds()
+  const heroInfoOverrides = loadHeroInfoOverrides()
+  const referencesBySlug = loadReferenceData()
   const createdByUserId = process.env.HERO_SEED_CREATED_BY_USER_ID || 'system'
   const now = new Date()
 
@@ -319,7 +376,28 @@ async function run() {
       throw new Error(`Failed to load seeded hero ${hero.slug}`)
     }
 
-    const payload = buildStatsPayload(hero, index)
+    const referenceData = referencesBySlug[hero.slug]
+    const heroInfo = heroInfoOverrides[hero.slug]
+    const payload = buildStatsPayload(hero, index, referenceData)
+
+    if (heroInfo) {
+      await heroInfos.updateOne(
+        { heroId: persistedHero._id },
+        {
+          $set: {
+            ...heroInfo,
+            heroId: persistedHero._id,
+            tag1OffsetY: heroInfo.tag1OffsetY ?? 0,
+            tag2OffsetY: heroInfo.tag2OffsetY ?? 0,
+            tag3OffsetY: heroInfo.tag3OffsetY ?? 0,
+            backstory: referenceData?.backstory || heroInfo.backstory || '',
+            updatedAt: now,
+          },
+          $setOnInsert: { createdAt: now },
+        },
+        { upsert: true },
+      )
+    }
 
     await weaponStats.updateOne(
       { heroId: persistedHero._id },
@@ -338,7 +416,7 @@ async function run() {
     )
   }
 
-  console.log(`Seeded Hero, WeaponStats, VitalityStats, and SpiritStats documents for ${heroSeeds.length} heroes`)
+  console.log(`Seeded Hero, HeroInfo, WeaponStats, VitalityStats, and SpiritStats documents for ${heroSeeds.length} heroes`)
 
   await mongoose.disconnect()
 }

@@ -4,8 +4,13 @@ export interface IUser {
   clerkId: string
   email: string
   username: string | null
+  emailVerified: boolean
   firstName: string | null
   lastName: string | null
+  preferredHero: string
+  isPublic: boolean
+  anonymousEdits: boolean
+  customBio?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -28,11 +33,31 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: null,
     },
+    emailVerified: {
+      type: Boolean,
+      default: false,
+    },
     firstName: {
       type: String,
       default: null,
     },
     lastName: {
+      type: String,
+      default: null,
+    },
+    preferredHero: {
+      type: String,
+      default: 'abrams',
+    },
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
+    anonymousEdits: {
+      type: Boolean,
+      default: false,
+    },
+    customBio: {
       type: String,
       default: null,
     },
