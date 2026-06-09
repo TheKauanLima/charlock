@@ -7,6 +7,7 @@
 }
 
 .avatarButton {
+  position: relative;
   display: grid;
   place-items: center;
   width: 62px;
@@ -15,6 +16,18 @@
   background: transparent;
   cursor: pointer;
   padding: 0;
+}
+
+.avatarNotification {
+  position: absolute;
+  top: 7px;
+  right: 5px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #050706;
+  border-radius: 999px;
+  background: #2fc890;
+  box-shadow: 0 0 14px rgba(47, 200, 144, 0.86);
 }
 
 .avatarFrame {
@@ -111,6 +124,22 @@
   background: rgba(34, 146, 175, 0.18);
   color: #ffefd6;
   outline: none;
+}
+
+.notificationIcon {
+  position: relative;
+  display: inline-flex;
+}
+
+.notificationDot {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #2fc890;
+  box-shadow: 0 0 12px rgba(47, 200, 144, 0.86);
 }
 
 .leaveItem:hover,

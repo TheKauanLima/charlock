@@ -1,9 +1,11 @@
 'use client'
 
-import { Upload } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import type { ChangeEvent, PointerEvent, WheelEvent } from 'react'
+import type { PointerEvent, WheelEvent } from 'react'
 
+import type { OurFileRouter } from '@/app/api/uploadthing/core'
+import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
+import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
 import EditorAssetModal from '@/components/EditorAssetModal/EditorAssetModal'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
@@ -11,10 +13,15 @@ import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
-import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
-import type { EditorAssetGroup, EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
+import { HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
+import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
+import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
+import { buildDefaultAbility, buildDefaultAbilityStats, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { UploadButton } from '@/lib/uploadthing'
+import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
 import cn from '@/lib/utilsd'
 
 import styles from './HeroInfoEditor.module.css'
@@ -25,15 +32,37 @@ interface HeroInfoEditorProps {
   backgroundOptions: HeroBackgroundOption[]
   selectedBackground: string
   renderSelection: EditorRenderSelection
+  savedHeroId?: string | null
+  savedHeroName?: string
+  allowCopies?: boolean
+  initialStats?: HeroStatsPayload | null
+  initialAbilityStats?: AbilityStatsPayload | null
+  isSaving?: boolean
+  saveStatusMessage?: string | null
   onBackgroundChange: (backgroundPath: string) => void
   onRenderSelectionChange: (renderSelection: EditorRenderSelection) => void
   onDraftChange: (draft: HeroInfoDefinition) => void
+  onSaveHero: (payload: CustomHeroSavePayload) => void
 }
 
 interface ColorFieldProps {
   label: string
   value: string
   onChange: (value: string) => void
+}
+
+interface CloudUploadButtonProps {
+  endpoint: keyof OurFileRouter
+  label: string
+  className?: string
+  onUploaded: (url: string) => void
+}
+
+interface UploadedAsset {
+  url?: string
+  serverData?: {
+    url?: string
+  } | null
 }
 
 interface TagControl {
@@ -81,23 +110,10 @@ const TAG_TILT_MAX = 45
 const TAG_WHEEL_STEP = 0.5
 const TAG_DRAG_PIXELS_PER_DEGREE = 6
 
-function createUploadPreview(file: File) {
-  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-    return URL.createObjectURL(file)
-  }
+function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
+  const uploadedAsset = uploadedAssets[0]
 
-  return file.name
-}
-
-function buildAbilityAssetGroups(): EditorAssetGroup[] {
-  return ABILITY_ICON_GROUPS.map(group => ({
-    id: group.heroSlug,
-    label: group.heroName,
-    assets: group.icons.map((icon, index) => ({
-      label: `${group.heroName} ability ${index + 1}`,
-      path: icon,
-    })),
-  }))
+  return uploadedAsset?.serverData?.url ?? uploadedAsset?.url ?? null
 }
 
 function parseEditableNumber(value: string | number | null | undefined) {
@@ -178,18 +194,101 @@ function ColorField({ label, value, onChange }: ColorFieldProps) {
   )
 }
 
-export default function HeroInfoEditor({ hero, draft, backgroundOptions, selectedBackground, renderSelection, onBackgroundChange, onRenderSelectionChange, onDraftChange }: HeroInfoEditorProps) {
+function CloudUploadButton({ endpoint, label, className, onUploaded }: CloudUploadButtonProps) {
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  return (
+    <span className={cn(styles.cloudUploadWrap, className)}>
+      <UploadButton
+        endpoint={endpoint}
+        appearance={{
+          container: styles.cloudUploadContainer,
+          button: styles.cloudUploadButton,
+          allowedContent: styles.cloudUploadAllowed,
+        }}
+        content={{
+          button: ({ isUploading }) => (isUploading ? 'Uploading...' : label),
+          allowedContent: () => null,
+        }}
+        onUploadBegin={() => setUploadError(null)}
+        onClientUploadComplete={uploadedAssets => {
+          const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
+
+          if (!uploadedUrl) {
+            setUploadError('Upload completed without a file URL.')
+            return
+          }
+
+          onUploaded(uploadedUrl)
+        }}
+        onUploadError={error => setUploadError(error.message || 'Upload failed.')}
+      />
+      {uploadError ? <span className={styles.inlineUploadError} role="alert">{uploadError}</span> : null}
+    </span>
+  )
+}
+
+export default function HeroInfoEditor({
+  hero,
+  draft,
+  backgroundOptions,
+  selectedBackground,
+  renderSelection,
+  savedHeroId = null,
+  savedHeroName = '',
+  allowCopies = false,
+  initialStats = null,
+  initialAbilityStats = null,
+  isSaving = false,
+  saveStatusMessage = null,
+  onBackgroundChange,
+  onRenderSelectionChange,
+  onDraftChange,
+  onSaveHero,
+}: HeroInfoEditorProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
   const [activeAbilityIndex, setActiveAbilityIndex] = useState<number | null>(null)
   const [isWeaponAssetModalOpen, setIsWeaponAssetModalOpen] = useState(false)
   const [isHeroRenderAssetModalOpen, setIsHeroRenderAssetModalOpen] = useState(false)
   const [tagRotationDrag, setTagRotationDrag] = useState<TagRotationDrag | null>(null)
-  const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => buildHeroStatsSeed(hero))
-  const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(buildHeroStatsSeed(hero).weapon.stats))
-  const [weaponTagsInput, setWeaponTagsInput] = useState(() => buildHeroStatsSeed(hero).weapon.weaponAttributes.join(', '))
-  const activeAbility = activeAbilityIndex === null ? null : ABILITY_CONTROLS[activeAbilityIndex]
+  const initialStatsDraft = initialStats ?? buildHeroStatsSeed(hero)
+  const initialAbilityDraft = initialAbilityStats ?? buildDefaultAbilityStats(hero)
+  const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
+  const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizeAbilityStats(initialAbilityDraft, hero))
+  const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(initialStatsDraft.weapon.stats))
+  const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
+  const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
+  const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
-  const abilityAssetGroups = useMemo(() => buildAbilityAssetGroups(), [])
+  const exportHeroName = getDraftName() || heroNamePreview
+  const exportShareUrl = savedHeroId && typeof window !== 'undefined' ? getCharacterShareUrl(savedHeroId, window.location.origin) : null
+  const exportPayload = buildCharacterExportPayload(
+    {
+      ...hero,
+      displayName: exportHeroName,
+      render: getRenderPath(),
+      heroInfo: draft,
+    },
+    {
+      hero: {
+        slug: hero.slug,
+        name: exportHeroName,
+        portrait: hero.portrait,
+        render: getRenderPath(),
+      },
+      heroInfo: draft,
+      weapon: statsDraft.weapon,
+      vitality: statsDraft.vitality,
+      spirit: statsDraft.spirit,
+    },
+    {
+      name: exportHeroName,
+      render: getRenderPath(),
+      heroInfo: draft,
+      shareUrl: exportShareUrl,
+    },
+  )
 
   const tagPreview = useMemo(
     () =>
@@ -235,53 +334,24 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
     }))
   }
 
-  function handleNameUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
+  function handleNameUpload(uploadUrl: string) {
     updateDraft({
       nameType: 'image',
-      nameValue: createUploadPreview(file),
+      nameValue: uploadUrl,
     })
   }
 
-  function handleWeaponImageUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
+  function handleWeaponImageUpload(uploadUrl: string) {
     updateWeaponDraft({
-      gunImageSrc: createUploadPreview(file),
+      gunImageSrc: uploadUrl,
     })
   }
 
-  function handleHeroRenderUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-
-    if (!file) {
-      return
-    }
-
+  function handleHeroRenderUpload(uploadUrl: string) {
     onRenderSelectionChange({
       mode: 'custom',
-      src: createUploadPreview(file),
+      src: uploadUrl,
     })
-  }
-
-  function selectAbilityIcon(iconPath: string) {
-    if (!activeAbility) {
-      return
-    }
-
-    updateDraft({
-      [activeAbility.iconKey]: iconPath,
-    })
-    setActiveAbilityIndex(null)
   }
 
   function handleWeaponStatsChange(nextStats: PanelStat[], changedStat: PanelStat) {
@@ -356,6 +426,71 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
     })
   }
 
+  function getRenderPath() {
+    if ((renderSelection.mode === 'hero' || renderSelection.mode === 'custom') && renderSelection.src) {
+      return renderSelection.src
+    }
+
+    return selectedBackground
+  }
+
+  function getDraftName() {
+    const explicitName = heroNameInput.trim()
+
+    if (explicitName) {
+      return explicitName
+    }
+
+    if (savedHeroName.trim()) {
+      return savedHeroName.trim()
+    }
+
+    return draft.nameType === 'text' ? draft.nameValue.trim() : ''
+  }
+
+  function handleGlobalSave(status: CustomHeroStatus) {
+    const name = getDraftName()
+
+    if (!name) {
+      setSaveError('Enter a hero name before saving this draft.')
+      return
+    }
+
+    setSaveError(null)
+    onSaveHero({
+      id: savedHeroId,
+      name,
+      status,
+      hero: {
+        portrait: hero.portrait,
+        render: getRenderPath(),
+        background: selectedBackground,
+      },
+      allowCopies: allowCopiesInput,
+      heroInfo: draft,
+      weapon: statsDraft.weapon,
+      vitality: statsDraft.vitality,
+      spirit: statsDraft.spirit,
+      abilityStats: abilityStatsDraft,
+    })
+  }
+
+  function handleAbilitySave(nextAbility: AbilityDefinition) {
+    const abilityControl = ABILITY_CONTROLS[nextAbility.slot - 1]
+
+    setAbilityStatsDraft(currentDraft => ({
+      abilities: currentDraft.abilities.map((ability, index) => (index === nextAbility.slot - 1 ? nextAbility : ability)),
+    }))
+
+    if (abilityControl) {
+      updateDraft({
+        [abilityControl.iconKey]: nextAbility.icon,
+      })
+    }
+
+    setActiveAbilityIndex(null)
+  }
+
   function updateTagTilt(tag: TagControl, tilt: number) {
     updateDraft({
       [tag.tiltKey]: clampTagTilt(tilt),
@@ -399,6 +534,19 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
     }
 
     setTagRotationDrag(null)
+  }
+
+  if (activeAbilityIndex !== null) {
+    const activeAbilityDraft = abilityStatsDraft.abilities[activeAbilityIndex] ?? buildDefaultAbility(activeAbilityIndex + 1, hero)
+
+    return (
+      <AbilityEditor
+        ability={activeAbilityDraft}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={handleAbilitySave}
+        onCancel={() => setActiveAbilityIndex(null)}
+      />
+    )
   }
 
   return (
@@ -462,7 +610,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                   type="button"
                   className={styles.abilityButton}
                   data-testid={`editor-ability-${index + 1}`}
-                  aria-label={`Choose ${ability.label} icon`}
+                  aria-label={`Edit ${ability.label}`}
                   style={{ backgroundColor: draft.abilityCircleColor }}
                   onClick={() => setActiveAbilityIndex(index)}
                 >
@@ -508,6 +656,18 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                     />
                   </label>
                 </div>
+                <label className={styles.compactLabel} htmlFor="editor-weapon-description">
+                  Description
+                  <textarea
+                    id="editor-weapon-description"
+                    value={statsDraft.weapon.weaponDesc}
+                    onChange={event => updateWeaponDraft({ weaponDesc: event.target.value })}
+                    rows={2}
+                    wrap="soft"
+                    className={cn(styles.textarea, styles.compactTextarea)}
+                    placeholder="Describe this weapon..."
+                  />
+                </label>
                 <div className={styles.twoColumnGrid}>
                   <label className={styles.compactLabel} htmlFor="editor-weapon-min-range">
                     Min
@@ -538,11 +698,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                   >
                     Asset
                   </button>
-                  <label className={styles.uploadButton}>
-                    <Upload className={styles.uploadIcon} aria-hidden />
-                    Upload
-                    <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleWeaponImageUpload} />
-                  </label>
+                  <CloudUploadButton endpoint="weaponImage" label="Upload" onUploaded={handleWeaponImageUpload} />
                 </div>
               </div>
               <WeaponPanel
@@ -602,16 +758,14 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                 >
                   Asset
                 </button>
-                <label
+                <CloudUploadButton
+                  endpoint="heroRender"
+                  label="Upload"
                   className={cn(
-                    styles.uploadButton,
                     renderSelection.mode === 'custom' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
                   )}
-                >
-                  <Upload className={styles.uploadIcon} aria-hidden />
-                  Upload
-                  <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleHeroRenderUpload} />
-                </label>
+                  onUploaded={handleHeroRenderUpload}
+                />
               </div>
             </div>
           ) : null}
@@ -664,11 +818,12 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
                 />
               </label>
             ) : (
-              <label className={cn(styles.uploadButton, styles.uploadNameButton)}>
-                <Upload className={styles.uploadIcon} aria-hidden />
-                Upload name image
-                <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleNameUpload} />
-              </label>
+              <CloudUploadButton
+                endpoint="heroNameAsset"
+                label="Upload name image"
+                className={styles.uploadNameButton}
+                onUploaded={handleNameUpload}
+              />
             )}
           </div>
 
@@ -741,33 +896,60 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             <ColorField label="Ability Circles" value={draft.abilityCircleColor} onChange={value => updateDraft({ abilityCircleColor: value })} />
           </div>
         </div>
-      </div>
 
-      {activeAbility ? (
-        <EditorAssetModal
-          title={activeAbility.label}
-          description="Choose an existing icon or upload your own."
-          uploadLabel="Upload custom icon"
-          groups={abilityAssetGroups}
-          previewMode="mask"
-          previewColor={draft.abilityIconColor}
-          testId="ability-icon-modal"
-          onClose={() => setActiveAbilityIndex(null)}
-          onSelect={selectAbilityIcon}
-          onUpload={file => {
-            updateDraft({
-              [activeAbility.iconKey]: createUploadPreview(file),
-            })
-            setActiveAbilityIndex(null)
-          }}
-        />
-      ) : null}
+        <div className={styles.globalActions}>
+          <label className={styles.heroNamePrompt} htmlFor="editor-save-hero-name">
+            Hero Name
+            <input
+              id="editor-save-hero-name"
+              type="text"
+              value={heroNameInput}
+              onChange={event => {
+                setHeroNameInput(event.target.value)
+                setSaveError(null)
+              }}
+              placeholder="Name this save"
+              className={styles.input}
+            />
+          </label>
+          <label className={styles.copyToggle} htmlFor="editor-allow-copies">
+            <input
+              id="editor-allow-copies"
+              type="checkbox"
+              checked={allowCopiesInput}
+              onChange={event => setAllowCopiesInput(event.target.checked)}
+            />
+            <span aria-hidden="true" />
+            <strong>Allow Copies</strong>
+          </label>
+          <button
+            type="button"
+            className={styles.saveActionButton}
+            disabled={isSaving}
+            onClick={() => handleGlobalSave('private')}
+          >
+            Save Private
+          </button>
+          <button
+            type="button"
+            className={styles.publishActionButton}
+            disabled={isSaving}
+            onClick={() => handleGlobalSave('published')}
+          >
+            Publish
+          </button>
+          <CharacterExportButton payload={exportPayload} className={styles.exportActionButton} />
+          {saveError ? <p className={styles.saveError} role="alert">{saveError}</p> : null}
+          {saveStatusMessage ? <p className={styles.actionStatus} role="status">{saveStatusMessage}</p> : null}
+        </div>
+      </div>
 
       {isHeroRenderAssetModalOpen ? (
         <EditorAssetModal
           title="Hero Render"
           description="Choose an existing hero render. Existing renders replace the selected background."
           uploadLabel="Upload custom render"
+          uploadEndpoint="heroRender"
           groups={HERO_RENDER_GROUPS}
           previewMode="image"
           testId="hero-render-modal"
@@ -776,8 +958,8 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             onRenderSelectionChange({ mode: 'hero', src: assetPath })
             setIsHeroRenderAssetModalOpen(false)
           }}
-          onUpload={file => {
-            onRenderSelectionChange({ mode: 'custom', src: createUploadPreview(file) })
+          onUpload={uploadUrl => {
+            onRenderSelectionChange({ mode: 'custom', src: uploadUrl })
             setIsHeroRenderAssetModalOpen(false)
           }}
         />
@@ -788,6 +970,7 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
           title="Weapon Image"
           description="Choose an existing hero weapon or upload your own."
           uploadLabel="Upload custom weapon"
+          uploadEndpoint="weaponImage"
           groups={WEAPON_IMAGE_GROUPS}
           previewMode="image"
           testId="weapon-image-modal"
@@ -796,8 +979,8 @@ export default function HeroInfoEditor({ hero, draft, backgroundOptions, selecte
             updateWeaponDraft({ gunImageSrc: assetPath })
             setIsWeaponAssetModalOpen(false)
           }}
-          onUpload={file => {
-            updateWeaponDraft({ gunImageSrc: createUploadPreview(file) })
+          onUpload={uploadUrl => {
+            updateWeaponDraft({ gunImageSrc: uploadUrl })
             setIsWeaponAssetModalOpen(false)
           }}
         />

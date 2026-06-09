@@ -23,6 +23,15 @@ beforeEach(() => {
   clerkMocks.useUserMock.mockReset()
   clerkMocks.signOutMock.mockReset()
   clerkMocks.signOutMock.mockResolvedValue(undefined)
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+    notifications: {
+      hasNotifications: false,
+      count: 0,
+    },
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  }))
 })
 
 describe('GlobalNav', () => {
@@ -38,7 +47,7 @@ describe('GlobalNav', () => {
     expect(screen.queryByLabelText('Open profile navigation')).not.toBeInTheDocument()
   })
 
-  it('opens dossier actions for signed-in users and signs out', async () => {
+  it('opens profile actions for signed-in users and signs out', async () => {
     const user = userEvent.setup()
 
     clerkMocks.useUserMock.mockReturnValue({
@@ -48,7 +57,7 @@ describe('GlobalNav', () => {
         id: 'clerk_123',
         username: null,
         unsafeMetadata: {
-          username: 'metadata_user',
+        username: 'metadata_user',
         },
         fullName: null,
         imageUrl: '',
@@ -61,11 +70,43 @@ describe('GlobalNav', () => {
     render(<GlobalNav />)
     await user.click(screen.getByLabelText('Open profile navigation'))
 
-    expect(screen.getByRole('menuitem', { name: /view dossier/i })).toHaveAttribute('href', '/profile/metadata_user')
+    expect(screen.getByRole('menuitem', { name: /view profile/i })).toHaveAttribute('href', '/profile/metadata_user')
+    expect(screen.getByRole('menuitem', { name: /activity feed/i })).toHaveAttribute('href', '/?tab=feed')
     expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/profile/settings')
 
     await user.click(screen.getByRole('menuitem', { name: /leave precinct/i }))
 
     expect(clerkMocks.signOutMock).toHaveBeenCalledWith({ redirectUrl: '/sign-in' })
+  })
+
+  it('shows the notification dot for new activity', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({
+      notifications: {
+        hasNotifications: true,
+        count: 3,
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    clerkMocks.useUserMock.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      user: {
+        id: 'clerk_123',
+        username: 'profile-user',
+        unsafeMetadata: {},
+        fullName: 'Profile User',
+        imageUrl: '',
+        primaryEmailAddress: {
+          emailAddress: 'player@example.com',
+        },
+      },
+    })
+
+    render(<GlobalNav />)
+
+    expect(await screen.findByLabelText('3 new activity updates')).toBeInTheDocument()
   })
 })

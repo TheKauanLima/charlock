@@ -75,7 +75,7 @@ export async function deleteAccount(formData: FormData) {
   const expected = user.username?.trim() || user.email.split('@')[0] || user.clerkId
 
   if (confirmation !== expected) {
-    redirect('/profile/settings?error=self-destruct')
+    redirect('/profile/settings?error=delete-confirmation')
   }
 
   await dbConnect()

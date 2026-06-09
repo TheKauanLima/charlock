@@ -20,9 +20,9 @@ async function run() {
       abrams = await Hero.create({
         name: 'Abrams',
         slug: 'abrams',
+        assetSlug: 'abrams',
         portrait: '/panorama/images/heroes/abrams.png',
         render: '/render/Abrams_Render.png',
-        assetSlug: 'abrams',
         createdByUserId: 'system',
         status: 'published'
       })
@@ -33,7 +33,7 @@ async function run() {
     const weaponDoc = {
       heroId,
       weaponName: 'Custom Shotgun',
-      weaponDesc: 'A heavy-duty shotgun modified for close-quarters occult combat.',
+      weaponDesc: 'A heavy-duty shotgun modified for close-quarters combat.',
       gunImageSrc: '/panorama/images/hud/abilities/abrams/weapon.png',
       weaponAttributes: ['Close Range', 'High Damage', 'Low Clip'],
       bulletDPS: 45,

@@ -66,6 +66,7 @@ async function run() {
         {
           name: hero.displayName,
           slug: hero.slug,
+          assetSlug: hero.assetSlug,
           portrait: hero.portrait,
           render: hero.render,
           createdByUserId: process.env.HERO_SEED_CREATED_BY_USER_ID || 'system',
@@ -73,7 +74,7 @@ async function run() {
           publishedAt: now,
           updatedAt: now,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true },
       )
       const referenceData = referencesBySlug[hero.slug]
       const doc = {
@@ -102,10 +103,10 @@ async function run() {
       }
       const payload = buildHeroStatsSeed(hero)
 
-      await HeroInfo.findOneAndUpdate({ heroId: persistedHero._id }, doc, { upsert: true, new: true })
-      await WeaponStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.weapon, heroId: persistedHero._id }, { upsert: true, new: true })
-      await VitalityStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.vitality, heroId: persistedHero._id }, { upsert: true, new: true })
-      await SpiritStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.spirit, heroId: persistedHero._id }, { upsert: true, new: true })
+      await HeroInfo.findOneAndUpdate({ heroId: persistedHero._id }, doc, { upsert: true, returnDocument: 'after' })
+      await WeaponStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.weapon, heroId: persistedHero._id }, { upsert: true, returnDocument: 'after' })
+      await VitalityStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.vitality, heroId: persistedHero._id }, { upsert: true, returnDocument: 'after' })
+      await SpiritStats.findOneAndUpdate({ heroId: persistedHero._id }, { ...payload.spirit, heroId: persistedHero._id }, { upsert: true, returnDocument: 'after' })
 
       mapping[hero.slug] = persistedHero._id.toHexString()
     }

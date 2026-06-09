@@ -54,6 +54,12 @@
   transition: opacity 150ms ease-out;
 }
 
+.iconImage {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
 .iconActive {
   opacity: 1;
 }

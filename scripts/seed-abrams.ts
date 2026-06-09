@@ -19,9 +19,9 @@ async function run() {
       abrams = await Hero.create({
         name: 'Abrams',
         slug: 'abrams',
+        assetSlug: 'abrams',
         portrait: '/panorama/images/heroes/abrams.png',
         render: '/render/Abrams_Render.png',
-        assetSlug: 'abrams',
         createdByUserId: 'system',
         status: 'published'
       })
@@ -51,7 +51,7 @@ async function run() {
       ability4Icon: '/panorama/images/hud/abilities/abrams/4.png',
       abilityCircleColor: '#2092ae',
       abilityIconColor: '#022021',
-      backstory: "Abrams is a detective from the 13th precinct, but his cases often lead him into the world of the occult. He has seen things that would drive most men mad, but his faith in justice keeps him grounded. He fights with a holy shotgun and the strength of his own two fists."
+      backstory: "Abrams is a frontline specialist whose toughest assignments demand steady judgment under pressure. He has endured situations that would unsettle most fighters, but his focus on teamwork keeps him grounded. He fights with a reinforced shotgun and the strength of his own two fists."
     }
     await HeroInfo.findOneAndUpdate({ heroId }, infoDoc, { upsert: true })
 
@@ -59,7 +59,7 @@ async function run() {
     const weaponDoc = {
       heroId,
       weaponName: 'Custom Shotgun',
-      weaponDesc: 'A heavy-duty shotgun modified for close-quarters occult combat.',
+      weaponDesc: 'A heavy-duty shotgun modified for close-quarters combat.',
       gunImageSrc: '/panorama/images/hud/abilities/abrams/weapon.png',
       weaponAttributes: ['Close Range', 'High Damage', 'Low Clip'],
       bulletDPS: 45,

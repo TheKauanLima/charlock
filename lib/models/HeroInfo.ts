@@ -132,6 +132,8 @@ const heroInfoSchema = new Schema<IHeroInfo>(
   },
 )
 
+heroInfoSchema.index({ backstory: 'text' })
+
 const HeroInfo: Model<IHeroInfo> = models.HeroInfo || model<IHeroInfo>('HeroInfo', heroInfoSchema)
 
 export default HeroInfo

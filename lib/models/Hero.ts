@@ -3,11 +3,9 @@ import { Schema, model, models, type Model } from 'mongoose'
 export interface IHero {
   name: string
   slug: string
+  assetSlug: string
   portrait: string
   render: string
-  createdByUserId: string
-  status: 'published' | 'private'
-  publishedAt?: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -24,6 +22,11 @@ const heroSchema = new Schema<IHero>(
       unique: true,
       index: true,
     },
+    assetSlug: {
+      type: String,
+      required: true,
+      index: true,
+    },
     portrait: {
       type: String,
       required: true,
@@ -32,26 +35,14 @@ const heroSchema = new Schema<IHero>(
       type: String,
       required: true,
     },
-    createdByUserId: {
-      type: String,
-      required: true,
-      index: true,
-    },
-    status: {
-      type: String,
-      required: true,
-      enum: ['published', 'private'],
-      default: 'private',
-    },
-    publishedAt: {
-      type: Date,
-      default: null,
-    },
   },
   {
+    collection: 'heroes',
     timestamps: true,
   },
 )
+
+heroSchema.index({ name: 'text' })
 
 const Hero: Model<IHero> = models.Hero || model<IHero>('Hero', heroSchema)
 

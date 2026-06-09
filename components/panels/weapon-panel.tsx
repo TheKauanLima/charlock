@@ -28,7 +28,6 @@ interface WeaponPanelProps {
   showSecondaryWeapon?: boolean
   panelType?: 'weapon' | 'armor' | 'tech'
   isEditable?: boolean
-  onSaveStats?: (stats: PanelStat[]) => void
   onStatsChange?: (stats: PanelStat[], changedStat: PanelStat) => void
 }
 
@@ -212,7 +211,6 @@ export default function WeaponPanel({
   showSecondaryWeapon = true,
   panelType = 'weapon',
   isEditable = false,
-  onSaveStats,
   onStatsChange,
 }: WeaponPanelProps) {
   const theme = PANEL_THEMES[panelType]
@@ -235,14 +233,6 @@ export default function WeaponPanel({
     }
 
     setEditedStats(nextStats)
-  }
-
-  function handleSave() {
-    onSaveStats?.(editedStats)
-  }
-
-  function handleCancel() {
-    setEditedStats(normalizedWeaponStats)
   }
 
   return (
@@ -345,16 +335,6 @@ export default function WeaponPanel({
             </div>
           ))}
         </div>
-        {isEditable ? (
-          <div className={styles.actions}>
-            <button type="button" className={styles.saveButton} onClick={handleSave}>
-              Save
-            </button>
-            <button type="button" className={styles.cancelButton} onClick={handleCancel}>
-              Cancel
-            </button>
-          </div>
-        ) : null}
       </div>
     </section>
   )

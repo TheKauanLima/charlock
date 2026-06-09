@@ -1,6 +1,6 @@
-import ProfileDossier from '@/components/UserProfile/ProfileDossier'
+import UserProfile from '@/components/UserProfile/UserProfile'
 import { HEROES } from '@/lib/hero-data'
-import { getProfileDossier } from '@/lib/profile'
+import { getUserProfile } from '@/lib/profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +12,7 @@ interface ProfilePageProps {
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
   const { username } = await params
-  const data = await getProfileDossier(username)
+  const data = await getUserProfile(username)
 
-  return <ProfileDossier data={data} heroes={HEROES} />
+  return <UserProfile data={data} heroes={HEROES} />
 }

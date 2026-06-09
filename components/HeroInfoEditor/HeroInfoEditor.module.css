@@ -310,6 +310,14 @@
   font-size: 0.75rem;
 }
 
+.compactTextarea {
+  min-height: 58px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  line-height: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
 .select {
   font-size: 0.74rem;
   letter-spacing: 0.08em;
@@ -340,7 +348,8 @@
 
 .segmentedButton,
 .assetButton,
-.uploadButton {
+.uploadButton,
+.cloudUploadButton {
   border: 1px solid rgba(255, 239, 214, 0.15);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.3);
@@ -358,7 +367,8 @@
 
 .segmentedButton:focus-visible,
 .assetButton:focus-visible,
-.uploadButton:focus-visible {
+.uploadButton:focus-visible,
+.cloudUploadButton:focus-visible {
   outline: 2px solid #ffefd6;
   outline-offset: 2px;
 }
@@ -371,12 +381,14 @@
 
 .segmentedButtonInactive:hover,
 .assetButton:hover,
-.uploadButton:hover {
+.uploadButton:hover,
+.cloudUploadButton:hover {
   border-color: rgba(47, 200, 144, 0.7);
   color: #bafbe0;
 }
 
-.uploadButton {
+.uploadButton,
+.cloudUploadButton {
   display: flex;
   cursor: pointer;
   align-items: center;
@@ -386,8 +398,43 @@
   border-color: rgba(255, 239, 214, 0.2);
 }
 
+.cloudUploadWrap {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  gap: 4px;
+}
+
+.cloudUploadContainer {
+  width: 100%;
+}
+
+.cloudUploadButton {
+  width: 100%;
+  min-height: 36px;
+}
+
+.cloudUploadButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.cloudUploadAllowed {
+  display: none;
+}
+
+.inlineUploadError {
+  color: #ff9b8e;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.62rem;
+  line-height: 1rem;
+}
+
 .uploadNameButton {
   gap: 8px;
+}
+
+.uploadNameButton .cloudUploadButton {
   padding: 12px;
   font-size: 0.68rem;
   letter-spacing: 0.18em;
@@ -407,6 +454,146 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.globalActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 239, 214, 0.1);
+}
+
+.heroNamePrompt,
+.copyToggle,
+.saveError,
+.actionStatus,
+.exportActionButton {
+  grid-column: 1 / -1;
+}
+
+.heroNamePrompt {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 239, 214, 0.75);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.copyToggle {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  color: rgba(255, 239, 214, 0.78);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.copyToggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.copyToggle span {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border: 1px solid rgba(255, 239, 214, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.44);
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.copyToggle span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 239, 214, 0.66);
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+
+.copyToggle input:checked + span {
+  border-color: #2fc890;
+  background: rgba(47, 200, 144, 0.18);
+}
+
+.copyToggle input:checked + span::after {
+  transform: translateX(16px);
+  background: #bafbe0;
+}
+
+.copyToggle input:focus-visible + span {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.saveActionButton,
+.publishActionButton,
+.exportActionButton {
+  border: 1px solid rgba(255, 239, 214, 0.3);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 150ms ease-out;
+}
+
+.saveActionButton {
+  background: rgba(255, 239, 214, 0.05);
+  color: #ffefd6;
+}
+
+.saveActionButton:hover {
+  background: rgba(255, 239, 214, 0.15);
+  border-color: #ffefd6;
+}
+
+.publishActionButton {
+  background: rgba(47, 200, 144, 0.15);
+  border-color: rgba(47, 200, 144, 0.5);
+  color: #bafbe0;
+}
+
+.publishActionButton:hover {
+  background: rgba(47, 200, 144, 0.25);
+  border-color: #2fc890;
+  box-shadow: 0 0 15px rgba(47, 200, 144, 0.15);
+}
+
+.saveActionButton:disabled,
+.publishActionButton:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.saveError,
+.actionStatus {
+  margin: 0;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.2rem;
+}
+
+.saveError {
+  color: #ff9b8e;
+}
+
+.actionStatus {
+  color: #bafbe0;
 }
 
 .uploadIcon {

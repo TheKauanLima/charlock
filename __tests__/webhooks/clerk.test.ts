@@ -109,7 +109,7 @@ describe('Clerk webhook route', () => {
       },
       {
         upsert: true,
-        new: true,
+        returnDocument: 'after',
         runValidators: true,
         setDefaultsOnInsert: true,
       },

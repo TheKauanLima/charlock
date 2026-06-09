@@ -2,7 +2,7 @@
 
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
@@ -53,11 +53,10 @@ describe('migrated stat panels', () => {
     expect(screen.getByText(/increases the effectiveness/i)).toBeInTheDocument()
   })
 
-  it('saves edited weapon stats and cycles scaling state', async () => {
+  it('edits weapon stats and cycles scaling state without panel-local save actions', async () => {
     const user = userEvent.setup()
-    const handleSave = vi.fn()
 
-    render(<WeaponPanel isEditable onSaveStats={handleSave} />)
+    render(<WeaponPanel isEditable />)
 
     const bulletDamageButton = screen.getByRole('button', { name: /Bullet Damage/ })
     expect(bulletDamageButton).toHaveAttribute('data-scaling', 'none')
@@ -78,8 +77,9 @@ describe('migrated stat panels', () => {
     const bulletDamageInput = screen.getByLabelText('Bullet Damage value')
     await user.clear(bulletDamageInput)
     await user.type(bulletDamageInput, '8.5')
-    await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(handleSave).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ label: 'Bullet Damage', value: '8.5', scaling: 'spirit', scalingValue: '12.34' })]))
+    expect(bulletDamageInput).toHaveValue('8.5')
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 })

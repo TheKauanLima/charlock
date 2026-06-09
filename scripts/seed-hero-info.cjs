@@ -252,6 +252,7 @@ async function run() {
         $set: {
           name: hero.displayName,
           slug: hero.slug,
+          assetSlug: nameAssetSlug,
           portrait: `/panorama/images/heroes/${nameAssetSlug}.png`,
           render: `/render/${hero.displayName.replaceAll(' ', '_').replaceAll('&', 'and')}_Render.png`,
           createdByUserId: process.env.HERO_SEED_CREATED_BY_USER_ID || 'system',

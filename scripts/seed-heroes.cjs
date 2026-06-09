@@ -356,6 +356,7 @@ async function run() {
     const heroDoc = {
       name: hero.displayName,
       slug: hero.slug,
+      assetSlug: hero.assetSlug || hero.slug,
       portrait: hero.portrait,
       render: hero.render,
       createdByUserId,

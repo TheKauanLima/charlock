@@ -25,6 +25,12 @@ vi.mock('@/lib/models/Hero', () => ({
   },
 }))
 
+vi.mock('@/lib/models/CustomHero', () => ({
+  default: {
+    findOne: vi.fn(),
+  },
+}))
+
 vi.mock('@/lib/models/HeroInfo', () => ({
   default: {
     findOne: heroInfoFindOneMock,

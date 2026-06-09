@@ -48,7 +48,7 @@
   padding: 96px 0 54px;
 }
 
-.identityPanel,
+.profileHeader,
 .reportPanel,
 .ledgerPanel,
 .statBox {
@@ -60,7 +60,7 @@
   transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-.identityPanel {
+.profileHeader {
   display: grid;
   grid-template-columns: 156px minmax(0, 1fr) 220px;
   gap: 24px;
@@ -101,7 +101,7 @@
   letter-spacing: 0;
 }
 
-.identityCopy {
+.profileCopy {
   min-width: 0;
 }
 
@@ -119,7 +119,7 @@
   font-size: 1.02rem;
 }
 
-.identityCopy h1 {
+.profileCopy h1 {
   margin: 4px 0 12px;
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
@@ -128,11 +128,11 @@
   text-transform: uppercase;
 }
 
-.rankLine {
+.levelLine {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--profile-rank);
+  color: var(--profile-level);
   font-family: var(--font-geist-mono), "Roboto Mono", monospace;
   font-size: 0.92rem;
   text-transform: uppercase;
@@ -145,6 +145,11 @@
   font-family: var(--font-geist-mono), "Roboto Mono", monospace;
   font-size: 0.76rem;
   text-transform: uppercase;
+}
+
+.profileActions {
+  display: grid;
+  gap: 12px;
 }
 
 .heroSelect {
@@ -166,6 +171,59 @@
 .heroSelect select:focus {
   border-color: var(--profile-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--profile-accent) 26%, transparent);
+}
+
+.homeLink {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
+  background: color-mix(in srgb, var(--profile-accent) 16%, rgba(0, 0, 0, 0.58));
+  color: #ffefd6;
+  padding: 11px 12px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.actionButton {
+  cursor: pointer;
+}
+
+.actionButton[aria-pressed="true"] {
+  border-color: var(--profile-name);
+  background: color-mix(in srgb, var(--profile-accent) 28%, rgba(0, 0, 0, 0.5));
+}
+
+.homeLink:hover {
+  border-color: var(--profile-name);
+  background: color-mix(in srgb, var(--profile-accent) 26%, rgba(0, 0, 0, 0.48));
+  color: var(--profile-name);
+}
+
+.homeLink:focus-visible {
+  outline: 2px solid var(--profile-name);
+  outline-offset: 2px;
+}
+
+.followMeta,
+.followError {
+  color: rgba(255, 239, 214, 0.6);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.7rem;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.followError {
+  color: #ff918d;
 }
 
 .statsGrid {
@@ -201,7 +259,7 @@
 .progressTrack span {
   display: block;
   height: 100%;
-  background: var(--profile-rank);
+  background: var(--profile-level);
   transition: width 150ms ease-out;
 }
 
@@ -262,6 +320,14 @@
   border: 1px solid rgba(255, 239, 214, 0.14);
   background: rgba(0, 0, 0, 0.28);
   padding: 12px;
+  color: inherit;
+  text-decoration: none;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.heroCard:hover {
+  border-color: color-mix(in srgb, var(--profile-accent) 68%, rgba(255, 239, 214, 0.2));
+  background: rgba(255, 239, 214, 0.06);
 }
 
 .heroPortrait {
@@ -308,7 +374,7 @@
     padding-top: 88px;
   }
 
-  .identityPanel {
+  .profileHeader {
     grid-template-columns: 1fr;
   }
 

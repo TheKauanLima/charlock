@@ -1,24 +1,37 @@
 'use client'
 
-import { Upload, X } from 'lucide-react'
-import type { ChangeEvent, CSSProperties } from 'react'
+import { X } from 'lucide-react'
+import { useState } from 'react'
+import type { CSSProperties } from 'react'
 
+import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import type { EditorAssetGroup } from '@/lib/editor-assets'
+import { UploadButton } from '@/lib/uploadthing'
 import cn from '@/lib/utilsd'
 
 import styles from './EditorAssetModal.module.css'
+
+type UploadEndpoint = keyof OurFileRouter
 
 interface EditorAssetModalProps {
   title: string
   description: string
   uploadLabel: string
+  uploadEndpoint: UploadEndpoint
   groups: EditorAssetGroup[]
   previewMode: 'mask' | 'image'
   previewColor?: string
   testId: string
   onClose: () => void
   onSelect: (assetPath: string) => void
-  onUpload: (file: File) => void
+  onUpload: (url: string) => void
+}
+
+interface UploadedAsset {
+  url?: string
+  serverData?: {
+    url?: string
+  } | null
 }
 
 function getPreviewStyle(assetPath: string, previewMode: 'mask' | 'image', previewColor?: string): CSSProperties {
@@ -35,14 +48,14 @@ function getPreviewStyle(assetPath: string, previewMode: 'mask' | 'image', previ
   }
 }
 
-export default function EditorAssetModal({ title, description, uploadLabel, groups, previewMode, previewColor, testId, onClose, onSelect, onUpload }: EditorAssetModalProps) {
-  function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
+function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
+  const uploadedAsset = uploadedAssets[0]
 
-    if (file) {
-      onUpload(file)
-    }
-  }
+  return uploadedAsset?.serverData?.url ?? uploadedAsset?.url ?? null
+}
+
+export default function EditorAssetModal({ title, description, uploadLabel, uploadEndpoint, groups, previewMode, previewColor, testId, onClose, onSelect, onUpload }: EditorAssetModalProps) {
+  const [uploadError, setUploadError] = useState<string | null>(null)
 
   return (
     <div className={cn(styles.backdrop, 'pointer-events-auto')} role="dialog" aria-modal="true" aria-label={`${title} selector`} data-testid={testId}>
@@ -63,11 +76,31 @@ export default function EditorAssetModal({ title, description, uploadLabel, grou
         </div>
 
         <div className={styles.uploadArea}>
-          <label className={styles.uploadLabel}>
-            <Upload className={styles.uploadIcon} aria-hidden />
-            {uploadLabel}
-            <input type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp" className="sr-only" onChange={handleUpload} />
-          </label>
+          <UploadButton
+            endpoint={uploadEndpoint}
+            appearance={{
+              container: styles.uploadThingContainer,
+              button: styles.uploadThingButton,
+              allowedContent: styles.uploadThingAllowed,
+            }}
+            content={{
+              button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadLabel),
+              allowedContent: () => null,
+            }}
+            onUploadBegin={() => setUploadError(null)}
+            onClientUploadComplete={uploadedAssets => {
+              const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
+
+              if (!uploadedUrl) {
+                setUploadError('Upload completed without a file URL.')
+                return
+              }
+
+              onUpload(uploadedUrl)
+            }}
+            onUploadError={error => setUploadError(error.message || 'Upload failed.')}
+          />
+          {uploadError ? <p className={styles.uploadError} role="alert">{uploadError}</p> : null}
         </div>
 
         <div className={styles.assetList}>

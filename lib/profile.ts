@@ -4,13 +4,15 @@ import { notFound } from 'next/navigation'
 import type { Types } from 'mongoose'
 
 import dbConnect from '@/lib/dbConnect'
+import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import { HEROES, type HeroDefinition } from '@/lib/hero-data'
-import Hero from '@/lib/models/Hero'
+import CustomHero from '@/lib/models/CustomHero'
+import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import User from '@/lib/models/User'
 
-export interface DetectiveRank {
-  label: 'Rookie' | 'Investigator' | 'Lead Detective' | 'Chief of Occult Crimes'
+export interface UserLevel {
+  label: 'New User' | 'Contributor' | 'Power User' | 'Community Leader'
   tone: 'rookie' | 'investigator' | 'lead' | 'chief'
   nextAt: number | null
   progress: number
@@ -39,15 +41,20 @@ export interface ProfileHeroCard {
   status: string
 }
 
-export interface ProfileDossierData {
+export interface UserProfileData {
   user: ProfileUser
   viewerIsOwner: boolean
   avatarUrl: string | null
   preferredHero: HeroDefinition
   authoredHeroes: ProfileHeroCard[]
-  rank: DetectiveRank
-  casesClosed: number
-  intelligenceReports: number
+  savedHeroes: CustomHeroSummary[]
+  bookmarkedHeroes: CustomHeroSummary[]
+  privateHeroes: CustomHeroSummary[]
+  viewerFollowsUser: boolean
+  followerCount: number
+  level: UserLevel
+  charactersCreated: number
+  userContributions: number
 }
 
 interface UserRecord {
@@ -59,6 +66,7 @@ interface UserRecord {
   isPublic?: boolean | null
   anonymousEdits?: boolean | null
   customBio?: string | null
+  bookmarks?: Types.ObjectId[]
   createdAt: Date
   updatedAt: Date
 }
@@ -73,12 +81,12 @@ interface HeroRecord {
   updatedAt: Date
 }
 
-const DEFAULT_PROFILE_BIO = 'No field report has been filed for this detective.'
+const DEFAULT_PROFILE_BIO = 'No profile bio has been added yet.'
 
-export function getDetectiveRank(contributionCount: number): DetectiveRank {
+export function getUserLevel(contributionCount: number): UserLevel {
   if (contributionCount > 50) {
     return {
-      label: 'Chief of Occult Crimes',
+      label: 'Community Leader',
       tone: 'chief',
       nextAt: null,
       progress: 100,
@@ -87,7 +95,7 @@ export function getDetectiveRank(contributionCount: number): DetectiveRank {
 
   if (contributionCount > 20) {
     return {
-      label: 'Lead Detective',
+      label: 'Power User',
       tone: 'lead',
       nextAt: 51,
       progress: Math.min(100, Math.round((contributionCount / 51) * 100)),
@@ -96,7 +104,7 @@ export function getDetectiveRank(contributionCount: number): DetectiveRank {
 
   if (contributionCount > 5) {
     return {
-      label: 'Investigator',
+      label: 'Contributor',
       tone: 'investigator',
       nextAt: 21,
       progress: Math.min(100, Math.round((contributionCount / 21) * 100)),
@@ -104,7 +112,7 @@ export function getDetectiveRank(contributionCount: number): DetectiveRank {
   }
 
   return {
-    label: 'Rookie',
+    label: 'New User',
     tone: 'rookie',
     nextAt: 6,
     progress: Math.min(100, Math.round((contributionCount / 6) * 100)),
@@ -163,6 +171,18 @@ async function getAvatarUrl(clerkId: string) {
   }
 }
 
+async function getSavedCustomHeroes(ownerIds: string[]) {
+  const { listCustomHeroesForOwner } = await import('@/lib/custom-heroes')
+
+  return listCustomHeroesForOwner(ownerIds)
+}
+
+async function getBookmarkedCustomHeroes(bookmarks: Types.ObjectId[] | undefined, ownerIds: string[]) {
+  const { listBookmarkedCustomHeroes } = await import('@/lib/custom-heroes')
+
+  return listBookmarkedCustomHeroes(bookmarks ?? [], ownerIds)
+}
+
 export async function getCurrentProfileUser() {
   const clerkUser = await currentUser()
 
@@ -195,14 +215,14 @@ export async function getCurrentProfileUser() {
     },
     {
       upsert: true,
-      new: true,
+      returnDocument: 'after',
       runValidators: true,
       setDefaultsOnInsert: true,
     },
   ).lean<UserRecord | null>()
 }
 
-export async function getProfileDossier(username: string): Promise<ProfileDossierData> {
+export async function getUserProfile(username: string): Promise<UserProfileData> {
   await dbConnect()
 
   const decodedUsername = decodeURIComponent(username)
@@ -225,12 +245,12 @@ export async function getProfileDossier(username: string): Promise<ProfileDossie
   }
 
   const ownerIds = buildOwnerIds(user)
-  const authoredHeroRecords = await Hero.find({ createdByUserId: { $in: ownerIds } })
+  const authoredHeroRecords = await CustomHero.find({ createdByUserId: { $in: ownerIds } })
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const authoredHeroIds = authoredHeroRecords.map(hero => hero._id)
 
-  const [heroInfoContributionCount, intelligenceReports, avatarUrl] = await Promise.all([
+  const [heroInfoContributionCount, userContributions, avatarUrl, savedHeroes, bookmarkedHeroes, viewerFollowsUser, followerCount] = await Promise.all([
     HeroInfo.countDocuments({ createdByUserId: { $in: ownerIds } }),
     authoredHeroIds.length
       ? HeroInfo.countDocuments({
@@ -239,10 +259,16 @@ export async function getProfileDossier(username: string): Promise<ProfileDossie
         })
       : Promise.resolve(0),
     getAvatarUrl(user.clerkId),
+    viewerIsOwner ? getSavedCustomHeroes(ownerIds) : Promise.resolve([]),
+    viewerIsOwner ? getBookmarkedCustomHeroes(user.bookmarks, ownerIds) : Promise.resolve([]),
+    userId && !viewerIsOwner
+      ? Follow.exists({ followerId: userId, followingId: user.clerkId }).then(Boolean)
+      : Promise.resolve(false),
+    Follow.countDocuments({ followingId: user.clerkId }),
   ])
 
-  const casesClosed = authoredHeroRecords.length
-  const contributionCount = casesClosed + heroInfoContributionCount
+  const charactersCreated = authoredHeroRecords.length
+  const contributionCount = charactersCreated + heroInfoContributionCount
   const serializedUser = serializeUser(user)
 
   return {
@@ -251,8 +277,13 @@ export async function getProfileDossier(username: string): Promise<ProfileDossie
     avatarUrl,
     preferredHero: getProfileHero(serializedUser.preferredHero),
     authoredHeroes: authoredHeroRecords.map(serializeHero),
-    rank: getDetectiveRank(contributionCount),
-    casesClosed,
-    intelligenceReports,
+    savedHeroes,
+    bookmarkedHeroes,
+    privateHeroes: savedHeroes.filter(hero => hero.status === 'private'),
+    viewerFollowsUser,
+    followerCount,
+    level: getUserLevel(contributionCount),
+    charactersCreated,
+    userContributions,
   }
 }

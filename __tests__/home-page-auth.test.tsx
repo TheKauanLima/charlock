@@ -8,6 +8,7 @@ const authMock = vi.hoisted(() => vi.fn())
 const redirectMock = vi.hoisted(() => vi.fn((path: string) => {
   throw new Error(`NEXT_REDIRECT:${path}`)
 }))
+const heroGridMock = vi.hoisted(() => vi.fn(() => <div data-testid="hero-grid" />))
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: authMock,
@@ -18,7 +19,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/components/HeroGrid/HeroGrid', () => ({
-  default: () => <div data-testid="hero-grid" />,
+  default: heroGridMock,
 }))
 
 import Home from '@/app/page'
@@ -26,6 +27,7 @@ import Home from '@/app/page'
 beforeEach(() => {
   authMock.mockReset()
   redirectMock.mockClear()
+  heroGridMock.mockClear()
 })
 
 describe('Home auth gate', () => {
@@ -42,5 +44,17 @@ describe('Home auth gate', () => {
     render(await Home())
 
     expect(screen.getByTestId('hero-grid')).toBeInTheDocument()
+  })
+
+  it('passes the create tab from search params into the hero grid', async () => {
+    authMock.mockResolvedValueOnce({ userId: 'user_123' })
+
+    render(await Home({ searchParams: Promise.resolve({ tab: 'create' }) }))
+
+    expect(screen.getByTestId('hero-grid')).toBeInTheDocument()
+    expect(heroGridMock).toHaveBeenCalledWith(
+      expect.objectContaining({ initialTab: 'Create' }),
+      undefined,
+    )
   })
 })

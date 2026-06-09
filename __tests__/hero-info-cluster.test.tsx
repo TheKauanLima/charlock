@@ -205,4 +205,89 @@ describe('HeroInfoCluster', () => {
     expect(await screen.findByRole('button', { name: /Max Health: 999/ })).toBeInTheDocument()
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/heroes/greytalon/stats', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
+
+  it('opens comments for a persisted community hero', async () => {
+    const user = userEvent.setup()
+    const hero = {
+      id: '507f1f77bcf86cd799439011',
+      slug: 'arc-light',
+      assetSlug: 'arc-light',
+      displayName: 'Arc Light',
+      portrait: '/panorama/images/heroes/abrams.png',
+      render: '/render/Abrams_Render.png',
+      bookmarkedByCurrentUser: false,
+      heroInfo: {
+        nameType: 'text',
+        nameValue: 'Arc Light',
+        nameColor: '#99ffdd',
+        tag1Text: 'Alpha',
+        tag2Text: 'Beta',
+        tag3Text: 'Gamma',
+        tagColor: 'rgba(0, 0, 0, 0.5)',
+        tagTextColor: '#ffffff',
+        tag1Tilt: 0,
+        tag2Tilt: 0,
+        tag3Tilt: 0,
+        tag1OffsetY: -10,
+        tag2OffsetY: 0,
+        tag3OffsetY: 10,
+        ability1Icon: '/panorama/images/hud/abilities/abrams/1.png',
+        ability2Icon: '/panorama/images/hud/abilities/abrams/2.png',
+        ability3Icon: '/panorama/images/hud/abilities/abrams/3.png',
+        ability4Icon: '/panorama/images/hud/abilities/abrams/4.png',
+        abilityCircleColor: '#ffffff',
+        abilityIconColor: '#000000',
+      },
+    } satisfies HeroDefinition & { id: string; bookmarkedByCurrentUser: boolean }
+    const stats = buildHeroStatsSeed(hero)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url.includes('/stats')) {
+        return Promise.resolve(new Response(JSON.stringify(stats), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }))
+      }
+
+      if (url.includes('/bookmark')) {
+        return Promise.resolve(new Response(JSON.stringify({ bookmark: { bookmarked: true } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }))
+      }
+
+      if (url.includes('/comments') && !url.includes('commentId')) {
+        return Promise.resolve(new Response(JSON.stringify({
+          comments: [
+            {
+              id: 'comment_1',
+              authorName: 'caseworker',
+              content: 'Strong silhouette.',
+              viewerCanDelete: false,
+              createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }))
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    })
+
+    render(<HeroInfoCluster hero={hero} />)
+
+    await user.click(screen.getByRole('button', { name: 'Bookmark' }))
+    expect(await screen.findByRole('button', { name: 'Bookmarked' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Comments/ }))
+
+    expect(await screen.findByText('Strong silhouette.')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes/507f1f77bcf86cd799439011/comments', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  })
 })

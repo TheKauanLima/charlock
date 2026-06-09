@@ -1,4 +1,4 @@
-import { Schema, models, model, type Model } from 'mongoose'
+import { Schema, models, model, type Model, type Types } from 'mongoose'
 
 export interface IUser {
   clerkId: string
@@ -11,6 +11,7 @@ export interface IUser {
   isPublic: boolean
   anonymousEdits: boolean
   customBio?: string | null
+  bookmarks: Types.ObjectId[]
   createdAt: Date
   updatedAt: Date
 }
@@ -60,6 +61,11 @@ const userSchema = new Schema<IUser>(
     customBio: {
       type: String,
       default: null,
+    },
+    bookmarks: {
+      type: [Schema.Types.ObjectId],
+      ref: 'Hero',
+      default: [],
     },
   },
   {

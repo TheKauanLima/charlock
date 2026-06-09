@@ -3,7 +3,8 @@ import 'server-only'
 import type { Types } from 'mongoose'
 
 import dbConnect from '@/lib/dbConnect'
-import Hero from '@/lib/models/Hero'
+import CustomHero from '@/lib/models/CustomHero'
+import OfficialHero from '@/lib/models/Hero'
 import HeroInfo from '@/lib/models/HeroInfo'
 import SpiritStats from '@/lib/models/SpiritStats'
 import VitalityStats from '@/lib/models/VitalityStats'
@@ -202,7 +203,8 @@ function serializeStoredHeroInfo(heroInfo: HeroInfoRecord): HeroInfoDefinition {
 export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsPayload | null> {
   await dbConnect()
 
-  const hero = await Hero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
+  const officialHero = await OfficialHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
+  const hero = officialHero ?? await CustomHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
 
   if (!hero) {
     return null

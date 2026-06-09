@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { LogOut, Settings, UserRound } from 'lucide-react'
+import { Bell, LogOut, Settings, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useClerk, useUser } from '@clerk/nextjs'
 
@@ -28,6 +28,7 @@ export default function GlobalNav() {
   const { isLoaded, isSignedIn, user } = useUser()
   const { signOut } = useClerk()
   const [isOpen, setIsOpen] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -51,6 +52,35 @@ export default function GlobalNav() {
       document.removeEventListener('keydown', handleKeyDown)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) {
+      return undefined
+    }
+
+    const abortController = new AbortController()
+
+    async function loadNotifications() {
+      try {
+        const response = await fetch('/api/notifications', {
+          signal: abortController.signal,
+        })
+        const body = await response.json() as { notifications?: { hasNotifications: boolean; count: number } }
+
+        if (response.ok && body.notifications?.hasNotifications) {
+          setNotificationCount(body.notifications.count)
+        }
+      } catch {
+        if (!abortController.signal.aborted) {
+          setNotificationCount(0)
+        }
+      }
+    }
+
+    void loadNotifications()
+
+    return () => abortController.abort()
+  }, [isLoaded, isSignedIn])
 
   if (!isLoaded || !isSignedIn || !user) {
     return null
@@ -83,13 +113,21 @@ export default function GlobalNav() {
             <span className={styles.avatarFallback}>{getInitials(displayName)}</span>
           )}
         </span>
+        {notificationCount > 0 ? <span className={styles.avatarNotification} aria-label={`${notificationCount} new activity updates`} /> : null}
       </button>
 
       {isOpen ? (
         <div className={styles.menu} role="menu" aria-label="Profile navigation">
+          <Link className={styles.menuItem} href="/?tab=feed" role="menuitem" onClick={() => setIsOpen(false)}>
+            <span className={styles.notificationIcon}>
+              <Bell aria-hidden="true" size={17} />
+              {notificationCount > 0 ? <span className={styles.notificationDot} aria-label={`${notificationCount} new activity updates`} /> : null}
+            </span>
+            <span>Activity Feed</span>
+          </Link>
           <Link className={styles.menuItem} href={profilePath} role="menuitem" onClick={() => setIsOpen(false)}>
             <UserRound aria-hidden="true" size={17} />
-            <span>View Dossier</span>
+            <span>View Profile</span>
           </Link>
           <Link className={styles.menuItem} href="/profile/settings" role="menuitem" onClick={() => setIsOpen(false)}>
             <Settings aria-hidden="true" size={17} />

@@ -23,9 +23,9 @@ async function run() {
       apollo = await Hero.create({
         name: 'Apollo',
         slug: 'apollo',
+        assetSlug: 'fencer',
         portrait: '/panorama/images/heroes/apollo.png',
         render: '/render/Apollo_Render.png',
-        assetSlug: 'fencer',
         createdByUserId: 'system',
         status: 'published'
       })

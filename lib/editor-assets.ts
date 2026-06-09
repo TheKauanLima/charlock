@@ -111,6 +111,42 @@ const HERO_WEAPON_IMAGE_PATHS = [
   '/panorama/images/heroes/guns/Yamato_Weapon.png',
 ] as const
 
+const PROPERTY_ICON_PATHS = [
+  '/panorama/images/icons/properties/ammo_clip_size.svg',
+  '/panorama/images/icons/properties/ammo_reload.svg',
+  '/panorama/images/icons/properties/armor_bullet_color.svg',
+  '/panorama/images/icons/properties/armor_melee_color.svg',
+  '/panorama/images/icons/properties/armor_spirit_color.svg',
+  '/panorama/images/icons/properties/bullet_velocity.svg',
+  '/panorama/images/icons/properties/charge.svg',
+  '/panorama/images/icons/properties/condition_knockdown.svg',
+  '/panorama/images/icons/properties/condition_silence.svg',
+  '/panorama/images/icons/properties/cooldown.svg',
+  '/panorama/images/icons/properties/damage_bullet_color.svg',
+  '/panorama/images/icons/properties/damage_crit_color.svg',
+  '/panorama/images/icons/properties/damage_magic_color.svg',
+  '/panorama/images/icons/properties/debuff_remove.svg',
+  '/panorama/images/icons/properties/duration.svg',
+  '/panorama/images/icons/properties/fire_rate.svg',
+  '/panorama/images/icons/properties/heal.svg',
+  '/panorama/images/icons/properties/healing_booster.svg',
+  '/panorama/images/icons/properties/health.svg',
+  '/panorama/images/icons/properties/health_regen.svg',
+  '/panorama/images/icons/properties/health_stealing_bullets_color.svg',
+  '/panorama/images/icons/properties/health_stealing_spirit_color.svg',
+  '/panorama/images/icons/properties/melee.svg',
+  '/panorama/images/icons/properties/move_speed.svg',
+  '/panorama/images/icons/properties/move_sprint.svg',
+  '/panorama/images/icons/properties/move_stamina.svg',
+  '/panorama/images/icons/properties/move_stamina_recharge.svg',
+  '/panorama/images/icons/properties/range.svg',
+  '/panorama/images/icons/properties/recharge.svg',
+  '/panorama/images/icons/properties/resist_bullet_color.svg',
+  '/panorama/images/icons/properties/resist_melee_color.svg',
+  '/panorama/images/icons/properties/resist_spirit_color.svg',
+  '/panorama/images/icons/properties/spirit.svg',
+] as const
+
 function formatBackgroundLabel(path: string) {
   const fileName = path.split('/').at(-1) ?? path
   const rawName = fileName.replace('_bg_psd.png', '')
@@ -162,6 +198,28 @@ export const HERO_RENDER_GROUPS: EditorAssetGroup[] = [
     assets: HEROES.map(hero => ({
       label: hero.displayName,
       path: hero.render,
+    })),
+  },
+]
+
+function formatPropertyIconLabel(path: string) {
+  const fileName = path.split('/').at(-1) ?? path
+  const rawName = fileName.replace('.svg', '').replace(/_color$/, '')
+
+  return rawName
+    .split('_')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+export const PROPERTY_ICON_GROUPS: EditorAssetGroup[] = [
+  {
+    id: 'property-icons',
+    label: 'Property Icons',
+    assets: PROPERTY_ICON_PATHS.map(path => ({
+      label: formatPropertyIconLabel(path),
+      path,
     })),
   },
 ]

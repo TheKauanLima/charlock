@@ -134,7 +134,7 @@ export async function POST(request: Request) {
         },
         {
           upsert: true,
-          new: true,
+          returnDocument: 'after',
           runValidators: true,
           setDefaultsOnInsert: true,
         },

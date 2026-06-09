@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 
 import ProfileSettings from '@/components/UserProfile/ProfileSettings'
 import { HEROES } from '@/lib/hero-data'
-import { getCurrentProfileUser, getProfileDossier, getProfilePathSegment } from '@/lib/profile'
+import { getCurrentProfileUser, getProfilePathSegment, getUserProfile } from '@/lib/profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +19,7 @@ export default async function ProfileSettingsPage({ searchParams }: ProfileSetti
     redirect('/sign-in')
   }
 
-  const data = await getProfileDossier(getProfilePathSegment(currentUser))
+  const data = await getUserProfile(getProfilePathSegment(currentUser))
 
   return (
     <ProfileSettings
@@ -30,7 +30,7 @@ export default async function ProfileSettingsPage({ searchParams }: ProfileSetti
       avatarUrl={data.avatarUrl}
       preferredHero={data.preferredHero}
       heroes={HEROES}
-      deleteError={query.error === 'self-destruct'}
+      deleteError={query.error === 'delete-confirmation'}
     />
   )
 }

@@ -78,7 +78,8 @@
   padding: 16px;
 }
 
-.uploadLabel {
+.uploadLabel,
+.uploadThingButton {
   display: flex;
   cursor: pointer;
   align-items: center;
@@ -96,8 +97,35 @@
   transition: background-color 150ms ease-out;
 }
 
-.uploadLabel:hover {
+.uploadLabel:hover,
+.uploadThingButton:hover {
   background: rgba(47, 200, 144, 0.16);
+}
+
+.uploadThingContainer {
+  width: 100%;
+}
+
+.uploadThingButton {
+  width: 100%;
+  min-height: 48px;
+}
+
+.uploadThingButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.uploadThingAllowed {
+  display: none;
+}
+
+.uploadError {
+  margin-top: 8px;
+  color: #ff9b8e;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.1rem;
 }
 
 .uploadIcon {

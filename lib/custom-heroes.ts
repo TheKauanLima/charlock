@@ -1,0 +1,850 @@
+import 'server-only'
+
+import { auth } from '@clerk/nextjs/server'
+import { Types, type PipelineStage } from 'mongoose'
+
+import dbConnect from '@/lib/dbConnect'
+import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
+import { normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
+import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
+import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
+import AbilityStats from '@/lib/models/AbilityStats'
+import CustomHero from '@/lib/models/CustomHero'
+import HeroInfo from '@/lib/models/HeroInfo'
+import SpiritStats from '@/lib/models/SpiritStats'
+import User from '@/lib/models/User'
+import VitalityStats from '@/lib/models/VitalityStats'
+import WeaponStats from '@/lib/models/WeaponStats'
+import type { ICustomHero } from '@/lib/models/CustomHero'
+import type { IPanelStat } from '@/lib/models/WeaponStats'
+
+interface Actor {
+  clerkId: string
+  storageUserId: string
+  ownerIds: string[]
+}
+
+interface HeroRecord extends ICustomHero {
+  _id: Types.ObjectId
+}
+
+interface HeroInfoRecord extends HeroInfoDefinition {
+  heroId: Types.ObjectId
+}
+
+interface WeaponStatsRecord {
+  weaponName: string
+  weaponDesc: string
+  gunImageSrc: string
+  weaponAttributes: string[]
+  bulletDPS: number
+  weaponMinRange: number
+  weaponMaxRange: number
+  stats: IPanelStat[]
+}
+
+interface VitalityStatsRecord {
+  stats: IPanelStat[]
+}
+
+interface SpiritStatsRecord {
+  topStats: IPanelStat[]
+  spiritPowerStat: IPanelStat
+}
+
+interface AbilityStatsRecord {
+  abilities: AbilityStatsPayload['abilities']
+}
+
+interface HeroBundle {
+  hero: HeroRecord
+  heroInfo: HeroInfoRecord | null
+  weapon: WeaponStatsRecord | null
+  vitality: VitalityStatsRecord | null
+  spirit: SpiritStatsRecord | null
+  abilityStats: AbilityStatsRecord | null
+}
+
+interface HeroAggregateRecord extends HeroRecord {
+  heroInfo?: HeroInfoRecord | null
+}
+
+export class CustomHeroError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'CustomHeroError'
+    this.status = status
+  }
+}
+
+const DEFAULT_HERO_INFO = HEROES[0].heroInfo
+const DEFAULT_BACKGROUND = '/panorama/images/heroes/backgrounds/generic_bg_psd.png'
+const TRENDING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function getString(value: unknown, fallback = '') {
+  return typeof value === 'string' ? value.trim() : fallback
+}
+
+function getNumber(value: unknown, fallback = 0) {
+  const parsed = Number(value)
+
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function getStringArray(value: unknown) {
+  return Array.isArray(value) ? value.map(item => getString(item)).filter(Boolean) : []
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeStatus(value: unknown): CustomHeroStatus {
+  return value === 'published' ? 'published' : 'private'
+}
+
+function normalizePanelStat(value: unknown): IPanelStat {
+  const record = isRecord(value) ? value : {}
+
+  return {
+    label: getString(record.label),
+    value: getString(record.value, '0'),
+    unit: getString(record.unit),
+    icon: getString(record.icon, 'dot'),
+    scaling: ['spirit', 'courage', 'melee', 'boon'].includes(getString(record.scaling)) ? getString(record.scaling) as IPanelStat['scaling'] : 'none',
+    scalingValue: getString(record.scalingValue, '0'),
+    ...(getString(record.description) ? { description: getString(record.description) } : {}),
+  }
+}
+
+function normalizeStats(value: unknown) {
+  return Array.isArray(value) ? value.map(normalizePanelStat).filter(stat => stat.label) : []
+}
+
+function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
+  const record = isRecord(value) ? value : {}
+
+  return {
+    nameType: record.nameType === 'text' ? 'text' : 'image',
+    nameValue: getString(record.nameValue, DEFAULT_HERO_INFO.nameValue),
+    nameColor: getString(record.nameColor, DEFAULT_HERO_INFO.nameColor),
+    tag1Text: getString(record.tag1Text, DEFAULT_HERO_INFO.tag1Text),
+    tag2Text: getString(record.tag2Text, DEFAULT_HERO_INFO.tag2Text),
+    tag3Text: getString(record.tag3Text, DEFAULT_HERO_INFO.tag3Text),
+    tagColor: getString(record.tagColor, DEFAULT_HERO_INFO.tagColor),
+    tagTextColor: getString(record.tagTextColor, DEFAULT_HERO_INFO.tagTextColor),
+    tag1Tilt: getNumber(record.tag1Tilt, DEFAULT_HERO_INFO.tag1Tilt),
+    tag2Tilt: getNumber(record.tag2Tilt, DEFAULT_HERO_INFO.tag2Tilt),
+    tag3Tilt: getNumber(record.tag3Tilt, DEFAULT_HERO_INFO.tag3Tilt),
+    tag1OffsetY: getNumber(record.tag1OffsetY, DEFAULT_HERO_INFO.tag1OffsetY),
+    tag2OffsetY: getNumber(record.tag2OffsetY, DEFAULT_HERO_INFO.tag2OffsetY),
+    tag3OffsetY: getNumber(record.tag3OffsetY, DEFAULT_HERO_INFO.tag3OffsetY),
+    ability1Icon: getString(record.ability1Icon, DEFAULT_HERO_INFO.ability1Icon),
+    ability2Icon: getString(record.ability2Icon, DEFAULT_HERO_INFO.ability2Icon),
+    ability3Icon: getString(record.ability3Icon, DEFAULT_HERO_INFO.ability3Icon),
+    ability4Icon: getString(record.ability4Icon, DEFAULT_HERO_INFO.ability4Icon),
+    abilityCircleColor: getString(record.abilityCircleColor, DEFAULT_HERO_INFO.abilityCircleColor),
+    abilityIconColor: getString(record.abilityIconColor, DEFAULT_HERO_INFO.abilityIconColor),
+    ...(getString(record.backstory) ? { backstory: getString(record.backstory) } : {}),
+  }
+}
+
+function parseSavePayload(value: unknown): CustomHeroSavePayload {
+  if (!isRecord(value)) {
+    throw new CustomHeroError('Hero payload is required', 400)
+  }
+
+  const heroRecord = isRecord(value.hero) ? value.hero : {}
+  const weaponRecord = isRecord(value.weapon) ? value.weapon : {}
+  const vitalityRecord = isRecord(value.vitality) ? value.vitality : {}
+  const spiritRecord = isRecord(value.spirit) ? value.spirit : {}
+  const abilityStatsRecord = isRecord(value.abilityStats) ? value.abilityStats : {}
+  const name = getString(value.name)
+  const status = normalizeStatus(value.status)
+  const allowCopies = value.allowCopies === true
+  const portrait = getString(heroRecord.portrait)
+  const render = getString(heroRecord.render)
+  const background = getString(heroRecord.background, render || DEFAULT_BACKGROUND)
+  const heroInfo = normalizeHeroInfo(value.heroInfo)
+
+  if (!name) {
+    throw new CustomHeroError('Hero name is required', 400)
+  }
+
+  if (status === 'published' && !portrait) {
+    throw new CustomHeroError('Publishing requires a portrait', 400)
+  }
+
+  if (!render) {
+    throw new CustomHeroError('Hero render is required', 400)
+  }
+
+  return {
+    id: getString(value.id) || null,
+    name,
+    status,
+    hero: {
+      portrait,
+      render,
+      background,
+    },
+    allowCopies,
+    heroInfo,
+    weapon: {
+      weaponName: getString(weaponRecord.weaponName, `${name} Weapon`),
+      weaponDesc: getString(weaponRecord.weaponDesc),
+      gunImageSrc: getString(weaponRecord.gunImageSrc),
+      weaponAttributes: getStringArray(weaponRecord.weaponAttributes),
+      bulletDPS: getNumber(weaponRecord.bulletDPS),
+      weaponMinRange: getNumber(weaponRecord.weaponMinRange),
+      weaponMaxRange: getNumber(weaponRecord.weaponMaxRange),
+      stats: normalizeStats(weaponRecord.stats),
+    },
+    vitality: {
+      stats: normalizeStats(vitalityRecord.stats),
+    },
+    spirit: {
+      topStats: normalizeStats(spiritRecord.topStats),
+      spiritPowerStat: normalizePanelStat(spiritRecord.spiritPowerStat),
+    },
+    abilityStats: normalizeAbilityStats(abilityStatsRecord, {
+      displayName: name,
+      heroInfo,
+    }),
+  }
+}
+
+function slugify(value: string) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return slug || 'custom-hero'
+}
+
+async function getUniqueSlug(name: string) {
+  const baseSlug = slugify(name)
+
+  for (let index = 0; index < 25; index += 1) {
+    const candidate = index === 0 ? baseSlug : `${baseSlug}-${index + 1}`
+    const existing = await CustomHero.exists({ slug: candidate })
+
+    if (!existing) {
+      return candidate
+    }
+  }
+
+  return `${baseSlug}-${new Types.ObjectId().toString().slice(-8)}`
+}
+
+async function getActor(): Promise<Actor> {
+  const session = await auth()
+
+  if (!session.userId) {
+    throw new CustomHeroError('Authentication required', 401)
+  }
+
+  const claim = session.sessionClaims?.mongo_user_id
+  const mongoUserId = typeof claim === 'string' && claim.length > 0 ? claim : null
+  const ownerIds = [session.userId, mongoUserId].filter((value): value is string => Boolean(value))
+
+  return {
+    clerkId: session.userId,
+    storageUserId: mongoUserId ?? session.userId,
+    ownerIds,
+  }
+}
+
+async function getOptionalActor(): Promise<Actor | null> {
+  const session = await auth()
+
+  if (!session.userId) {
+    return null
+  }
+
+  const claim = session.sessionClaims?.mongo_user_id
+  const mongoUserId = typeof claim === 'string' && claim.length > 0 ? claim : null
+  const ownerIds = [session.userId, mongoUserId].filter((value): value is string => Boolean(value))
+
+  return {
+    clerkId: session.userId,
+    storageUserId: mongoUserId ?? session.userId,
+    ownerIds,
+  }
+}
+
+function getValidObjectId(id: string) {
+  if (!Types.ObjectId.isValid(id)) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  return new Types.ObjectId(id)
+}
+
+function serializeDate(value?: Date | null) {
+  return value ? value.toISOString() : null
+}
+
+function serializeHeroInfo(heroInfo: HeroInfoRecord | null): HeroInfoDefinition {
+  if (!heroInfo) {
+    return DEFAULT_HERO_INFO
+  }
+
+  return {
+    nameType: heroInfo.nameType,
+    nameValue: heroInfo.nameValue,
+    nameColor: heroInfo.nameColor,
+    tag1Text: heroInfo.tag1Text,
+    tag2Text: heroInfo.tag2Text,
+    tag3Text: heroInfo.tag3Text,
+    tagColor: heroInfo.tagColor,
+    tagTextColor: heroInfo.tagTextColor,
+    tag1Tilt: heroInfo.tag1Tilt,
+    tag2Tilt: heroInfo.tag2Tilt,
+    tag3Tilt: heroInfo.tag3Tilt,
+    tag1OffsetY: heroInfo.tag1OffsetY,
+    tag2OffsetY: heroInfo.tag2OffsetY,
+    tag3OffsetY: heroInfo.tag3OffsetY,
+    ability1Icon: heroInfo.ability1Icon,
+    ability2Icon: heroInfo.ability2Icon,
+    ability3Icon: heroInfo.ability3Icon,
+    ability4Icon: heroInfo.ability4Icon,
+    abilityCircleColor: heroInfo.abilityCircleColor,
+    abilityIconColor: heroInfo.abilityIconColor,
+    ...(heroInfo.backstory ? { backstory: heroInfo.backstory } : {}),
+  }
+}
+
+function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, actor: Actor | null = null, bookmarks: Set<string> | null = null): CustomHeroSummary {
+  const likedBy = hero.likedBy ?? []
+  const viewerCanEdit = Boolean(actor?.ownerIds.some(ownerId => ownerId === hero.createdByUserId))
+  const likedByCurrentUser = Boolean(actor?.ownerIds.some(ownerId => likedBy.includes(ownerId)))
+  const heroId = hero._id.toString()
+
+  return {
+    id: heroId,
+    creatorId: hero.createdByUserId,
+    slug: hero.slug,
+    assetSlug: hero.slug,
+    displayName: hero.name,
+    portrait: hero.portrait,
+    render: hero.render,
+    background: hero.background || hero.render || DEFAULT_BACKGROUND,
+    heroInfo: serializeHeroInfo(heroInfo),
+    status: hero.status,
+    likesCount: hero.likesCount ?? likedBy.length,
+    likedByCurrentUser,
+    bookmarkedByCurrentUser: bookmarks?.has(heroId) ?? false,
+    allowCopies: hero.allowCopies ?? false,
+    viewerCanEdit,
+    publishedAt: serializeDate(hero.publishedAt),
+    createdAt: hero.createdAt.toISOString(),
+    updatedAt: hero.updatedAt.toISOString(),
+  }
+}
+
+function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): CustomHeroDetail {
+  const summary = serializeSummary(bundle.hero, bundle.heroInfo, actor)
+  const abilityStats = normalizeAbilityStats(bundle.abilityStats, {
+    displayName: summary.displayName,
+    heroInfo: summary.heroInfo,
+  })
+  const stats: HeroStatsPayload = {
+    hero: {
+      slug: summary.slug,
+      name: summary.displayName,
+      portrait: summary.portrait,
+      render: summary.render,
+    },
+    heroInfo: summary.heroInfo,
+    weapon: {
+      weaponName: bundle.weapon?.weaponName ?? `${summary.displayName} Weapon`,
+      weaponDesc: bundle.weapon?.weaponDesc ?? '',
+      gunImageSrc: bundle.weapon?.gunImageSrc ?? '',
+      weaponAttributes: bundle.weapon?.weaponAttributes ?? [],
+      bulletDPS: bundle.weapon?.bulletDPS ?? 0,
+      weaponMinRange: bundle.weapon?.weaponMinRange ?? 0,
+      weaponMaxRange: bundle.weapon?.weaponMaxRange ?? 0,
+      stats: bundle.weapon?.stats ?? [],
+    },
+    vitality: {
+      stats: bundle.vitality?.stats ?? [],
+    },
+    spirit: {
+      topStats: bundle.spirit?.topStats ?? [],
+      spiritPowerStat: bundle.spirit?.spiritPowerStat ?? {
+        label: 'Spirit Power',
+        value: '0',
+        unit: '',
+        icon: 'spiritPower',
+        scaling: 'none',
+        scalingValue: '0',
+      },
+    },
+  }
+
+  return {
+    ...summary,
+    stats,
+    abilityStats,
+  }
+}
+
+function uniqueObjectIds(values: Types.ObjectId[]) {
+  const seen = new Set<string>()
+
+  return values.filter(value => {
+    const id = value.toString()
+
+    if (seen.has(id)) {
+      return false
+    }
+
+    seen.add(id)
+    return true
+  })
+}
+
+async function getTextSearchHeroIds(search: string) {
+  const trimmedSearch = search.trim()
+
+  if (!trimmedSearch) {
+    return []
+  }
+
+  try {
+    const [heroMatches, heroInfoMatches] = await Promise.all([
+      CustomHero.find({ $text: { $search: trimmedSearch } }).select('_id').limit(500).lean<Array<{ _id: Types.ObjectId }>>(),
+      HeroInfo.find({ $text: { $search: trimmedSearch } }).select('heroId').limit(500).lean<Array<{ heroId: Types.ObjectId }>>(),
+    ])
+
+    return uniqueObjectIds([
+      ...heroMatches.map(hero => hero._id),
+      ...heroInfoMatches.map(heroInfo => heroInfo.heroId),
+    ])
+  } catch {
+    return []
+  }
+}
+
+function getLookupStage(from: string, as: string): PipelineStage.Lookup {
+  return {
+    $lookup: {
+      from,
+      localField: '_id',
+      foreignField: 'heroId',
+      as,
+    },
+  }
+}
+
+function getUnwindStage(path: string): PipelineStage.Unwind {
+  return {
+    $unwind: {
+      path,
+      preserveNullAndEmptyArrays: true,
+    },
+  }
+}
+
+function getSortStage(sort: CustomHeroSort): PipelineStage.Sort['$sort'] {
+  if (sort === 'liked') {
+    return { likesCount: -1, publishedAt: -1, updatedAt: -1, _id: -1 }
+  }
+
+  if (sort === 'trending') {
+    return { trendingScore: -1, publishedAt: -1, updatedAt: -1, _id: -1 }
+  }
+
+  return { publishedAt: -1, updatedAt: -1, _id: -1 }
+}
+
+async function buildHeroListPipeline(filters: CustomHeroListFilters): Promise<PipelineStage[]> {
+  const trimmedSearch = filters.search.trim()
+  const searchHeroIds = await getTextSearchHeroIds(trimmedSearch)
+
+  const pipeline: PipelineStage[] = [
+    { $match: { status: filters.status } },
+    getLookupStage(HeroInfo.collection.name, 'heroInfo'),
+    getUnwindStage('$heroInfo'),
+    {
+      $addFields: {
+        recentLikeEvents: {
+          $filter: {
+            input: { $ifNull: ['$likeEvents', []] },
+            as: 'event',
+            cond: { $gte: ['$$event.createdAt', new Date(Date.now() - TRENDING_WINDOW_MS)] },
+          },
+        },
+        recentCopyEvents: {
+          $filter: {
+            input: { $ifNull: ['$copyEvents', []] },
+            as: 'event',
+            cond: { $gte: ['$$event.createdAt', new Date(Date.now() - TRENDING_WINDOW_MS)] },
+          },
+        },
+      },
+    },
+    {
+      $addFields: {
+        trendingScore: { $add: [{ $multiply: [{ $size: '$recentLikeEvents' }, 3] }, { $multiply: [{ $size: '$recentCopyEvents' }, 2] }] },
+      },
+    },
+  ]
+
+  if (trimmedSearch) {
+    const escapedSearch = escapeRegExp(trimmedSearch)
+    const searchConditions: PipelineStage.Match['$match'][] = [
+      { name: { $regex: escapedSearch, $options: 'i' } },
+      { 'heroInfo.backstory': { $regex: escapedSearch, $options: 'i' } },
+    ]
+
+    if (searchHeroIds.length) {
+      searchConditions.push({ _id: { $in: searchHeroIds } })
+    }
+
+    pipeline.push({ $match: { $or: searchConditions } })
+  }
+
+  return pipeline
+}
+
+async function getHeroInfoMap(heroIds: Types.ObjectId[]) {
+  const heroInfos = await HeroInfo.find({ heroId: { $in: heroIds } }).lean<HeroInfoRecord[]>()
+
+  return new Map(heroInfos.map(heroInfo => [heroInfo.heroId.toString(), heroInfo]))
+}
+
+async function getActorBookmarkSet(actor: Actor | null) {
+  if (!actor) {
+    return null
+  }
+
+  const user = await User.findOne({ clerkId: actor.clerkId }).select('bookmarks').lean<{ bookmarks?: Types.ObjectId[] } | null>()
+
+  return new Set((user?.bookmarks ?? []).map(bookmark => bookmark.toString()))
+}
+
+async function getHeroBundle(hero: HeroRecord): Promise<HeroBundle> {
+  const [heroInfo, weapon, vitality, spirit, abilityStats] = await Promise.all([
+    HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>(),
+    WeaponStats.findOne({ heroId: hero._id }).lean<WeaponStatsRecord | null>(),
+    VitalityStats.findOne({ heroId: hero._id }).lean<VitalityStatsRecord | null>(),
+    SpiritStats.findOne({ heroId: hero._id }).lean<SpiritStatsRecord | null>(),
+    AbilityStats.findOne({ heroId: hero._id }).lean<AbilityStatsRecord | null>(),
+  ])
+
+  return {
+    hero,
+    heroInfo,
+    weapon,
+    vitality,
+    spirit,
+    abilityStats,
+  }
+}
+
+export async function listCustomHeroPage(filters: CustomHeroListFilters): Promise<CustomHeroListResult> {
+  const actor = await getOptionalActor()
+
+  await dbConnect()
+
+  const pipeline = await buildHeroListPipeline(filters)
+  const totalResult = await CustomHero.aggregate<{ total: number }>([
+    ...pipeline,
+    { $count: 'total' },
+  ])
+  const total = totalResult[0]?.total ?? 0
+  const heroes = await CustomHero.aggregate<HeroAggregateRecord>([
+    ...pipeline,
+    { $sort: getSortStage(filters.sort) },
+    { $skip: filters.offset },
+    { $limit: filters.limit },
+  ])
+  const bookmarks = await getActorBookmarkSet(actor)
+  const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks))
+
+  return {
+    heroes: summaries,
+    pagination: {
+      limit: filters.limit,
+      offset: filters.offset,
+      total,
+      hasMore: filters.offset + summaries.length < total,
+    },
+  }
+}
+
+export async function listCustomHeroes(status: CustomHeroStatus, sort: CustomHeroSort, search = ''): Promise<CustomHeroSummary[]> {
+  const result = await listCustomHeroPage({
+    status,
+    sort,
+    search,
+    limit: 40,
+    offset: 0,
+  })
+
+  return result.heroes
+}
+
+export async function getEditableCustomHero(id: string): Promise<CustomHeroDetail> {
+  const actor = await getActor()
+
+  await dbConnect()
+
+  const objectId = getValidObjectId(id)
+  const hero = await CustomHero.findOne({
+    _id: objectId,
+    $or: [
+      { status: 'published' },
+      { createdByUserId: { $in: actor.ownerIds } },
+    ],
+  }).lean<HeroRecord | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  return serializeDetail(await getHeroBundle(hero), actor)
+}
+
+export async function getPublishedCustomHero(id: string): Promise<CustomHeroDetail> {
+  const actor = await getOptionalActor()
+
+  await dbConnect()
+
+  const objectId = getValidObjectId(id)
+  const hero = await CustomHero.findOne({ _id: objectId, status: 'published' }).lean<HeroRecord | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  return serializeDetail(await getHeroBundle(hero), actor)
+}
+
+export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<CustomHeroSummary[]> {
+  await dbConnect()
+
+  const heroes = await CustomHero.find({ createdByUserId: { $in: ownerIds } })
+    .sort({ updatedAt: -1 })
+    .lean<HeroRecord[]>()
+  const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
+  const actor = {
+    clerkId: ownerIds[0],
+    storageUserId: ownerIds[0],
+    ownerIds,
+  }
+  const bookmarks = await getActorBookmarkSet(actor)
+
+  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks))
+}
+
+export async function listPrivateCustomHeroesForOwner(ownerIds: string[]): Promise<CustomHeroSummary[]> {
+  const heroes = await listCustomHeroesForOwner(ownerIds)
+
+  return heroes.filter(hero => hero.status === 'private')
+}
+
+export async function listBookmarkedCustomHeroes(heroIds: Types.ObjectId[], ownerIds: string[]): Promise<CustomHeroSummary[]> {
+  await dbConnect()
+
+  if (!heroIds.length) {
+    return []
+  }
+
+  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published' })
+    .sort({ updatedAt: -1 })
+    .lean<HeroRecord[]>()
+  const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
+  const actor = {
+    clerkId: ownerIds[0],
+    storageUserId: ownerIds[0],
+    ownerIds,
+  }
+  const bookmarks = new Set(heroIds.map(heroId => heroId.toString()))
+
+  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks))
+}
+
+export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> {
+  const actor = await getActor()
+  const payload = parseSavePayload(value)
+  const isPublishing = payload.status === 'published'
+
+  await dbConnect()
+
+  const existingHero = payload.id
+    ? await CustomHero.findOne({ _id: getValidObjectId(payload.id), createdByUserId: { $in: actor.ownerIds } }).lean<HeroRecord | null>()
+    : null
+
+  if (payload.id && !existingHero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  const publishedAt = isPublishing ? existingHero?.publishedAt ?? new Date() : null
+  const heroId = existingHero?._id ?? new Types.ObjectId()
+  const slug = existingHero?.slug ?? await getUniqueSlug(payload.name)
+  const hero = await CustomHero.findOneAndUpdate(
+    { _id: heroId },
+    {
+      $set: {
+        name: payload.name,
+        slug,
+        portrait: payload.hero.portrait,
+        render: payload.hero.render,
+        background: payload.hero.background,
+        createdByUserId: existingHero?.createdByUserId ?? actor.storageUserId,
+        status: payload.status,
+        allowCopies: payload.allowCopies,
+        publishedAt,
+      },
+      $setOnInsert: {
+        likesCount: 0,
+        likedBy: [],
+        likeEvents: [],
+        copyEvents: [],
+      },
+    },
+    {
+      upsert: true,
+      returnDocument: 'after',
+      runValidators: true,
+      setDefaultsOnInsert: true,
+    },
+  ).lean<HeroRecord | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Failed to save hero', 500)
+  }
+
+  await Promise.all([
+    HeroInfo.findOneAndUpdate(
+      { heroId: hero._id },
+      {
+        ...payload.heroInfo,
+        heroId: hero._id,
+        createdByUserId: hero.createdByUserId,
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+    WeaponStats.findOneAndUpdate(
+      { heroId: hero._id },
+      {
+        ...payload.weapon,
+        heroId: hero._id,
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+    VitalityStats.findOneAndUpdate(
+      { heroId: hero._id },
+      {
+        ...payload.vitality,
+        heroId: hero._id,
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+    SpiritStats.findOneAndUpdate(
+      { heroId: hero._id },
+      {
+        ...payload.spirit,
+        heroId: hero._id,
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+    AbilityStats.findOneAndUpdate(
+      { heroId: hero._id },
+      {
+        ...payload.abilityStats,
+        heroId: hero._id,
+      },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+  ])
+
+  return serializeDetail(await getHeroBundle(hero), actor)
+}
+
+export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
+  const actor = await getActor()
+
+  await dbConnect()
+
+  const objectId = getValidObjectId(id)
+  const existingHero = await CustomHero.findOne({ _id: objectId, status: 'published' }).lean<HeroRecord | null>()
+
+  if (!existingHero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  const existingLikedBy = existingHero.likedBy ?? []
+  const isLiked = actor.ownerIds.some(ownerId => existingLikedBy.includes(ownerId))
+  const nextLikedBy = isLiked
+    ? existingLikedBy.filter(ownerId => !actor.ownerIds.includes(ownerId))
+    : [...existingLikedBy, actor.storageUserId]
+  const engagementUpdate = isLiked
+    ? {
+        $pull: {
+          likeEvents: { userId: { $in: actor.ownerIds } },
+        },
+      }
+    : {
+        $push: {
+          likeEvents: {
+            userId: actor.storageUserId,
+            createdAt: new Date(),
+          },
+        },
+      }
+  const hero = await CustomHero.findOneAndUpdate(
+    { _id: objectId, status: 'published' },
+    {
+      $set: {
+        likedBy: nextLikedBy,
+        likesCount: nextLikedBy.length,
+      },
+      ...engagementUpdate,
+    },
+    { returnDocument: 'after', runValidators: true },
+  ).lean<HeroRecord | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  const heroInfo = await HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>()
+
+  return serializeSummary(hero, heroInfo, actor)
+}
+
+export async function recordCustomHeroCopy(id: string): Promise<void> {
+  const actor = await getActor()
+
+  await dbConnect()
+
+  const objectId = getValidObjectId(id)
+  const hero = await CustomHero.findOneAndUpdate(
+    { _id: objectId, status: 'published', allowCopies: true },
+    {
+      $push: {
+        copyEvents: {
+          userId: actor.storageUserId,
+          createdAt: new Date(),
+        },
+      },
+    },
+    { runValidators: true },
+  ).select('_id').lean<{ _id: Types.ObjectId } | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+}

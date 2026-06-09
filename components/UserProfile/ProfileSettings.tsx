@@ -39,7 +39,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
             )}
           </div>
           <div>
-            <p className={styles.eyebrow}>Classified</p>
+            <p className={styles.eyebrow}>Profile</p>
             <h1>Settings</h1>
             <p className={styles.identifier}>{user.email}</p>
           </div>
@@ -47,7 +47,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
 
         <form className={styles.form} action={updateProfileSettings}>
           <section className={styles.section}>
-            <h2>Dossier Controls</h2>
+            <h2>Profile Controls</h2>
             <label className={styles.field}>
               <span>Main Hero</span>
               <select name="preferredHero" defaultValue={user.preferredHero}>
@@ -59,7 +59,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
               </select>
             </label>
             <label className={styles.textareaField}>
-              <span>Typewritten Report</span>
+              <span>Bio</span>
               <textarea name="customBio" defaultValue={user.customBio} rows={7} />
             </label>
           </section>
@@ -69,7 +69,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
             <label className={styles.toggle}>
               <input type="checkbox" name="isPublic" defaultChecked={user.isPublic} />
               <span aria-hidden="true" />
-              <strong>Public Dossier</strong>
+              <strong>Public Profile</strong>
             </label>
             <label className={styles.toggle}>
               <input type="checkbox" name="anonymousEdits" defaultChecked={user.anonymousEdits} />
@@ -79,7 +79,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
           </section>
 
           <button className={styles.saveButton} type="submit">
-            Save Classified File
+            Save Profile
           </button>
         </form>
 
@@ -94,11 +94,11 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
         </section>
 
         <section className={styles.dangerZone}>
-          <h2>Self-Destruct</h2>
+          <h2>Delete Account</h2>
           <p>Type <strong>{user.username}</strong> to confirm permanent account deletion.</p>
           {deleteError ? <p className={styles.error} role="alert">Confirmation string did not match.</p> : null}
           <form className={styles.deleteForm} action={deleteAccount}>
-            <input name="confirmation" required autoComplete="off" aria-label="Self-destruct confirmation" />
+            <input name="confirmation" required autoComplete="off" aria-label="Delete account confirmation" />
             <button type="submit">Delete Account</button>
           </form>
         </section>
