@@ -11,7 +11,9 @@ export interface PanelStat extends ScalingState {
   label: string
   value: string | number
   unit?: string
+  append?: string
   icon?: string
+  iconColor?: string
   description?: string
 }
 

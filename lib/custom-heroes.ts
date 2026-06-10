@@ -117,6 +117,7 @@ function normalizePanelStat(value: unknown): IPanelStat {
     label: getString(record.label),
     value: getString(record.value, '0'),
     unit: getString(record.unit),
+    append: getString(record.append),
     icon: getString(record.icon, 'dot'),
     scaling: ['spirit', 'courage', 'melee', 'boon'].includes(getString(record.scaling)) ? getString(record.scaling) as IPanelStat['scaling'] : 'none',
     scalingValue: getString(record.scalingValue, '0'),

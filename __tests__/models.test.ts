@@ -14,6 +14,8 @@ describe('Mongoose model schemas', () => {
     const scalingPath = statSchema.path('scaling')
 
     expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
+    expect(statSchema.path('iconColor')).toBeDefined()
+    expect(statSchema.path('append')).toBeDefined()
   })
 
   it('stores hero tag offsets and optional backstory', () => {
@@ -28,12 +30,16 @@ describe('Mongoose model schemas', () => {
     const abilitiesPath = AbilityStats.schema.path('abilities')
     const sectionTypePath = AbilityStats.schema.path('abilities.sections.type')
     const mainCellScalingPath = AbilityStats.schema.path('abilities.sections.mainCells.scaling')
+    const mainCellIconColorPath = AbilityStats.schema.path('abilities.sections.mainCells.iconColor')
+    const mainCellAppendPath = AbilityStats.schema.path('abilities.sections.mainCells.append')
 
     expect(AbilityStats.collection.name).toBe('abilitystats')
     expect(AbilityStats.schema.path('heroId')).toBeDefined()
     expect(abilitiesPath).toBeDefined()
     expect(sectionTypePath).toHaveProperty('enumValues', ['richText', 'grid'])
     expect(mainCellScalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
+    expect(mainCellIconColorPath).toBeDefined()
+    expect(mainCellAppendPath).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

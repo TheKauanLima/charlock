@@ -3,121 +3,53 @@
   inset: 0;
   z-index: 240;
   min-height: 100dvh;
-  color: #f2e9cf;
-  font-family: var(--font-geist-sans), Arial, sans-serif;
-  overflow: auto;
+  color: #f4ecd8;
+  font-family: "Retail Demo", var(--font-geist-sans), Arial, sans-serif;
+  pointer-events: none;
 }
 
 .focusBackdrop {
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(circle at 28% 18%, rgb(175 156 96 / 18%), transparent 30%),
-    linear-gradient(135deg, rgb(13 16 17 / 96%), rgb(23 22 18 / 98%));
+  display: none;
 }
 
 .editorLayout {
-  position: relative;
+  position: absolute;
+  top: clamp(110px, 18vh, 190px);
+  right: clamp(44px, 11vw, 210px);
   display: grid;
-  grid-template-columns: 58px minmax(520px, 820px) minmax(220px, 280px);
-  gap: 18px;
+  grid-template-columns: 46px minmax(500px, 560px);
+  gap: 10px;
   align-items: start;
-  width: min(1180px, calc(100vw - 32px));
-  margin: 28px auto;
-}
-
-.sideTabs,
-.returnPanel {
-  position: sticky;
-  top: 28px;
-  border: 1px solid rgb(220 194 112 / 24%);
-  background: rgb(14 17 17 / 82%);
-  box-shadow: 0 20px 50px rgb(0 0 0 / 35%);
-  backdrop-filter: blur(16px);
-}
-
-.sideTabs {
-  display: grid;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 6px;
-}
-
-.sideTabs button,
-.richToolbar button,
-.gridActions button,
-.iconHeader button,
-.saveReturnButton,
-.cancelButton,
-.scalingButton,
-.iconButton,
-.abilityIconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgb(217 190 110 / 30%);
-  color: #f2e5bd;
-  background: rgb(43 43 35 / 74%);
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
-}
-
-.sideTabs button {
-  width: 40px;
-  min-height: 40px;
-  border-radius: 4px;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.sideTabs svg,
-.returnPanel svg,
-.richToolbar svg,
-.iconHeader svg {
-  width: 16px;
-  height: 16px;
-}
-
-.sideTabs button:hover,
-.richToolbar button:hover,
-.gridActions button:hover,
-.saveReturnButton:hover,
-.cancelButton:hover,
-.scalingButton:hover,
-.iconButton:hover,
-.abilityIconButton:hover {
-  border-color: rgb(245 216 131 / 72%);
-  background: rgb(82 75 51 / 86%);
+  pointer-events: auto;
 }
 
 .tooltipSurface {
   position: relative;
-  min-height: 720px;
-  max-height: calc(100dvh - 56px);
-  padding: 34px 36px 38px;
-  border: 1px solid rgb(239 211 129 / 34%);
-  border-radius: 3px;
-  overflow: auto;
+  width: min(560px, calc(100vw - 72px));
+  min-height: 520px;
+  max-height: calc(100dvh - 170px);
+  padding: 28px 30px 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
   background-image: url('/panorama/images/tooltips/ability/ability_tooltip_bg_png.png');
   background-size: 100% 100%;
   background-position: center;
-  box-shadow:
-    inset 0 0 0 1px rgb(255 255 255 / 5%),
-    0 28px 80px rgb(0 0 0 / 55%);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 42%);
+  scrollbar-color: rgb(198 127 255 / 52%) rgb(255 255 255 / 8%);
+  scrollbar-width: thin;
 }
 
 .tooltipTexture {
   pointer-events: none;
   position: absolute;
   inset: 0;
-  opacity: 0.16;
+  opacity: 0.0;
   background-image: url('/panorama/images/tooltips/ability/ability_texture_layer_png.png');
   background-size: cover;
   mix-blend-mode: screen;
 }
 
 .header,
-.coreEditors,
 .subStats,
 .sections {
   position: relative;
@@ -126,291 +58,595 @@
 
 .header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px;
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 162px;
+  gap: 16px;
   align-items: start;
 }
 
 .titleGroup {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 16px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
 }
 
 .abilityIconButton {
-  width: 72px;
-  height: 72px;
-  border-radius: 4px;
+  display: none;
 }
 
-.abilityIconButton span {
-  width: 46px;
-  height: 46px;
-  background: #f0d28c;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.titleGroup label,
-.sectionTitleLabel,
-.statEditor label,
-.iconHeader label,
-.chargeToggle {
-  display: grid;
-  gap: 5px;
-  color: #b5a57e;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.titleGroup input {
-  min-width: 0;
+.nameInputWrap input {
+  width: 100%;
   border: 0;
-  border-bottom: 1px solid rgb(235 206 123 / 34%);
-  color: #f6e4af;
+  color: #fff5dc;
   background: transparent;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: clamp(1.95rem, 4vw, 3rem);
-  font-weight: 800;
+  font-family: "Valve Occult", Georgia, 'Times New Roman', serif;
+  font-size: 2.15rem;
+  font-weight: 900;
   line-height: 1;
   outline: none;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 55%);
+}
+
+.nameInputWrap input:focus,
+.sectionTitleLabel input:focus,
+.richEditable:focus,
+.inlineStatEditor input:focus {
+  outline: none;
+  /* outline: 1px solid rgb(206 146 255 / 68%); */
+  outline-offset: 2px;
 }
 
 .timingPanel {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid rgb(222 196 119 / 26%);
-  background: rgb(12 15 15 / 48%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
 }
 
 .chargeToggle {
-  grid-template-columns: auto 1fr;
+  display: flex;
+  gap: 6px;
   align-items: center;
-  color: #e7d39e;
-}
-
-.chargeToggle input {
-  accent-color: #d8bd75;
-}
-
-.chargeGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.chargeGrid > div,
-.cooldownBox {
-  display: grid;
-  min-height: 56px;
-  align-content: center;
-  gap: 2px;
-  padding: 8px;
-  border: 1px solid rgb(240 214 133 / 18%);
-  background: rgb(40 37 28 / 66%);
-}
-
-.chargeGrid span,
-.cooldownBox span {
-  color: #b6a77d;
-  font-size: 0.65rem;
-  font-weight: 800;
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.68rem;
+  font-weight: 900;
   text-transform: uppercase;
 }
 
-.cooldownBox strong,
-.chargeGrid strong,
-.subStat strong,
-.mainCell strong,
-.lowerCell strong {
-  color: #f4df9d;
-  font-size: 1.45rem;
-  line-height: 1;
+.chargeToggle input {
+  accent-color: #a77cdf;
+}
+
+.chargeGrid {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.subStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0px;
+  margin-top: 0px;
+}
+
+.sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.section {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding-inline: 22px;
+}
+
+.sectionTitleLabel input,
+.mainCellTitleLabel input {
+  width: 100%;
+  border: 0;
+  color: rgb(255 255 255 / 62%);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sideTabs {
+  display: grid;
+  gap: 8px;
+  margin-top: 76px;
+}
+
+.sideTabs button,
+.returnPanel button,
+.richToolbar button,
+.gridActions button,
+.iconHeader button,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(189 126 255 / 55%);
+  color: #f7e9ff;
+  background: rgb(21 16 27 / 58%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.sideTabs button {
+  width: 38px;
+  min-height: 38px;
+  border-radius: 2px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sideTabs svg,
+.returnPanel svg,
+.richToolbar svg,
+.iconHeader svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sideTabs button:hover,
+.returnPanel button:hover,
+.richToolbar button:hover,
+.gridActions button:hover,
+.iconButton:hover {
+  border-color: rgb(235 204 255 / 88%);
+  background: rgb(73 36 94 / 78%);
+}
+
+.inlineStatEditor {
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.inlineStatEditorTiming {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 4px 12px;
+  background: rgb(255 255 255 / 15%);
+  color: #170f1f;
+  width: fit-content;
+}
+
+.inlineStatEditorTiming .iconButton {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-right: 3px;
+}
+
+.inlineStatEditorTiming .valueInputLabel,
+.inlineStatEditorTiming .unitInputLabel,
+.inlineStatEditorTiming .statLabelInputLabel {
+  display: flex;
+  align-items: center;
+  grid-area: auto;
+}
+
+.inlineStatEditorTiming .valueInput {
+  color: #fffbeb;
+  text-align: left;
+}
+
+.inlineStatEditorTiming .unitInput {
+  color: #afabaf;
+  text-align: left;
+}
+
+.inlineStatEditorSub {
+  display: inline-grid;
+  grid-template-columns: 18px max-content max-content max-content;
+  grid-template-areas: "icon value unit scaleButton";
+  align-items: center;
+  justify-content: start;
+  column-gap: 4px;
+  width: max-content;
+  min-width: 0;
+  padding: 4px 22px 4px 9px;
+  background: rgb(255 255 255 / 15%);
+  color: #170f1f;
+}
+
+.inlineStatEditorSub .iconButton {
+  width: 18px;
+  height: 18px;
+  margin-right: 0;
+}
+
+.inlineStatEditorSub .valueInputLabel,
+.inlineStatEditorSub .unitInputLabel,
+.inlineStatEditorSub .statLabelInputLabel {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  grid-area: auto;
+}
+
+.inlineStatEditorSub .valueInput {
+  color: #fffbeb;
+  text-align: left;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  margin-left: -60px;
+}
+
+.inlineStatEditorSub .unitInput {
+  color: #afabaf;
+  text-align: left;
+}
+
+.inlineStatEditorSub .statLabelInputLabel {
+  min-width: 0px;
+  margin-right: 0px;
+}
+
+.inlineStatEditorSub .statLabelInput {
+  text-align: center;
+}
+
+.inlineStatEditorScaled {
+  box-shadow: inset 0 0 0 1px rgb(198 127 255 / 62%);
+}
+
+.inlineStatEditorMain {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 65px;
+  padding: 0px 12px 0px;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid transparent;
+}
+
+.mainRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.inlineStatEditorLower {
+  width: max-content;
+  grid-template-columns: 26px max-content max-content 1fr max-content;
+  grid-template-areas: "icon value append label scaleButton";
+  align-items: center;
+  column-gap: 0px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.iconButton {
+  grid-area: icon;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .propertyIcon {
   display: inline-block;
   width: 18px;
   height: 18px;
-  margin-right: 6px;
-  vertical-align: -3px;
   background: currentColor;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
 }
 
-.coreEditors {
-  display: grid;
-  gap: 9px;
-  margin-top: 24px;
-  padding: 12px;
-  border: 1px solid rgb(227 200 119 / 18%);
-  background: rgb(0 0 0 / 18%);
+.inlineStatEditorTiming .propertyIcon,
+.inlineStatEditorSub .propertyIcon {
+  color: #7e61a1;
 }
 
-.subStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
-  margin-top: 18px;
+.valueInputLabel {
+  grid-area: value;
 }
 
-.subStat {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid rgb(231 205 123 / 18%);
-  background: rgb(26 31 29 / 50%);
+.unitInputLabel {
+  grid-area: unit;
 }
 
-.subStat > span {
-  color: #c7b98d;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.appendInputLabel {
+  grid-area: append;
 }
 
-.sections {
-  display: grid;
-  gap: 16px;
-  margin-top: 18px;
+.statLabelInputLabel {
+  grid-area: label;
 }
 
-.section {
-  display: grid;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid rgb(230 201 115 / 18%);
-  background: rgb(10 13 13 / 42%);
+.scaleInputLabel {
+  grid-area: scale;
 }
 
-.sectionTitleLabel input,
-.statEditor input,
-.richTextEditor textarea,
-.iconHeader input {
+.scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
-  border: 1px solid rgb(213 189 113 / 24%);
-  border-radius: 3px;
-  color: #f3e0ad;
-  background: rgb(5 7 7 / 58%);
+  margin-left: 2px;
+}
+
+.scalingValueWrap:empty {
+  display: none;
+}
+
+.scalingValueWrap > span {
+  margin-top: 0;
+  margin-right: -5px;
+}
+
+.inlineStatEditor input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-family: "Retail Demo", sans-serif;
   outline: none;
+  text-align: center;
 }
 
-.sectionTitleLabel input,
-.statEditor input,
-.iconHeader input {
-  height: 32px;
-  padding: 0 9px;
+.valueInput {
+  max-width: 58px;
+  font-size: 1rem;
+  font-weight: 950;
 }
 
-.statEditor {
-  display: grid;
-  grid-template-columns: 36px minmax(110px, 1.1fr) minmax(86px, 0.8fr) 70px auto minmax(74px, 0.7fr);
-  gap: 8px;
-  align-items: end;
+.inlineStatEditorMain .valueInput {
+  max-width: 72px;
+  font-size: 1.55rem;
+  color: rgb(251 240 208 / 100%);
 }
 
-.iconButton {
-  width: 36px;
-  height: 32px;
-  border-radius: 3px;
+.inlineStatEditorMain .iconButton {
+  width: 20px;
+  height: 20px;
 }
 
-.iconButton .propertyIcon {
+.inlineStatEditorMain .propertyIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.inlineStatEditorMain .iconButton {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .valueInputLabel {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .appendInputLabel {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .unitInputLabel {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  margin-top: -9px;
+  width: 100%;
+}
+
+.inlineStatEditorMain .unitInput {
+  color: rgb(251 240 208 / 100%);
+  text-align: center;
+  flex: 0 0 auto;
+  max-width: none;
+}
+
+.inlineStatEditorMain .appendInputLabel {
+  display: flex;
+  align-items: baseline;
+}
+
+.inlineStatEditorMain .appendInput {
+  color: rgb(169 166 166 / 100%);
+  font-size: 1.1rem;
+  font-weight: 950;
+  text-align: left;
+}
+
+.inlineStatEditorMain .scalingValueWrap {
+  position: absolute;
+  top: -12px;
+  right: 5px;
   margin: 0;
-  color: #ead08c;
 }
 
-.scalingButton {
-  gap: 5px;
-  height: 32px;
-  padding: 0 9px;
-  border-radius: 3px;
-  font-size: 0.68rem;
+.inlineStatEditorMain .scalingValueWrap > span {
+  margin: 0;
+}
+
+.inlineStatEditorMain.inlineStatEditorScaled {
+  box-shadow: none;
+}
+
+.inlineStatEditorLower.inlineStatEditorScaled {
+  box-shadow: none;
+}
+
+.inlineStatEditorMain[data-scaling="spirit"] {
+  border-color: #48315e;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(50 31 65 / 100%) 70%),
+    rgb(255 255 255 / 0%);
+}
+
+.inlineStatEditorMain[data-scaling="courage"],
+.inlineStatEditorMain[data-scaling="melee"] {
+  border-color: #4d311a;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(48 35 18 / 100%) 70%),
+    rgb(255 255 255 / 0%);
+}
+
+.inlineStatEditorMain[data-scaling="boon"] {
+  border-color: #36554a;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(36 60 51 / 100%) 100%),
+    rgb(255 255 255 / 0%);
+}
+
+.unitInput {
+  max-width: 36px;
+  font-size: 0.78rem;
   font-weight: 900;
-  text-transform: uppercase;
 }
 
-.scalingButton span {
-  width: 15px;
-  height: 15px;
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
+.statLabelInput {
+  color: rgb(255 255 255 / 88%);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+.inlineStatEditorTiming .valueInput,
+.inlineStatEditorTiming .unitInput,
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput,
+.inlineStatEditorLower .valueInput,
+.inlineStatEditorLower .unitInput,
+.appendInput {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-width: 0;
 }
 
-.scalingButtonActive {
-  color: #fff0b8;
-  background: rgb(92 79 44 / 88%);
+.inlineStatEditorLower .valueInput {
+  width: 100%;
+  max-width: 42px;
+  color: rgb(251 240 208 / 100%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .unitInput {
+  width: 100%;
+  max-width: 24px;
+  color: rgb(251 240 208 / 80%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .appendInputLabel {
+  display: flex;
+  align-items: baseline;
+  margin-left: -4px;
+}
+
+.inlineStatEditorLower .appendInput {
+  width: 100%;
+  color: rgb(169 166 166 / 100%);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.inlineStatEditorLower .statLabelInput {
+  width: 100%;
+  color: rgb(255 255 255 / 84%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .scalingValueWrap {
+  justify-self: start;
+  width: max-content;
+  min-width: 0;
+  margin-left: 3px;
+}
+
+.inlineStatEditorLower .scalingValueWrap > span {
+  margin: 0;
 }
 
 .richTextEditor {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .richToolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 5px;
 }
 
 .richToolbar button,
 .gridActions button {
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 3px;
-  font-size: 0.7rem;
-  font-weight: 800;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  font-weight: 900;
   text-transform: uppercase;
 }
 
-.richTextEditor textarea {
+.richEditable {
   width: 100%;
-  resize: vertical;
-  padding: 10px;
+  min-height: 2.7em;
+  border: 0;
+  color: #f0e8dc;
+  background: transparent;
   font: inherit;
-  line-height: 1.45;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.35;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.richPreview {
-  min-height: 78px;
-  padding: 12px;
-  border-top: 1px solid rgb(239 211 129 / 18%);
-  color: #d9ccb0;
-  background: rgb(0 0 0 / 20%);
-  font-size: 0.92rem;
-  line-height: 1.45;
+.richEditable strong {
+  font-weight: 900;
+}
+
+.richEditable:empty::before {
+  color: rgb(255 255 255 / 38%);
+  content: 'Write ability text...';
 }
 
 .richPreview strong {
-  color: #fff1c4;
+  color: #fff;
 }
 
 .darkenText {
-  color: #786f5e;
+  color: #80776f;
 }
 
 .richColorSpirit {
-  color: #c996ff;
+  color: #d6a1ff;
 }
 
 .richColorHealing {
-  color: #82e7a8;
+  color: #51f596;
 }
 
 .richColorDamage {
-  color: #ffbd72;
+  color: #ffb05a;
 }
 
 .richColorWarning {
-  color: #ffdf70;
+  color: #f7d65a;
 }
 
 .inlineIcon {
@@ -419,21 +655,108 @@
   height: 18px;
   margin: 0 3px;
   vertical-align: -4px;
-  background: #e8cf8c;
+  background: currentColor;
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
 }
 
+.inlineIconOriginalColor {
+  background-color: transparent;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.inlineIconCaret {
+  display: inline;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+}
+
+.inlineIconPending {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0 3px;
+  vertical-align: -4px;
+  border: 1px solid currentColor;
+  opacity: 0.65;
+}
+
+.swatchMenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.swatchPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgb(205 142 255 / 28%);
+  background: rgb(20 18 25 / 94%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.swatchPanel button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 30%);
+  box-shadow: none;
+}
+
+.swatchPanel .swatchSpirit {
+  background-color: #d6a1ff;
+}
+
+.swatchPanel .swatchHealing {
+  background-color: #51f596;
+}
+
+.swatchPanel .swatchDamage {
+  background-color: #ffb05a;
+}
+
+.swatchPanel .swatchWarning {
+  background-color: #f7d65a;
+}
+
+.swatchPanel .swatchSpirit:hover {
+  background-color: #d6a1ff;
+}
+
+.swatchPanel .swatchHealing:hover {
+  background-color: #51f596;
+}
+
+.swatchPanel .swatchDamage:hover {
+  background-color: #ffb05a;
+}
+
+.swatchPanel .swatchWarning:hover {
+  background-color: #f7d65a;
+}
+
 .gridEditor {
   display: grid;
-  gap: 12px;
+  gap: 7px;
 }
 
 .gridActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .gridActions button:disabled {
@@ -443,73 +766,183 @@
 
 .mainCellGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  width: 100%;
+  gap: 5px;
 }
 
 .mainCell,
-.lowerCell {
-  display: grid;
-  gap: 9px;
-  padding: 12px;
-  border: 1px solid rgb(237 208 124 / 20%);
-  background: rgb(38 40 31 / 54%);
+.subStat {
+  min-width: 0;
 }
 
-.mainCell > span,
-.lowerCell > span {
-  color: #bdb08d;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
+.mainCell {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+.mainCellTitleLabel {
+  display: block;
+  min-width: 0;
+}
+
+.mainCellTitleLabel input {
+  min-width: 0;
+  color: rgb(255 255 255 / 82%);
+  font-size: 0.7rem;
+  text-align: left;
+}
+
+.subStat {
+  position: relative;
+}
+
+.removeStatButton {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 72%);
+  background: rgb(0 0 0 / 18%);
+  opacity: 0.72;
+}
+
+.removeStatButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeStatButton svg {
+  width: 10px;
+  height: 10px;
+}
+
+.removeGridCellButton,
+.removeLowerCellButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 72%);
+  background: rgb(0 0 0 / 18%);
+  opacity: 0.72;
+}
+
+.removeGridCellButton:hover,
+.removeLowerCellButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeGridCellButton svg,
+.removeLowerCellButton svg {
+  width: 10px;
+  height: 10px;
+}
+
+.removeGridCellButton {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 3;
+}
+
+.removeLowerCellButton {
+  flex: 0 0 auto;
+  margin-left: 5px;
+}
+
+.inlineStatEditorSub .valueInputLabel {
+  grid-area: value;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  grid-area: unit;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-width: 34px;
+  margin-left: 2px;
+}
+
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput {
+  min-width: 0;
+  max-width: none;
 }
 
 .lowerCellGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 5px;
+  padding: 9px 12px;
+  column-gap: 14px;
+  row-gap: 8px;
+  background: rgb(255 255 255 / 16%);
+}
+
+.lowerCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
 }
 
 .returnPanel {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 6px;
+  position: absolute;
+  right: 0;
+  top: -50px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: end;
+  grid-column: 2;
 }
 
-.returnPanel p {
-  margin: 0;
-  color: #afa27d;
-  font-size: 0.68rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
+.returnPanel p,
 .returnPanel h2 {
-  margin: 0;
-  color: #f4df9f;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.5rem;
-  line-height: 1.1;
+  display: none;
 }
 
 .saveReturnButton,
 .cancelButton {
-  gap: 8px;
-  min-height: 40px;
-  border-radius: 4px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 2px;
+  font-size: 0.74rem;
   font-weight: 900;
+  text-transform: uppercase;
 }
 
 .saveReturnButton {
-  color: #201f17;
-  border-color: #f1d384;
-  background: #e4c36f;
+  color: #201827;
+  border-color: rgb(242 214 255 / 88%);
+  background: rgb(255 255 255 / 78%);
 }
 
 .cancelButton {
-  color: #e3d2aa;
-  background: rgb(23 24 22 / 72%);
+  color: #efe2ff;
+  background: rgb(21 16 27 / 58%);
 }
 
 .iconBackdrop {
@@ -519,51 +952,89 @@
   display: grid;
   place-items: center;
   padding: 22px;
-  background: rgb(0 0 0 / 68%);
+  background: rgb(0 0 0 / 52%);
+  pointer-events: auto;
 }
 
 .iconModal {
   display: grid;
   gap: 14px;
-  width: min(720px, 100%);
-  max-height: min(720px, calc(100dvh - 44px));
+  width: min(700px, 100%);
+  max-height: min(700px, calc(100dvh - 44px));
   padding: 16px;
-  border: 1px solid rgb(234 206 126 / 32%);
-  border-radius: 6px;
-  background: rgb(14 17 17 / 96%);
+  border: 1px solid rgb(198 127 255 / 46%);
+  border-radius: 3px;
+  background: rgb(20 18 25 / 94%);
   box-shadow: 0 24px 70px rgb(0 0 0 / 55%);
 }
 
 .iconHeader {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 38px;
   gap: 10px;
 }
 
 .iconHeader label {
   position: relative;
+  display: grid;
 }
 
 .iconHeader label svg {
   position: absolute;
   left: 10px;
-  bottom: 8px;
-  color: #b8ab84;
+  bottom: 9px;
+  color: rgb(255 255 255 / 58%);
 }
 
 .iconHeader input {
-  padding-left: 34px;
+  height: 38px;
+  min-width: 0;
+  padding: 0 10px 0 34px;
+  border: 1px solid rgb(205 142 255 / 34%);
+  color: #f8ecff;
+  background: rgb(255 255 255 / 10%);
+  outline: none;
 }
 
 .iconHeader button {
-  width: 40px;
-  height: 40px;
-  border-radius: 3px;
+  width: 38px;
+  height: 38px;
+}
+
+.iconColorPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.iconColorSwatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgb(205 142 255 / 34%);
+  color: #efe2ff;
+  background: rgb(255 255 255 / 9%);
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.iconColorSwatch:not(:empty) {
+  min-width: 70px;
+}
+
+.iconColorSwatchActive {
+  border-color: rgb(255 255 255 / 86%);
+  box-shadow: 0 0 0 1px rgb(198 127 255 / 42%);
 }
 
 .iconGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
   gap: 8px;
   overflow: auto;
   padding-right: 4px;
@@ -574,18 +1045,18 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-height: 46px;
+  min-height: 44px;
   padding: 8px;
-  border: 1px solid rgb(221 194 111 / 18%);
-  border-radius: 4px;
-  color: #e3d4ad;
-  background: rgb(35 38 33 / 66%);
-  font-size: 0.76rem;
+  border: 1px solid rgb(205 142 255 / 24%);
+  border-radius: 2px;
+  color: #efe2ff;
+  background: rgb(255 255 255 / 9%);
+  font-size: 0.74rem;
   font-weight: 800;
   text-align: left;
 }
 
-.iconGrid button span {
+.iconPreview {
   width: 24px;
   height: 24px;
   background: #e4c774;
@@ -594,43 +1065,176 @@
   mask-position: center;
 }
 
-@media (max-width: 980px) {
-  .editorLayout {
-    grid-template-columns: 1fr;
-  }
+.propertyIconOriginalColor,
+.iconPreviewOriginalColor {
+  background-color: transparent;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
 
-  .sideTabs,
-  .returnPanel {
-    position: relative;
-    top: auto;
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.inlineStatEditorSub .valueInputLabel,
+.inlineStatEditorSub .unitInputLabel,
+.inlineStatEditorSub .statLabelInputLabel,
+.inlineStatEditorSub .scalingValueWrap {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorSub .statLabelInputLabel {
+  min-width: 0;
+  margin-left: 8px;
+  margin-right: 6px;
+}
+
+.inlineStatEditorSub .statLabelInput {
+  min-width: 0;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  margin-left: 6px;
+}
+
+.inlineStatEditorSub + .removeStatButton,
+.removeStatButton {
+  width: 14px;
+  height: 14px;
+}
+
+.removeStatButton svg {
+  width: 9px;
+  height: 9px;
+}
+
+@media (max-width: 1100px) {
+  .editorLayout {
+    right: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .editorLayout {
+    top: 86px;
+    right: 16px;
+    left: 16px;
+    grid-template-columns: 1fr;
   }
 
   .sideTabs {
     display: flex;
+    margin: 0;
+  }
+
+  .tooltipSurface {
+    width: 100%;
+    min-height: auto;
+    padding: 24px 18px;
   }
 
   .header {
     grid-template-columns: 1fr;
   }
 
-  .tooltipSurface {
-    min-height: auto;
-    max-height: none;
-    padding: 24px 18px;
+  .returnPanel {
+    position: relative;
+    top: auto;
+    grid-column: 1;
+    justify-content: start;
+    order: -1;
   }
 
-  .statEditor,
-  .mainCellGrid,
-  .lowerCellGrid {
+  .mainCellGrid {
     grid-template-columns: 1fr;
   }
+}
 
-  .titleGroup {
-    grid-template-columns: 58px minmax(0, 1fr);
-  }
+.inlineStatEditorSub {
+  display: inline-grid;
+  grid-template-columns: 18px max-content max-content max-content;
+  grid-template-areas: "icon value unit scaleButton";
+  column-gap: 4px;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+}
 
-  .abilityIconButton {
-    width: 58px;
-    height: 58px;
-  }
+.inlineStatEditorSub .iconButton {
+  grid-area: icon;
+}
+
+.inlineStatEditorSub .valueInputLabel {
+  grid-area: value;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  margin: 0;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  grid-area: unit;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  margin: 0;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-width: 34px;
+  margin-left: 4px;
+}
+
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput {
+  min-width: 1.6em;
+  padding-right: 2px;
+  display: block;
+  max-width: none;
+  text-align: left;
+}
+
+.removeSectionButton {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 70%);
+  background: rgb(255 255 255 / 10%);
+  opacity: 0.78;
+}
+
+.removeSectionButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeSectionButton svg {
+  width: 12px;
+  height: 12px;
 }

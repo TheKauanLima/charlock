@@ -4,7 +4,9 @@ export interface IPanelStat {
   label: string
   value: string
   unit: string
+  append?: string
   icon: string
+  iconColor?: string
   scaling: 'none' | 'spirit' | 'courage' | 'melee' | 'boon'
   scalingValue: string
   description?: string
@@ -28,7 +30,9 @@ export const statSchema = new Schema<IPanelStat>({
   label: { type: String, required: true },
   value: { type: String, required: true },
   unit: { type: String, default: '' },
+  append: { type: String, default: '' },
   icon: { type: String, default: 'dot' },
+  iconColor: { type: String, default: '' },
   scaling: {
     type: String,
     enum: ['none', 'spirit', 'courage', 'melee', 'boon'],

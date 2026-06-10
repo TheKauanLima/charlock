@@ -39,7 +39,9 @@ const abilityGridCellSchema = new Schema<IAbilityGridCell>({
   label: { type: String, required: true },
   value: { type: String, required: true },
   unit: { type: String, default: '' },
+  append: { type: String, default: '' },
   icon: { type: String, default: '/panorama/images/icons/properties/spirit.svg' },
+  iconColor: { type: String, default: '' },
   scaling: {
     type: String,
     enum: ['none', 'spirit', 'courage', 'melee', 'boon'],

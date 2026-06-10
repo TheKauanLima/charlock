@@ -6,6 +6,7 @@ export type AbilityTextColor = 'default' | 'spirit' | 'healing' | 'damage' | 'wa
 
 export interface AbilityStat extends PanelStat {
   icon: string
+  iconColor?: string
   scaling: ScalingType
   scalingValue: string
 }
@@ -77,7 +78,9 @@ function buildAbilityStat(value: Partial<AbilityStat> = {}): AbilityStat {
     label: getString(value.label, 'Value'),
     value: getString(value.value, '0'),
     unit: getString(value.unit),
+    append: getString(value.append),
     icon: getString(value.icon, DEFAULT_PROPERTY_ICON),
+    iconColor: getString(value.iconColor),
     scaling: getScaling(value.scaling),
     scalingValue: getString(value.scalingValue, '0'),
     ...(value.description ? { description: value.description } : {}),
@@ -91,7 +94,9 @@ function normalizeAbilityStat(value: unknown, fallback: AbilityStat): AbilitySta
     label: getString(record.label, fallback.label),
     value: getString(record.value, String(fallback.value)),
     unit: getString(record.unit, fallback.unit ?? ''),
+    append: getString(record.append, fallback.append ?? ''),
     icon: getString(record.icon, fallback.icon),
+    iconColor: getString(record.iconColor, fallback.iconColor ?? ''),
     scaling: getScaling(record.scaling),
     scalingValue: getString(record.scalingValue, fallback.scalingValue),
     description: getString(record.description),
@@ -160,7 +165,7 @@ export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): Abilit
         id: `ability-${slot}-description`,
         type: 'richText',
         title: 'Description',
-        text: `[b]${hero.displayName}[/b] channels custom ability ${slot}. Add [c:spirit]scaling[/c] values and [i:cooldown] timing details here.`,
+        text: `${hero.displayName} channels custom ability ${slot}. Add [c:spirit]scaling[/c] values and [i:cooldown] timing details here.`,
       },
       {
         id: `ability-${slot}-grid`,
@@ -184,7 +189,7 @@ export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): Abilit
             ...buildAbilityStat({
               label: 'Bonus',
               value: String(10 + slot * 5),
-              unit: '%',
+              append: '%',
               icon: DEFAULT_HEAL_ICON,
             }),
           },
@@ -214,10 +219,17 @@ function normalizeSection(value: unknown, fallback: AbilitySection): AbilitySect
         id: getString((Array.isArray(record.mainCells) && isRecord(record.mainCells[index]) ? record.mainCells[index].id : undefined), gridFallback.mainCells[index]?.id ?? `${gridFallback.id}-main-${index + 1}`),
         ...stat,
       })),
-      lowerCells: normalizeStatArray(record.lowerCells, gridFallback.lowerCells).map((stat, index) => ({
-        id: getString((Array.isArray(record.lowerCells) && isRecord(record.lowerCells[index]) ? record.lowerCells[index].id : undefined), gridFallback.lowerCells[index]?.id ?? `${gridFallback.id}-lower-${index + 1}`),
-        ...stat,
-      })),
+      lowerCells: normalizeStatArray(record.lowerCells, gridFallback.lowerCells).map((stat, index) => {
+        const sourceCell = Array.isArray(record.lowerCells) && isRecord(record.lowerCells[index]) ? record.lowerCells[index] : {}
+        const migratedAppend = getString(sourceCell.append, getString(sourceCell.unit, stat.append ?? ''))
+
+        return {
+          id: getString(sourceCell.id, gridFallback.lowerCells[index]?.id ?? `${gridFallback.id}-lower-${index + 1}`),
+          ...stat,
+          append: migratedAppend,
+          unit: '',
+        }
+      }),
     }
   }
 
