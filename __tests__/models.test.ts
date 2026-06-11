@@ -32,6 +32,9 @@ describe('Mongoose model schemas', () => {
     const mainCellScalingPath = AbilityStats.schema.path('abilities.sections.mainCells.scaling')
     const mainCellIconColorPath = AbilityStats.schema.path('abilities.sections.mainCells.iconColor')
     const mainCellAppendPath = AbilityStats.schema.path('abilities.sections.mainCells.append')
+    const tierPath = AbilityStats.schema.path('abilities.tiers.tier')
+    const tierUpgradeTextPath = AbilityStats.schema.path('abilities.tiers.upgradeText')
+    const tierVariantSectionsPath = AbilityStats.schema.path('abilities.tiers.variant.sections')
 
     expect(AbilityStats.collection.name).toBe('abilitystats')
     expect(AbilityStats.schema.path('heroId')).toBeDefined()
@@ -40,6 +43,9 @@ describe('Mongoose model schemas', () => {
     expect(mainCellScalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
     expect(mainCellIconColorPath).toBeDefined()
     expect(mainCellAppendPath).toBeDefined()
+    expect(tierPath).toHaveProperty('enumValues', [1, 2, 3])
+    expect(tierUpgradeTextPath).toBeDefined()
+    expect(tierVariantSectionsPath).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

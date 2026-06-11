@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import { buildDefaultAbilityStats } from '@/lib/ability-editor-types'
-import { PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
+import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import { HEROES } from '@/lib/hero-data'
 
 afterEach(() => {
@@ -14,6 +14,43 @@ afterEach(() => {
 })
 
 describe('AbilityEditor', () => {
+  it('shows the hero info cluster and changes ability circle icons from the focused editor', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const onHeroInfoChange = vi.fn()
+    const onAbilityIconChange = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onHeroInfoChange={onHeroInfoChange}
+        onAbilityIconChange={onAbilityIconChange}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Change Ability 1 icon' }))
+
+    const iconModal = screen.getByTestId('ability-icon-modal')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Abrams 2' }))
+
+    expect(onHeroInfoChange).toHaveBeenCalledWith(expect.objectContaining({
+      ability1Icon: hero.heroInfo.ability2Icon,
+    }))
+    expect(onAbilityIconChange).toHaveBeenCalledWith(1, hero.heroInfo.ability2Icon)
+
+    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    expect(onSave.mock.calls[0]?.[0].icon).toBe(hero.heroInfo.ability2Icon)
+  })
+
   it('manages focused ability state and saves a scaled rich-text payload', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
@@ -104,6 +141,89 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text).toContain('[c:healing]')
     expect(savedRichText?.text).toContain('[i:heal]')
     expect(savedRichText?.text.indexOf('[i:heal]')).toBeLessThan(savedRichText?.text.indexOf(' channels') ?? 0)
+  })
+
+  it('switches between tier variants without leaking edits into the base ability', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const tierOneButton = screen.getByRole('button', { name: 'Tier 1 upgrade' })
+    const tierTwoButton = screen.getByRole('button', { name: 'Tier 2 upgrade' })
+
+    expect(screen.getByRole('button', { name: '0' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(tierOneButton)
+    expect(tierOneButton.className).toContain('tierBoxFlashing')
+    await user.click(tierTwoButton)
+    expect(tierOneButton.className).toContain('tierBoxActive')
+    expect(tierTwoButton.className).toContain('tierBoxFlashing')
+    await user.click(tierOneButton)
+
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Tier One Variant')
+
+    const tierOneText = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
+
+    tierOneText.textContent = 'Tier one'
+    fireEvent.input(tierOneText)
+    tierOneText.focus()
+
+    const tierTextNode = tierOneText.firstChild
+
+    expect(tierTextNode).not.toBeNull()
+
+    const caretRange = document.createRange()
+
+    caretRange.setStart(tierTextNode!, 'Tier one'.length)
+    caretRange.collapse(true)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(caretRange)
+
+    await user.keyboard(' upgrade')
+    expect(tierOneText.textContent).toContain('Tier one upgrade')
+
+    const boldRange = document.createRange()
+    const updatedTierTextNode = tierOneText.firstChild
+
+    expect(updatedTierTextNode).not.toBeNull()
+    boldRange.setStart(updatedTierTextNode!, 'Tier one '.length)
+    boldRange.setEnd(updatedTierTextNode!, 'Tier one upgrade'.length)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(boldRange)
+
+    const tierBoldButton = screen.getByRole('button', { name: 'Bold Tier 1 selected text' })
+
+    await user.click(tierBoldButton)
+    expect(tierOneText.querySelector('strong')?.textContent).toBe('upgrade')
+
+    await user.click(tierBoldButton)
+    expect(tierOneText.querySelector('strong')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: '0' }))
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Abrams Ability 1')
+
+    await user.click(tierOneButton)
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Tier One Variant')
+
+    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
+
+    expect(savedAbility?.name).toBe('Abrams Ability 1')
+    expect(savedAbility?.tiers).toHaveLength(3)
+    expect(savedTierOne?.upgradeText).toBe('Tier one upgrade')
+    expect(savedTierOne?.variant.name).toBe('Tier One Variant')
   })
 
   it('does not duplicate inline icons when styling a selection that contains one', async () => {
@@ -280,16 +400,16 @@ describe('AbilityEditor', () => {
 
     const mainCellGrid = screen.getByLabelText('Main cell 1 title').closest('[class*="mainCellGrid"]') as HTMLElement | null
 
-    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(1, minmax(0, 1fr))')
+    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(1, minmax(min-content, 1fr))')
 
     await user.click(screen.getByRole('button', { name: 'Add Main Cell' }))
-    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
+    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(2, minmax(min-content, 1fr))')
 
     await user.click(screen.getByRole('button', { name: 'Add Main Cell' }))
-    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))')
+    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(3, minmax(min-content, 1fr))')
     expect(screen.getByRole('button', { name: 'Add Main Cell' })).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Remove main cell 3' }))
-    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
+    expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(2, minmax(min-content, 1fr))')
     expect(screen.getByRole('button', { name: 'Add Main Cell' })).toBeEnabled()
 
     await user.clear(screen.getByLabelText('Main cell 1 title'))

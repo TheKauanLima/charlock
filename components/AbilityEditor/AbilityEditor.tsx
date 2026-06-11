@@ -2,7 +2,7 @@
 
 import { Bold, Italic, Moon, Plus, Save, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode } from 'react'
 
 import { getNextScaling } from '@/components/panels/scaling-utils'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
@@ -13,8 +13,12 @@ import type {
   AbilityRichTextSection,
   AbilitySection,
   AbilityStat,
+  AbilityTier,
+  AbilityTierLevel,
+  AbilityVariant,
 } from '@/lib/ability-editor-types'
-import type { EditorAssetGroup } from '@/lib/editor-assets'
+import type { AbilityIconGroup, EditorAssetGroup } from '@/lib/editor-assets'
+import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import cn from '@/lib/utilsd'
 
 import styles from './AbilityEditor.module.css'
@@ -22,6 +26,11 @@ import styles from './AbilityEditor.module.css'
 interface AbilityEditorProps {
   ability: AbilityDefinition
   propertyIconGroups: EditorAssetGroup[]
+  hero?: HeroDefinition
+  heroInfo?: HeroInfoDefinition
+  abilityIconGroups?: AbilityIconGroup[]
+  onHeroInfoChange?: (heroInfo: HeroInfoDefinition) => void
+  onAbilityIconChange?: (slot: number, iconPath: string) => void
   onSave: (ability: AbilityDefinition) => void
   onCancel: () => void
 }
@@ -35,6 +44,8 @@ type IconTarget =
   | { type: 'mainCell'; sectionId: string; index: number }
   | { type: 'lowerCell'; sectionId: string; index: number }
   | { type: 'inlineIcon'; sectionId: string; marker: string }
+
+type AbilityIconKey = 'ability1Icon' | 'ability2Icon' | 'ability3Icon' | 'ability4Icon'
 
 const RICH_TEXT_COLORS: Array<{ id: string; label: string; token: string }> = [
   { id: 'spirit', label: 'Spirit', token: 'spirit' },
@@ -52,6 +63,13 @@ const ICON_COLOR_SWATCHES = [
 ] as const
 
 const INLINE_ICON_CARET_STOP = '\u200B'
+const TIER_BOXES: Array<{ tier: AbilityTierLevel; cost: string }> = [
+  { tier: 1, cost: '1' },
+  { tier: 2, cost: '2' },
+  { tier: 3, cost: '5' },
+]
+type ActiveTier = 0 | AbilityTierLevel
+const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
 
 type RichTextEffect =
   | { type: 'bold' }
@@ -319,20 +337,20 @@ function unwrapEffectFromRange(range: Range, root: HTMLElement, effect: RichText
   let firstNode: Node | null = null
   let lastNode: Node | null = null
 
-  elements.forEach(element => {
+  for (const element of elements) {
     if (!element.isConnected) {
-      return
+      continue
     }
 
     const children = unwrapRichTextElement(element)
 
     if (!children?.length) {
-      return
+      continue
     }
 
     firstNode ??= children[0]
     lastNode = children.at(-1) ?? lastNode
-  })
+  }
 
   if (!firstNode || !lastNode || !firstNode.parentNode || !lastNode.parentNode) {
     return null
@@ -399,11 +417,51 @@ function cloneAbility(ability: AbilityDefinition): AbilityDefinition {
   return structuredClone(ability)
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, onSave, onCancel }: AbilityEditorProps) {
+function getAbilityIconGroupsAsAssets(groups: AbilityIconGroup[]): EditorAssetGroup[] {
+  return groups.map(group => ({
+    id: `ability-icons-${group.heroSlug}`,
+    label: group.heroName,
+    assets: group.icons.map((icon, index) => ({
+      label: `${group.heroName} ${index + 1}`,
+      path: icon,
+    })),
+  }))
+}
+
+function getActiveVariant(ability: AbilityDefinition, activeTier: ActiveTier): AbilityVariant {
+  if (activeTier === 0) {
+    return ability
+  }
+
+  return ability.tiers.find(tier => tier.tier === activeTier)?.variant ?? ability
+}
+
+function updateActiveVariant(ability: AbilityDefinition, activeTier: ActiveTier, updater: (variant: AbilityVariant) => AbilityVariant): AbilityDefinition {
+  const nextVariant = updater(getActiveVariant(ability, activeTier))
+
+  if (activeTier === 0) {
+    return {
+      ...ability,
+      ...nextVariant,
+    }
+  }
+
+  return {
+    ...ability,
+    tiers: ability.tiers.map(tier => tier.tier === activeTier ? { ...tier, variant: nextVariant } : tier),
+  }
+}
+
+export default function AbilityEditor({ ability, propertyIconGroups, hero, heroInfo, abilityIconGroups = [], onHeroInfoChange, onAbilityIconChange, onSave, onCancel }: AbilityEditorProps) {
   const [draftAbility, setDraftAbility] = useState(() => cloneAbility(ability))
+  const [activeTier, setActiveTier] = useState<ActiveTier>(0)
+  const [flashingTier, setFlashingTier] = useState<AbilityTierLevel | null>(null)
+  const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [iconTarget, setIconTarget] = useState<IconTarget | null>(null)
+  const [abilityIconTargetSlot, setAbilityIconTargetSlot] = useState<number | null>(null)
   const [iconSearch, setIconSearch] = useState('')
   const [selectedIconColor, setSelectedIconColor] = useState('')
+  const abilityIconAssetGroups = useMemo(() => getAbilityIconGroupsAsAssets(abilityIconGroups), [abilityIconGroups])
   const filteredIconGroups = useMemo(() => {
     const query = iconSearch.trim().toLowerCase()
 
@@ -416,6 +474,53 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
       assets: group.assets.filter(asset => asset.label.toLowerCase().includes(query) || asset.path.toLowerCase().includes(query)),
     })).filter(group => group.assets.length)
   }, [iconSearch, propertyIconGroups])
+  const activeAbility = getActiveVariant(draftAbility, activeTier)
+  const abilityIconPickerGroups = useMemo(() => {
+    const query = iconSearch.trim().toLowerCase()
+
+    if (!query) {
+      return abilityIconAssetGroups
+    }
+
+    return abilityIconAssetGroups.map(group => ({
+      ...group,
+      assets: group.assets.filter(asset => asset.label.toLowerCase().includes(query) || asset.path.toLowerCase().includes(query)),
+    })).filter(group => group.assets.length)
+  }, [abilityIconAssetGroups, iconSearch])
+
+  useEffect(() => () => {
+    if (flashTimeoutRef.current) {
+      clearTimeout(flashTimeoutRef.current)
+    }
+  }, [])
+
+  function setActiveAbility(updater: (variant: AbilityVariant) => AbilityVariant) {
+    setDraftAbility(current => updateActiveVariant(current, activeTier, updater))
+  }
+
+  function selectTier(tier: ActiveTier) {
+    setActiveTier(tier)
+
+    if (tier === 0) {
+      return
+    }
+
+    if (flashTimeoutRef.current) {
+      clearTimeout(flashTimeoutRef.current)
+    }
+
+    setFlashingTier(tier)
+    flashTimeoutRef.current = setTimeout(() => {
+      setFlashingTier(current => current === tier ? null : current)
+    }, 500)
+  }
+
+  function updateTierText(tierToUpdate: AbilityTierLevel, upgradeText: string) {
+    setDraftAbility(current => ({
+      ...current,
+      tiers: current.tiers.map(tier => tier.tier === tierToUpdate ? { ...tier, upgradeText } : tier),
+    }))
+  }
 
   function updateStat(stat: AbilityStat, patch: Partial<AbilityStat>): AbilityStat {
     return {
@@ -425,28 +530,28 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
   }
 
   function updateSubStat(index: number, patch: Partial<AbilityStat>) {
-    setDraftAbility(current => ({
+    setActiveAbility(current => ({
       ...current,
       subStats: current.subStats.map((stat, statIndex) => (statIndex === index ? updateStat(stat, patch) : stat)),
     }))
   }
 
   function removeSubStat(index: number) {
-    setDraftAbility(current => ({
+    setActiveAbility(current => ({
       ...current,
       subStats: current.subStats.filter((_, statIndex) => statIndex !== index),
     }))
   }
 
   function updateSection(sectionId: string, updater: (section: AbilitySection) => AbilitySection) {
-    setDraftAbility(current => ({
+    setActiveAbility(current => ({
       ...current,
       sections: current.sections.map(section => (section.id === sectionId ? updater(section) : section)),
     }))
   }
 
   function removeSection(sectionId: string) {
-    setDraftAbility(current => ({
+    setActiveAbility(current => ({
       ...current,
       sections: current.sections.filter(section => section.id !== sectionId),
     }))
@@ -482,7 +587,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
           lowerCells: [],
         }
 
-    setDraftAbility(current => ({
+    setActiveAbility(current => ({
       ...current,
       sections: [...current.sections, section],
     }))
@@ -496,13 +601,13 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
     const iconColor = isIntrinsicColorPropertyIcon(path) ? '' : selectedIconColor
 
     if (iconTarget.type === 'abilityIcon') {
-      setDraftAbility(current => ({ ...current, icon: path }))
+      setActiveAbility(current => ({ ...current, icon: path }))
     } else if (iconTarget.type === 'cooldown') {
-      setDraftAbility(current => ({ ...current, cooldown: updateStat(current.cooldown, { icon: path, iconColor }) }))
+      setActiveAbility(current => ({ ...current, cooldown: updateStat(current.cooldown, { icon: path, iconColor }) }))
     } else if (iconTarget.type === 'charges') {
-      setDraftAbility(current => ({ ...current, charges: updateStat(current.charges, { icon: path, iconColor }) }))
+      setActiveAbility(current => ({ ...current, charges: updateStat(current.charges, { icon: path, iconColor }) }))
     } else if (iconTarget.type === 'rechargeTime') {
-      setDraftAbility(current => ({ ...current, rechargeTime: updateStat(current.rechargeTime, { icon: path, iconColor }) }))
+      setActiveAbility(current => ({ ...current, rechargeTime: updateStat(current.rechargeTime, { icon: path, iconColor }) }))
     } else if (iconTarget.type === 'subStat') {
       updateSubStat(iconTarget.index, { icon: path, iconColor })
     } else if (iconTarget.type === 'mainCell') {
@@ -531,6 +636,29 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
     setSelectedIconColor('')
   }
 
+  function applyHeroAbilityIcon(slot: number, iconPath: string) {
+    const iconKey = ABILITY_ICON_KEYS[slot - 1]
+
+    if (heroInfo && iconKey && onHeroInfoChange) {
+      onHeroInfoChange({
+        ...heroInfo,
+        [iconKey]: iconPath,
+      })
+    }
+
+    onAbilityIconChange?.(slot, iconPath)
+
+    if (slot === draftAbility.slot) {
+      setDraftAbility(current => ({
+        ...current,
+        icon: iconPath,
+      }))
+    }
+
+    setAbilityIconTargetSlot(null)
+    setIconSearch('')
+  }
+
   function closeIconModal() {
     if (iconTarget?.type === 'inlineIcon') {
       const markerToken = `[[inline-icon-marker:${iconTarget.marker}]]`
@@ -550,6 +678,11 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
     setIconTarget(null)
     setIconSearch('')
     setSelectedIconColor('')
+  }
+
+  function closeAbilityIconModal() {
+    setAbilityIconTargetSlot(null)
+    setIconSearch('')
   }
 
   function shouldIgnoreStatBoxClick(target: EventTarget) {
@@ -574,7 +707,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
         ? { width: stat.unit ? `${Math.max(2, stat.unit.length + 1)}ch` : '0px', visibility: stat.unit ? 'visible' as const : 'hidden' as const }
         : undefined
     const appendInputStyle = showAppend
-      ? { width: stat.append ? `${Math.max(1, stat.append.length + 1)}ch` : '1ch' }
+      ? { width: stat.append ? `${Math.max(3, stat.append.length + 1)}ch` : '2ch' }
       : undefined
     const nextValue = (value: string) => variant === 'main' ? value : value.replace(/[^\d.-]/g, '')
 
@@ -673,7 +806,6 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
             <span className={styles.srOnly}>Detail</span>
             <input
               className={styles.statLabelInput}
-              style={variant === 'sub' ? { width: `${Math.max(4, stat.label.length)}ch` } : undefined}
               value={stat.label}
               aria-label="Detail"
               onChange={event => onChange(updateStat(stat, { label: event.target.value }))}
@@ -688,93 +820,111 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
   }
 
   return (
-    <section className={styles.focusShell} data-testid="ability-editor" aria-label={`Ability editor for ${draftAbility.name}`}>
+    <section className={styles.focusShell} data-testid="ability-editor" aria-label={`Ability editor for ${activeAbility.name}`}>
       <div className={styles.focusBackdrop} />
+      {hero && heroInfo ? (
+        <AbilityHeroInfoCluster
+          hero={hero}
+          heroInfo={heroInfo}
+          onAbilityIconClick={slot => setAbilityIconTargetSlot(slot)}
+        />
+      ) : null}
       <div className={styles.editorLayout}>
         <aside className={styles.sideTabs} aria-label="Append ability sections">
-          <button type="button" aria-label="Add sub-header stat" onClick={() => setDraftAbility(current => ({ ...current, subStats: [...current.subStats, createStat(`ability-${current.slot}-sub-${Date.now()}`, 'Stat')] }))}>
+          <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat(`ability-${draftAbility.slot}-tier-${activeTier}-sub-${Date.now()}`, 'Stat')] }))}>
             <Plus aria-hidden="true" />
           </button>
           <button type="button" onClick={() => addSection('richText')}>Text</button>
           <button type="button" onClick={() => addSection('grid')}>Grid</button>
         </aside>
 
-        <div className={styles.tooltipSurface}>
-          <div className={styles.tooltipTexture} />
-          <header className={styles.header}>
-            <div className={styles.titleGroup}>
-              <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => setIconTarget({ type: 'abilityIcon' })}>
-                <span aria-hidden="true" style={{ WebkitMaskImage: `url('${draftAbility.icon}')`, maskImage: `url('${draftAbility.icon}')` }} />
-              </button>
-              <label className={styles.nameInputWrap}>
-                <span className={styles.srOnly}>Ability Name</span>
-                <input value={draftAbility.name} onChange={event => setDraftAbility(current => ({ ...current, name: event.target.value }))} />
-              </label>
-            </div>
-
-            <div className={styles.timingPanel}>
-              <label className={styles.chargeToggle}>
-                <input type="checkbox" checked={draftAbility.hasCharges} onChange={event => setDraftAbility(current => ({ ...current, hasCharges: event.target.checked }))} />
-                Charges
-              </label>
-              {draftAbility.hasCharges ? (
-                <div className={styles.chargeGrid}>
-                  {renderInlineStat(draftAbility.charges, 'Charges', charges => setDraftAbility(current => ({ ...current, charges })), () => setIconTarget({ type: 'charges' }), 'timing')}
-                  {renderInlineStat(draftAbility.rechargeTime, 'Recharge Time', rechargeTime => setDraftAbility(current => ({ ...current, rechargeTime })), () => setIconTarget({ type: 'rechargeTime' }), 'timing')}
-                </div>
-              ) : null}
-              {renderInlineStat(draftAbility.cooldown, 'Cooldown', cooldown => setDraftAbility(current => ({ ...current, cooldown })), () => setIconTarget({ type: 'cooldown' }), 'timing')}
-            </div>
-          </header>
-
-          <section className={styles.subStats} aria-label="Sub-header stats">
-            {draftAbility.subStats.map((stat, index) => (
-              <div key={`${stat.label}-${index}`} className={styles.subStat}>
-                <button type="button" className={styles.removeStatButton} aria-label={`Remove ${stat.label}`} onClick={() => removeSubStat(index)}>
-                  <X aria-hidden="true" />
+        <div className={styles.mainEditorColumn}>
+          <div className={styles.tooltipSurface}>
+            <div className={styles.scrollContent}>
+              <div className={styles.tooltipTexture} />
+              <header className={styles.header}>
+              <div className={styles.titleGroup}>
+                <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => setIconTarget({ type: 'abilityIcon' })}>
+                  <span aria-hidden="true" style={{ WebkitMaskImage: `url('${activeAbility.icon}')`, maskImage: `url('${activeAbility.icon}')` }} />
                 </button>
-                {renderInlineStat(stat, stat.label, nextStat => updateSubStat(index, nextStat), () => setIconTarget({ type: 'subStat', index }), 'sub')}
+                <label className={styles.nameInputWrap}>
+                  <span className={styles.srOnly}>Ability Name</span>
+                  <input value={activeAbility.name} onChange={event => setActiveAbility(current => ({ ...current, name: event.target.value }))} />
+                </label>
               </div>
-            ))}
-          </section>
 
-          <section className={styles.sections} aria-label="Ability sections">
-            {draftAbility.sections.map(section => (
-              <article key={section.id} className={styles.section}>
-                <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${section.title} section`} onClick={() => removeSection(section.id)}>
-                  <X aria-hidden="true" />
-                </button>
+              <div className={styles.timingPanel}>
+                <label className={styles.chargeToggle}>
+                  <input type="checkbox" checked={activeAbility.hasCharges} onChange={event => setActiveAbility(current => ({ ...current, hasCharges: event.target.checked }))} />
+                  Charges
+                </label>
+                {activeAbility.hasCharges ? (
+                  <div className={styles.chargeGrid}>
+                    {renderInlineStat(activeAbility.charges, 'Charges', charges => setActiveAbility(current => ({ ...current, charges })), () => setIconTarget({ type: 'charges' }), 'timing')}
+                    {renderInlineStat(activeAbility.rechargeTime, 'Recharge Time', rechargeTime => setActiveAbility(current => ({ ...current, rechargeTime })), () => setIconTarget({ type: 'rechargeTime' }), 'timing')}
+                  </div>
+                ) : null}
+                {renderInlineStat(activeAbility.cooldown, 'Cooldown', cooldown => setActiveAbility(current => ({ ...current, cooldown })), () => setIconTarget({ type: 'cooldown' }), 'timing')}
+              </div>
+              </header>
 
-                {section.type === 'richText' ? (
-                  <>
-                    <label className={styles.sectionTitleLabel}>
-                      <span className={styles.srOnly}>Section Title</span>
-                      <input value={section.title} onChange={event => updateSection(section.id, current => ({ ...current, title: event.target.value }))} />
-                    </label>
-                    <RichTextSection section={section} onTextChange={text => updateSection(section.id, current => ({ ...current, text }))} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
-                  </>
-                ) : (
-                  <GridSection
-                    section={section}
-                    renderInlineStat={renderInlineStat}
-                    onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createStat(`${section.id}-main-${current.mainCells.length + 1}`, 'Value')].slice(0, 3) } : current)}
-                    onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: [...current.lowerCells, createStat(`${section.id}-lower-${current.lowerCells.length + 1}`, 'Detail')] } : current)}
-                    onMainCellChange={(index, cell) => updateGridCell(section.id, 'mainCells', index, cell)}
-                    onLowerCellChange={(index, cell) => updateGridCell(section.id, 'lowerCells', index, cell)}
-                    onMainCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: current.mainCells.filter((_, cellIndex) => cellIndex !== index) } : current)}
-                    onLowerCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: current.lowerCells.filter((_, cellIndex) => cellIndex !== index) } : current)}
-                    onMainIconClick={index => setIconTarget({ type: 'mainCell', sectionId: section.id, index })}
-                    onLowerIconClick={index => setIconTarget({ type: 'lowerCell', sectionId: section.id, index })}
-                  />
-                )}
-              </article>
-            ))}
-          </section>
+              <section className={styles.subStats} aria-label="Sub-header stats">
+              {activeAbility.subStats.map((stat, index) => (
+                <div key={`${stat.label}-${index}`} className={styles.subStat}>
+                  <button type="button" className={styles.removeStatButton} aria-label={`Remove ${stat.label}`} onClick={() => removeSubStat(index)}>
+                    <X aria-hidden="true" />
+                  </button>
+                  {renderInlineStat(stat, stat.label, nextStat => updateSubStat(index, nextStat), () => setIconTarget({ type: 'subStat', index }), 'sub')}
+                </div>
+              ))}
+              </section>
+
+              <section className={styles.sections} aria-label="Ability sections">
+              {activeAbility.sections.map(section => (
+                <article key={section.id} className={styles.section}>
+                  <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${section.title} section`} onClick={() => removeSection(section.id)}>
+                    <X aria-hidden="true" />
+                  </button>
+
+                  {section.type === 'richText' ? (
+                    <>
+                      <label className={styles.sectionTitleLabel}>
+                        <span className={styles.srOnly}>Section Title</span>
+                        <input value={section.title} onChange={event => updateSection(section.id, current => ({ ...current, title: event.target.value }))} />
+                      </label>
+                      <RichTextSection section={section} onTextChange={text => updateSection(section.id, current => ({ ...current, text }))} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
+                    </>
+                  ) : (
+                    <GridSection
+                      section={section}
+                      renderInlineStat={renderInlineStat}
+                      onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createStat(`${section.id}-main-${current.mainCells.length + 1}`, 'Value')].slice(0, 3) } : current)}
+                      onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: [...current.lowerCells, createStat(`${section.id}-lower-${current.lowerCells.length + 1}`, 'Detail')] } : current)}
+                      onMainCellChange={(index, cell) => updateGridCell(section.id, 'mainCells', index, cell)}
+                      onLowerCellChange={(index, cell) => updateGridCell(section.id, 'lowerCells', index, cell)}
+                      onMainCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: current.mainCells.filter((_, cellIndex) => cellIndex !== index) } : current)}
+                      onLowerCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: current.lowerCells.filter((_, cellIndex) => cellIndex !== index) } : current)}
+                      onMainIconClick={index => setIconTarget({ type: 'mainCell', sectionId: section.id, index })}
+                      onLowerIconClick={index => setIconTarget({ type: 'lowerCell', sectionId: section.id, index })}
+                    />
+                  )}
+                </article>
+              ))}
+              </section>
+            </div>
+          </div>
+          <TierSelector
+            activeTier={activeTier}
+            flashingTier={flashingTier}
+            tiers={draftAbility.tiers}
+            onTierSelect={selectTier}
+            onTierTextChange={updateTierText}
+          />
         </div>
 
         <aside className={styles.returnPanel}>
           <p>Focused Ability Editor</p>
-          <h2>{draftAbility.name}</h2>
+          <h2>{activeAbility.name}</h2>
           <button type="button" className={styles.saveReturnButton} onClick={() => onSave(draftAbility)}>
             <Save aria-hidden="true" />
             Save & Return
@@ -797,6 +947,24 @@ export default function AbilityEditor({ ability, propertyIconGroups, onSave, onC
           onClose={closeIconModal}
         />
       ) : null}
+
+      {abilityIconTargetSlot ? (
+        <IconSearchModal
+          groups={abilityIconPickerGroups}
+          search={iconSearch}
+          selectedIconColor=""
+          title="Ability icon selector"
+          testId="ability-icon-modal"
+          searchPlaceholder="Search ability icons"
+          previewMode="image"
+          showColorPicker={false}
+          closeLabel="Close ability icon selector"
+          onIconColorChange={() => undefined}
+          onSearch={setIconSearch}
+          onSelect={iconPath => applyHeroAbilityIcon(abilityIconTargetSlot, iconPath)}
+          onClose={closeAbilityIconModal}
+        />
+      ) : null}
     </section>
   )
 }
@@ -805,6 +973,336 @@ interface RichTextSectionProps {
   section: AbilityRichTextSection
   onTextChange: (text: string) => void
   onInlineIcon: (marker: string) => void
+}
+
+interface TierSelectorProps {
+  activeTier: ActiveTier
+  flashingTier: AbilityTierLevel | null
+  tiers: AbilityTier[]
+  onTierSelect: (tier: ActiveTier) => void
+  onTierTextChange: (tier: AbilityTierLevel, text: string) => void
+}
+
+function TierSelector({ activeTier, flashingTier, tiers, onTierSelect, onTierTextChange }: TierSelectorProps) {
+  return (
+    <section className={styles.tierSystem} aria-label="Ability tiers">
+      <button
+        type="button"
+        className={cn(styles.baseTierButton, activeTier === 0 && styles.baseTierButtonActive)}
+        aria-pressed={activeTier === 0}
+        onClick={() => onTierSelect(0)}
+      >
+        0
+      </button>
+      <div className={styles.tierBoxes}>
+        {TIER_BOXES.map(({ tier, cost }) => {
+          const tierData = tiers.find(candidate => candidate.tier === tier)
+
+          if (!tierData) {
+            return null
+          }
+
+          return (
+            <article
+              key={tier}
+              className={cn(
+                styles.tierBox,
+                activeTier !== 0 && tier <= activeTier && styles.tierBoxActive,
+                flashingTier === tier && styles.tierBoxFlashing,
+              )}
+              aria-label={`Tier ${tier} upgrade`}
+              aria-pressed={activeTier === tier}
+              role="button"
+              tabIndex={0}
+              onClick={event => {
+                if (event.target instanceof HTMLElement && event.target.closest('[contenteditable="true"], button')) {
+                  return
+                }
+
+                onTierSelect(tier)
+              }}
+              onKeyDown={event => {
+                if (event.target instanceof HTMLElement && event.target.closest('[contenteditable="true"], button')) {
+                  return
+                }
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  onTierSelect(tier)
+                }
+              }}
+            >
+              <header className={styles.tierHeader}>
+                <span className={styles.tierApIcon} aria-hidden="true" />
+                <span>{cost}</span>
+              </header>
+              <TierTextEditor
+                text={tierData.upgradeText}
+                tier={tier}
+                onFocus={() => onTierSelect(tier)}
+                onTextChange={text => onTierTextChange(tier, text)}
+              />
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+interface TierTextEditorProps {
+  text: string
+  tier: AbilityTierLevel
+  onFocus: () => void
+  onTextChange: (text: string) => void
+}
+
+function TierTextEditor({ text, tier, onFocus, onTextChange }: TierTextEditorProps) {
+  const editorRef = useRef<HTMLDivElement | null>(null)
+  const lastTextRef = useRef('')
+  const lastSelectionRef = useRef<Range | null>(null)
+  const handledToolbarPointerRef = useRef(false)
+  const visibleLineCount = text.split(/\r?\n/).length
+  const isDense = visibleLineCount > 4 || text.length > 92
+
+  useEffect(() => {
+    if (!editorRef.current || document.activeElement === editorRef.current || lastTextRef.current === text) {
+      return
+    }
+
+    editorRef.current.innerHTML = tokenTextToHtml(text)
+    lastTextRef.current = text
+  }, [text])
+
+  useEffect(() => {
+    function handleSelectionChange() {
+      rememberSelection({ allowCollapsed: false })
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+    }
+  })
+
+  function isEditorNode(node: Node | null) {
+    return Boolean(node && editorRef.current && (node === editorRef.current || editorRef.current.contains(node)))
+  }
+
+  function rememberSelection({ allowCollapsed = true }: { allowCollapsed?: boolean } = {}) {
+    const selection = window.getSelection()
+
+    if (!selection || selection.rangeCount === 0 || !isEditorNode(selection.anchorNode) || !isEditorNode(selection.focusNode)) {
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+
+    if (!allowCollapsed && range.collapsed) {
+      return
+    }
+
+    lastSelectionRef.current = range.cloneRange()
+  }
+
+  function getEditorRange() {
+    const selection = window.getSelection()
+    const currentRange = selection?.rangeCount ? selection.getRangeAt(0) : null
+
+    if (currentRange && isEditorNode(currentRange.commonAncestorContainer)) {
+      return currentRange
+    }
+
+    return lastSelectionRef.current && isEditorNode(lastSelectionRef.current.commonAncestorContainer)
+      ? lastSelectionRef.current
+      : null
+  }
+
+  function syncText() {
+    if (!editorRef.current) {
+      return
+    }
+
+    const nextText = editableHtmlToTokenText(editorRef.current)
+
+    lastTextRef.current = nextText
+    onTextChange(nextText)
+  }
+
+  function applyBold() {
+    const range = getEditorRange()
+    const selection = window.getSelection()
+
+    if (!selection || !range || range.collapsed || !editorRef.current) {
+      return
+    }
+
+    if (rangeFullyHasEffect(range, editorRef.current, { type: 'bold' })) {
+      const nextRange = unwrapEffectFromRange(range, editorRef.current, { type: 'bold' })
+
+      if (nextRange) {
+        selection.removeAllRanges()
+        selection.addRange(nextRange)
+        lastSelectionRef.current = nextRange.cloneRange()
+        editorRef.current.focus()
+        syncText()
+      }
+
+      return
+    }
+
+    selection.removeAllRanges()
+    selection.addRange(range)
+
+    const wrapper = document.createElement('strong')
+    const selectedContent = range.extractContents()
+
+    wrapper.append(selectedContent)
+    range.insertNode(wrapper)
+    const nextRange = document.createRange()
+
+    nextRange.selectNodeContents(wrapper)
+    selection.removeAllRanges()
+    selection.addRange(nextRange)
+    lastSelectionRef.current = nextRange.cloneRange()
+    editorRef.current?.focus()
+    syncText()
+  }
+
+  function handleToolbarPointerDown(event: PointerEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    rememberSelection({ allowCollapsed: false })
+    handledToolbarPointerRef.current = true
+    applyBold()
+  }
+
+  function handleToolbarClick(event: MouseEvent<HTMLButtonElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!handledToolbarPointerRef.current) {
+      applyBold()
+    }
+
+    handledToolbarPointerRef.current = false
+  }
+
+  return (
+    <div className={styles.tierTextShell} onClick={event => event.stopPropagation()}>
+      <div className={styles.tierTextToolbar}>
+        <button
+          type="button"
+          className={styles.tierTextBoldButton}
+          aria-label={`Bold Tier ${tier} selected text`}
+          onPointerDown={handleToolbarPointerDown}
+          onClick={handleToolbarClick}
+        >
+          <Bold aria-hidden="true" />
+        </button>
+      </div>
+      <div
+        ref={editorRef}
+        className={cn(styles.tierTextEditor, isDense && styles.tierTextEditorDense)}
+        contentEditable
+        role="textbox"
+        aria-label={`Tier ${tier} upgrade text`}
+        spellCheck
+        onFocus={onFocus}
+        onKeyDown={event => event.stopPropagation()}
+        onPointerUp={() => rememberSelection()}
+        onMouseUp={() => rememberSelection()}
+        onKeyUp={() => rememberSelection()}
+        onInput={() => {
+          rememberSelection()
+          syncText()
+        }}
+        suppressContentEditableWarning
+      />
+    </div>
+  )
+}
+
+interface AbilityHeroInfoClusterProps {
+  hero: HeroDefinition
+  heroInfo: HeroInfoDefinition
+  onAbilityIconClick: (slot: number) => void
+}
+
+function AbilityHeroInfoCluster({ hero, heroInfo, onAbilityIconClick }: AbilityHeroInfoClusterProps) {
+  const tags = [
+    { text: heroInfo.tag1Text, tilt: heroInfo.tag1Tilt, offsetY: heroInfo.tag1OffsetY },
+    { text: heroInfo.tag2Text, tilt: heroInfo.tag2Tilt, offsetY: heroInfo.tag2OffsetY },
+    { text: heroInfo.tag3Text, tilt: heroInfo.tag3Tilt, offsetY: heroInfo.tag3OffsetY },
+  ]
+
+  return (
+    <aside className={styles.heroInfoCluster} aria-label={`${hero.displayName} ability editor hero info`}>
+      <div className={styles.heroInfoNameRow}>
+        {heroInfo.nameType === 'image' ? (
+          <span
+            className={styles.heroInfoNameImage}
+            aria-label={`${hero.displayName} name`}
+            role="img"
+            style={{
+              backgroundColor: heroInfo.nameColor,
+              WebkitMaskImage: `url('${heroInfo.nameValue}')`,
+              maskImage: `url('${heroInfo.nameValue}')`,
+            }}
+          />
+        ) : (
+          <span className={styles.heroInfoNameText} style={{ color: heroInfo.nameColor }}>
+            {heroInfo.nameValue || hero.displayName}
+          </span>
+        )}
+      </div>
+
+      <div className={styles.heroInfoTags} aria-label="Hero tags">
+        {tags.map((tag, index) => (
+          <span
+            key={`${hero.slug}-focused-tag-${index + 1}`}
+            className={styles.heroInfoTag}
+            style={{
+              transform: `translateY(${tag.offsetY}px) rotate(${tag.tilt}deg)`,
+              backgroundColor: heroInfo.tagColor,
+              color: heroInfo.tagTextColor,
+            }}
+          >
+            <span>{tag.text}</span>
+          </span>
+        ))}
+      </div>
+
+      <div className={styles.heroInfoAbilities} aria-label="Editable hero ability icons">
+        {ABILITY_ICON_KEYS.map((iconKey, index) => {
+          const slot = index + 1
+
+          return (
+            <button
+              key={iconKey}
+              type="button"
+              className={styles.heroInfoAbility}
+              data-testid={`ability-editor-hero-info-ability-${slot}`}
+              aria-label={`Change Ability ${slot} icon`}
+              style={{ backgroundColor: heroInfo.abilityCircleColor, color: heroInfo.abilityCircleColor }}
+              onClick={() => onAbilityIconClick(slot)}
+            >
+              <span
+                className={styles.heroInfoAbilityIcon}
+                aria-hidden="true"
+                style={{
+                  backgroundColor: heroInfo.abilityIconColor,
+                  WebkitMaskImage: `url('${heroInfo[iconKey]}')`,
+                  maskImage: `url('${heroInfo[iconKey]}')`,
+                }}
+              />
+            </button>
+          )
+        })}
+      </div>
+    </aside>
+  )
 }
 
 function RichTextSection({ section, onTextChange, onInlineIcon }: RichTextSectionProps) {
@@ -886,7 +1384,7 @@ function RichTextSection({ section, onTextChange, onInlineIcon }: RichTextSectio
     return node?.nodeType === Node.TEXT_NODE && !(node.textContent ?? '').replaceAll(INLINE_ICON_CARET_STOP, '').trim()
   }
 
-  function isInlineIconNode(node: Node | null): node is HTMLElement {
+  function isInlineIconNode(node: Node | null) {
     return node instanceof HTMLElement && Boolean(node.dataset.inlineIcon || node.dataset.inlineIconMarker)
   }
 
@@ -896,7 +1394,7 @@ function RichTextSection({ section, onTextChange, onInlineIcon }: RichTextSectio
     }
 
     if (isInlineIconNode(node)) {
-      return node
+      return node as HTMLElement
     }
 
     if (node.nodeType === Node.TEXT_NODE) {
@@ -955,12 +1453,16 @@ function RichTextSection({ section, onTextChange, onInlineIcon }: RichTextSectio
       return isSkippableTextNode(node)
     }
 
-    if (node instanceof HTMLBRElement) {
-      return true
-    }
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement
 
-    if (node instanceof HTMLElement && !isInlineIconNode(node)) {
-      return !node.textContent?.trim() && !node.querySelector('[data-inline-icon], [data-inline-icon-marker]')
+      if (element.tagName === 'BR') {
+        return true
+      }
+
+      if (!isInlineIconNode(element)) {
+        return !element.textContent?.trim() && !element.querySelector('[data-inline-icon], [data-inline-icon-marker]')
+      }
     }
 
     return false
@@ -1213,8 +1715,8 @@ function RichTextSection({ section, onTextChange, onInlineIcon }: RichTextSectio
         spellCheck
         onKeyDown={handleEditorKeyDown}
         onMouseDown={handleEditorMouseDown}
-        onMouseUp={rememberSelection}
-        onKeyUp={rememberSelection}
+        onMouseUp={() => rememberSelection()}
+        onKeyUp={() => rememberSelection()}
         onInput={() => {
           rememberSelection()
           syncEditorText()
@@ -1286,45 +1788,57 @@ interface IconSearchModalProps {
   groups: EditorAssetGroup[]
   search: string
   selectedIconColor: string
+  title?: string
+  testId?: string
+  searchPlaceholder?: string
+  previewMode?: 'property' | 'image'
+  showColorPicker?: boolean
+  closeLabel?: string
   onIconColorChange: (color: string) => void
   onSearch: (search: string) => void
   onSelect: (path: string) => void
   onClose: () => void
 }
 
-function IconSearchModal({ groups, search, selectedIconColor, onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
+function IconSearchModal({ groups, search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
   return (
-    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label="Property icon selector" data-testid="property-icon-modal">
+    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId}>
       <div className={styles.iconModal}>
         <div className={styles.iconHeader}>
           <label>
             <Search aria-hidden="true" />
-            <input value={search} onChange={event => onSearch(event.target.value)} placeholder="Search property icons" />
+            <input value={search} onChange={event => onSearch(event.target.value)} placeholder={searchPlaceholder} />
           </label>
-          <button type="button" aria-label="Close property icon selector" onClick={onClose}><X aria-hidden="true" /></button>
+          <button type="button" aria-label={closeLabel} onClick={onClose}><X aria-hidden="true" /></button>
         </div>
-        <section className={styles.iconColorPicker} aria-label="Icon color">
-          {ICON_COLOR_SWATCHES.map(swatch => (
-            <button
-              key={swatch.id}
-              type="button"
-              className={cn(styles.iconColorSwatch, selectedIconColor === swatch.value && styles.iconColorSwatchActive)}
-              style={swatch.value ? { backgroundColor: swatch.value } : undefined}
-              aria-label={`${swatch.label} icon color`}
-              aria-pressed={selectedIconColor === swatch.value}
-              onClick={() => onIconColorChange(swatch.value)}
-            >
-              {swatch.value ? null : 'Default'}
-            </button>
-          ))}
-        </section>
+        {showColorPicker ? (
+          <section className={styles.iconColorPicker} aria-label="Icon color">
+            {ICON_COLOR_SWATCHES.map(swatch => (
+              <button
+                key={swatch.id}
+                type="button"
+                className={cn(styles.iconColorSwatch, selectedIconColor === swatch.value && styles.iconColorSwatchActive)}
+                style={swatch.value ? { backgroundColor: swatch.value } : undefined}
+                aria-label={`${swatch.label} icon color`}
+                aria-pressed={selectedIconColor === swatch.value}
+                onClick={() => onIconColorChange(swatch.value)}
+              >
+                {swatch.value ? null : 'Default'}
+              </button>
+            ))}
+          </section>
+        ) : null}
         <div className={styles.iconGrid}>
           {groups.flatMap(group => group.assets).map(asset => (
             <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => onSelect(asset.path)}>
               <span
-                className={cn(styles.iconPreview, isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor)}
+                className={cn(
+                  styles.iconPreview,
+                  previewMode === 'image' && styles.iconPreviewImage,
+                  previewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor,
+                )}
                 aria-hidden="true"
-                style={getPropertyIconVisualStyle(asset.path, selectedIconColor)}
+                style={previewMode === 'image' ? { backgroundImage: `url('${asset.path}')` } : getPropertyIconVisualStyle(asset.path, selectedIconColor)}
               />
               {asset.label}
             </button>

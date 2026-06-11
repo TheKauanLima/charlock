@@ -15,8 +15,7 @@ export interface IAbilitySection {
   lowerCells?: IAbilityGridCell[]
 }
 
-export interface IAbilityDefinition {
-  slot: number
+export interface IAbilityVariant {
   name: string
   icon: string
   cooldown: IPanelStat
@@ -25,6 +24,17 @@ export interface IAbilityDefinition {
   rechargeTime: IPanelStat
   subStats: IPanelStat[]
   sections: IAbilitySection[]
+}
+
+export interface IAbilityTier {
+  tier: 1 | 2 | 3
+  upgradeText: string
+  variant: IAbilityVariant
+}
+
+export interface IAbilityDefinition extends IAbilityVariant {
+  slot: number
+  tiers: IAbilityTier[]
 }
 
 export interface IAbilityStats {
@@ -72,6 +82,39 @@ const abilitySectionSchema = new Schema<IAbilitySection>({
   lowerCells: [abilityGridCellSchema],
 })
 
+const abilityVariantSchema = new Schema<IAbilityVariant>({
+  name: { type: String, required: true },
+  icon: { type: String, required: true },
+  cooldown: {
+    type: statSchema,
+    required: true,
+  },
+  hasCharges: { type: Boolean, default: false },
+  charges: {
+    type: statSchema,
+    required: true,
+  },
+  rechargeTime: {
+    type: statSchema,
+    required: true,
+  },
+  subStats: [statSchema],
+  sections: [abilitySectionSchema],
+})
+
+const abilityTierSchema = new Schema<IAbilityTier>({
+  tier: {
+    type: Number,
+    enum: [1, 2, 3],
+    required: true,
+  },
+  upgradeText: { type: String, default: '' },
+  variant: {
+    type: abilityVariantSchema,
+    required: true,
+  },
+})
+
 const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
   slot: { type: Number, required: true, min: 1 },
   name: { type: String, required: true },
@@ -91,6 +134,15 @@ const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
   },
   subStats: [statSchema],
   sections: [abilitySectionSchema],
+  tiers: {
+    type: [abilityTierSchema],
+    validate: {
+      validator(tiers: IAbilityTier[]) {
+        return tiers.length === 3
+      },
+      message: 'Ability definitions must include exactly 3 upgrade tiers.',
+    },
+  },
 })
 
 const abilityStatsSchema = new Schema<IAbilityStats>(

@@ -9,7 +9,7 @@
   pointer-events: auto;
   position: absolute;
   left: clamp(100px, 32vw, 300px);
-  bottom: clamp(180px, 12vh, 280px);
+  bottom: clamp(280px, 12vh, 280px);
   display: flex;
   min-height: 230px;
   width: min(52vw, 780px);

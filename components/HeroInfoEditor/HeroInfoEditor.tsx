@@ -13,7 +13,7 @@ import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
-import { HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
+import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { buildDefaultAbility, buildDefaultAbilityStats, normalizeAbilityStats } from '@/lib/ability-editor-types'
@@ -491,6 +491,20 @@ export default function HeroInfoEditor({
     setActiveAbilityIndex(null)
   }
 
+  function handleAbilityIconChange(slot: number, iconPath: string) {
+    const abilityControl = ABILITY_CONTROLS[slot - 1]
+
+    if (abilityControl) {
+      updateDraft({
+        [abilityControl.iconKey]: iconPath,
+      })
+    }
+
+    setAbilityStatsDraft(currentDraft => ({
+      abilities: currentDraft.abilities.map((ability, index) => (index === slot - 1 ? { ...ability, icon: iconPath } : ability)),
+    }))
+  }
+
   function updateTagTilt(tag: TagControl, tilt: number) {
     updateDraft({
       [tag.tiltKey]: clampTagTilt(tilt),
@@ -543,6 +557,11 @@ export default function HeroInfoEditor({
       <AbilityEditor
         ability={activeAbilityDraft}
         propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={draft}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onHeroInfoChange={onDraftChange}
+        onAbilityIconChange={handleAbilityIconChange}
         onSave={handleAbilitySave}
         onCancel={() => setActiveAbilityIndex(null)}
       />

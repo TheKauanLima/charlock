@@ -32,8 +32,7 @@ export interface AbilityGridSection {
 
 export type AbilitySection = AbilityRichTextSection | AbilityGridSection
 
-export interface AbilityDefinition {
-  slot: number
+export interface AbilityVariant {
   name: string
   icon: string
   cooldown: AbilityStat
@@ -42,6 +41,19 @@ export interface AbilityDefinition {
   rechargeTime: AbilityStat
   subStats: AbilityStat[]
   sections: AbilitySection[]
+}
+
+export type AbilityTierLevel = 1 | 2 | 3
+
+export interface AbilityTier {
+  tier: AbilityTierLevel
+  upgradeText: string
+  variant: AbilityVariant
+}
+
+export interface AbilityDefinition extends AbilityVariant {
+  slot: number
+  tiers: AbilityTier[]
 }
 
 export interface AbilityStatsPayload {
@@ -127,11 +139,10 @@ function getAbilityIcon(heroInfo: AbilityHeroLike['heroInfo'], slot: number) {
   return heroInfo.ability4Icon
 }
 
-export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): AbilityDefinition {
+function buildDefaultAbilityVariant(slot: number, hero: AbilityHeroLike, idPrefix = `ability-${slot}`): AbilityVariant {
   const baseCooldown = String(18 + slot * 6)
 
   return {
-    slot,
     name: `${hero.displayName} Ability ${slot}`,
     icon: getAbilityIcon(hero.heroInfo, slot),
     cooldown: buildAbilityStat({
@@ -162,18 +173,18 @@ export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): Abilit
     ],
     sections: [
       {
-        id: `ability-${slot}-description`,
+        id: `${idPrefix}-description`,
         type: 'richText',
         title: 'Description',
         text: `${hero.displayName} channels custom ability ${slot}. Add [c:spirit]scaling[/c] values and [i:cooldown] timing details here.`,
       },
       {
-        id: `ability-${slot}-grid`,
+        id: `${idPrefix}-grid`,
         type: 'grid',
         title: 'Impact',
         mainCells: [
           {
-            id: `ability-${slot}-damage`,
+            id: `${idPrefix}-damage`,
             ...buildAbilityStat({
               label: 'Damage',
               value: String(70 + slot * 25),
@@ -185,7 +196,7 @@ export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): Abilit
         ],
         lowerCells: [
           {
-            id: `ability-${slot}-heal`,
+            id: `${idPrefix}-heal`,
             ...buildAbilityStat({
               label: 'Bonus',
               value: String(10 + slot * 5),
@@ -196,6 +207,18 @@ export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): Abilit
         ],
       },
     ],
+  }
+}
+
+export function buildDefaultAbility(slot: number, hero: AbilityHeroLike): AbilityDefinition {
+  return {
+    slot,
+    ...buildDefaultAbilityVariant(slot, hero),
+    tiers: [1, 2, 3].map(tier => ({
+      tier: tier as AbilityTierLevel,
+      upgradeText: `[b]+${tier === 1 ? 150 : tier === 2 ? 250 : 500}[/b] upgrade detail`,
+      variant: buildDefaultAbilityVariant(slot, hero, `ability-${slot}-tier-${tier}`),
+    })),
   }
 }
 
@@ -250,21 +273,47 @@ function normalizeSection(value: unknown, fallback: AbilitySection): AbilitySect
 
 export function normalizeAbilityDefinition(value: unknown, fallback: AbilityDefinition): AbilityDefinition {
   const record = isRecord(value) ? value : {}
+
+  function normalizeAbilityVariant(valueToNormalize: unknown, fallbackVariant: AbilityVariant): AbilityVariant {
+    const variantRecord = isRecord(valueToNormalize) ? valueToNormalize : {}
+    const sectionFallbacks = fallbackVariant.sections
+    const sections = Array.isArray(variantRecord.sections)
+      ? variantRecord.sections.map((section, index) => normalizeSection(section, sectionFallbacks[index] ?? sectionFallbacks[0]))
+      : sectionFallbacks
+
+    return {
+      name: getString(variantRecord.name, fallbackVariant.name),
+      icon: getString(variantRecord.icon, fallbackVariant.icon),
+      cooldown: normalizeAbilityStat(variantRecord.cooldown, fallbackVariant.cooldown),
+      hasCharges: getBoolean(variantRecord.hasCharges, fallbackVariant.hasCharges),
+      charges: normalizeAbilityStat(variantRecord.charges, fallbackVariant.charges),
+      rechargeTime: normalizeAbilityStat(variantRecord.rechargeTime, fallbackVariant.rechargeTime),
+      subStats: normalizeStatArray(variantRecord.subStats, fallbackVariant.subStats),
+      sections,
+    }
+  }
+
   const sectionFallbacks = fallback.sections
   const sections = Array.isArray(record.sections)
     ? record.sections.map((section, index) => normalizeSection(section, sectionFallbacks[index] ?? sectionFallbacks[0]))
     : sectionFallbacks
+  const normalizedBase = normalizeAbilityVariant({ ...record, sections }, fallback)
+  const sourceTiers = Array.isArray(record.tiers) ? record.tiers : []
+  const tiers = fallback.tiers.map(fallbackTier => {
+    const sourceTier = sourceTiers.find(tier => isRecord(tier) && Number(tier.tier) === fallbackTier.tier)
+    const tierRecord = isRecord(sourceTier) ? sourceTier : {}
+
+    return {
+      tier: fallbackTier.tier,
+      upgradeText: getString(tierRecord.upgradeText, fallbackTier.upgradeText),
+      variant: normalizeAbilityVariant(tierRecord.variant, fallbackTier.variant),
+    }
+  })
 
   return {
     slot: Number(record.slot) || fallback.slot,
-    name: getString(record.name, fallback.name),
-    icon: getString(record.icon, fallback.icon),
-    cooldown: normalizeAbilityStat(record.cooldown, fallback.cooldown),
-    hasCharges: getBoolean(record.hasCharges, fallback.hasCharges),
-    charges: normalizeAbilityStat(record.charges, fallback.charges),
-    rechargeTime: normalizeAbilityStat(record.rechargeTime, fallback.rechargeTime),
-    subStats: normalizeStatArray(record.subStats, fallback.subStats),
-    sections,
+    ...normalizedBase,
+    tiers,
   }
 }
 
