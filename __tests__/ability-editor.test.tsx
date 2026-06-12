@@ -47,8 +47,39 @@ describe('AbilityEditor', () => {
     }))
     expect(onAbilityIconChange).toHaveBeenCalledWith(1, hero.heroInfo.ability2Icon)
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
     expect(onSave.mock.calls[0]?.[0].icon).toBe(hero.heroInfo.ability2Icon)
+  })
+
+  it('marks the active ability and commits the draft when selecting another ability from the hero cluster', async () => {
+    const user = userEvent.setup()
+    const onAbilitySelect = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onAbilitySelect={onAbilitySelect}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Change Ability 1 icon' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Edited First Ability')
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 2' }))
+
+    expect(onAbilitySelect).toHaveBeenCalledWith(2, expect.objectContaining({
+      name: 'Edited First Ability',
+      slot: 1,
+    }))
   })
 
   it('manages focused ability state and saves a scaled rich-text payload', async () => {
@@ -117,7 +148,7 @@ describe('AbilityEditor', () => {
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
     await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Kinetic Fault',
@@ -215,7 +246,7 @@ describe('AbilityEditor', () => {
     await user.click(tierOneButton)
     expect(screen.getByLabelText('Ability Name')).toHaveValue('Tier One Variant')
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
@@ -224,6 +255,52 @@ describe('AbilityEditor', () => {
     expect(savedAbility?.tiers).toHaveLength(3)
     expect(savedTierOne?.upgradeText).toBe('Tier one upgrade')
     expect(savedTierOne?.variant.name).toBe('Tier One Variant')
+  })
+
+  it('cascades stat edits from lower tiers into higher tiers', async () => {
+    const user = userEvent.setup()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    async function setCooldown(value: string) {
+      const cooldown = screen.getByTestId('ability-stat-timing-cooldown')
+      const valueInput = within(cooldown).getByLabelText('Value')
+
+      await user.clear(valueInput)
+      await user.type(valueInput, value)
+    }
+
+    function expectCooldown(value: string) {
+      const cooldown = screen.getByTestId('ability-stat-timing-cooldown')
+
+      expect(within(cooldown).getByLabelText('Value')).toHaveValue(value)
+    }
+
+    await setCooldown('31')
+    await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
+    expectCooldown('31')
+
+    await setCooldown('41')
+    await user.click(screen.getByRole('button', { name: 'Tier 2 upgrade' }))
+    expectCooldown('41')
+
+    await setCooldown('51')
+    await user.click(screen.getByRole('button', { name: 'Tier 3 upgrade' }))
+    expectCooldown('51')
+
+    await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
+    expectCooldown('41')
+
+    await user.click(screen.getByRole('button', { name: '0' }))
+    expectCooldown('31')
   })
 
   it('does not duplicate inline icons when styling a selection that contains one', async () => {
@@ -264,7 +341,7 @@ describe('AbilityEditor', () => {
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Darken selected text' }))
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -310,7 +387,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
     await user.click(screen.getByRole('button', { name: 'Apply Healing color' }))
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -362,7 +439,7 @@ describe('AbilityEditor', () => {
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Bold selected text' }))
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -414,7 +491,7 @@ describe('AbilityEditor', () => {
 
     await user.clear(screen.getByLabelText('Main cell 1 title'))
     await user.type(screen.getByLabelText('Main cell 1 title'), 'Impact Damage')
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
@@ -473,7 +550,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Remove lower cell 3' }))
     expect(lowerCellGrid.children).toHaveLength(2)
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
@@ -584,7 +661,7 @@ describe('AbilityEditor', () => {
     expect(healPreview?.style.backgroundColor).toBe('rgb(46, 152, 96)')
 
     await user.click(healOption)
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -613,7 +690,7 @@ describe('AbilityEditor', () => {
     await user.click(within(iconModal).getByRole('button', { name: 'Violet icon color' }))
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
     await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
 
@@ -667,7 +744,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -716,7 +793,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -760,7 +837,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -803,7 +880,7 @@ describe('AbilityEditor', () => {
       expect(richTextEditor.querySelector('[data-inline-icon-marker]')).toBeNull()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')

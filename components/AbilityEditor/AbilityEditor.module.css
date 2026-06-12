@@ -95,6 +95,15 @@
   cursor: pointer;
 }
 
+.heroInfoAbilityActive {
+  outline: 2px solid #fff3dd;
+  outline-offset: 4px;
+  box-shadow:
+    0 4px 10px rgb(0 0 0 / 18%),
+    0 0 0 3px rgb(198 154 246 / 42%),
+    0 0 22px rgb(198 154 246 / 55%);
+}
+
 .heroInfoAbility:focus-visible {
   outline: 2px solid #fff3dd;
   outline-offset: 4px;
@@ -1023,23 +1032,29 @@
 }
 
 .tierSystem {
+  position: relative;
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 7px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
-  width: calc(100% + 39px);
-  margin-left: -39px;
+  width: 100%;
 }
 
 .baseTierButton {
-  align-self: stretch;
-  min-height: 0;
+  position: fixed;
+  z-index: 245;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
   border: 1px solid rgb(255 210 210 / 54%);
+  border-radius: 2px;
   color: #fff1ee;
   background: rgb(119 22 18 / 84%);
   font-size: 1rem;
   font-weight: 950;
   box-shadow: 0 10px 22px rgb(0 0 0 / 32%);
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .baseTierButtonActive {
@@ -1246,14 +1261,20 @@
 
 .iconModal {
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 14px;
   width: min(700px, 100%);
   max-height: min(700px, calc(100dvh - 44px));
+  overflow: hidden;
   padding: 16px;
   border: 1px solid rgb(198 127 255 / 46%);
   border-radius: 3px;
   background: rgb(20 18 25 / 94%);
   box-shadow: 0 24px 70px rgb(0 0 0 / 55%);
+}
+
+.iconModalAbility {
+  width: min(820px, calc(100vw - 44px));
 }
 
 .iconHeader {
@@ -1324,8 +1345,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
   gap: 8px;
+  min-height: 0;
   overflow: auto;
   padding-right: 4px;
+  scrollbar-color: rgb(255 255 255 / 45%) rgb(255 255 255 / 8%);
+  scrollbar-width: thin;
 }
 
 .iconGrid button {
@@ -1344,6 +1368,64 @@
   text-align: left;
 }
 
+.iconGridAbility {
+  grid-template-columns: repeat(2, max-content);
+  align-items: start;
+  justify-content: center;
+  justify-items: center;
+  column-gap: 34px;
+  row-gap: 14px;
+  max-height: min(520px, calc(100dvh - 150px));
+  padding: 2px 6px 2px 2px;
+}
+
+.iconGridTitle {
+  margin: 0;
+  color: #f5eadb;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.iconAbilityGroup {
+  display: grid;
+  grid-template-columns: repeat(4, 72px);
+  gap: 10px;
+}
+
+.iconAbilityGroupTitle {
+  grid-column: 1 / -1;
+  margin: 0 0 -2px;
+  color: rgb(245 234 219 / 82%);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.iconGridAbility button {
+  display: inline-flex;
+  width: 72px;
+  min-width: 72px;
+  height: 72px;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgb(255 255 255 / 10%);
+  text-align: center;
+}
+
+.iconGridAbility button:hover,
+.iconGridAbility button:focus-visible {
+  border-color: rgb(255 255 255 / 78%);
+  background: rgb(255 255 255 / 18%);
+}
+
 .iconPreview {
   width: 24px;
   height: 24px;
@@ -1351,6 +1433,18 @@
   mask-size: contain;
   mask-repeat: no-repeat;
   mask-position: center;
+}
+
+.iconPreviewAbility {
+  width: 46px;
+  height: 46px;
+  background-color: #ffffff;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
 }
 
 .iconPreviewImage {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { PointerEvent, WheelEvent } from 'react'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
@@ -301,22 +301,6 @@ export default function HeroInfoEditor({
     [draft],
   )
 
-  useEffect(() => {
-    if (activeAbilityIndex === null) {
-      return undefined
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setActiveAbilityIndex(null)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [activeAbilityIndex])
-
   function updateDraft(nextDraft: Partial<HeroInfoDefinition>) {
     onDraftChange({
       ...draft,
@@ -475,7 +459,7 @@ export default function HeroInfoEditor({
     })
   }
 
-  function handleAbilitySave(nextAbility: AbilityDefinition) {
+  function commitAbilityDraft(nextAbility: AbilityDefinition) {
     const abilityControl = ABILITY_CONTROLS[nextAbility.slot - 1]
 
     setAbilityStatsDraft(currentDraft => ({
@@ -487,8 +471,16 @@ export default function HeroInfoEditor({
         [abilityControl.iconKey]: nextAbility.icon,
       })
     }
+  }
 
+  function handleAbilitySave(nextAbility: AbilityDefinition) {
+    commitAbilityDraft(nextAbility)
     setActiveAbilityIndex(null)
+  }
+
+  function handleFocusedAbilitySelect(slot: number, currentAbility: AbilityDefinition) {
+    commitAbilityDraft(currentAbility)
+    setActiveAbilityIndex(slot - 1)
   }
 
   function handleAbilityIconChange(slot: number, iconPath: string) {
@@ -555,6 +547,7 @@ export default function HeroInfoEditor({
 
     return (
       <AbilityEditor
+        key={activeAbilityDraft.slot}
         ability={activeAbilityDraft}
         propertyIconGroups={PROPERTY_ICON_GROUPS}
         hero={hero}
@@ -562,6 +555,7 @@ export default function HeroInfoEditor({
         abilityIconGroups={ABILITY_ICON_GROUPS}
         onHeroInfoChange={onDraftChange}
         onAbilityIconChange={handleAbilityIconChange}
+        onAbilitySelect={handleFocusedAbilitySelect}
         onSave={handleAbilitySave}
         onCancel={() => setActiveAbilityIndex(null)}
       />

@@ -264,7 +264,7 @@ describe('HeroGrid', () => {
 
     await user.type(within(modal).getByPlaceholderText('Search property icons'), 'spirit')
     await user.click(within(modal).getByRole('button', { name: 'Use Spirit' }))
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const abilityMask = screen.getByTestId('editor-ability-1').querySelector('[aria-hidden="true"]')
 
@@ -379,7 +379,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
     await user.clear(screen.getByLabelText('Ability Name'))
     await user.type(screen.getByLabelText('Ability Name'), 'Arc Pulse')
-    await user.click(screen.getByRole('button', { name: 'Save & Return' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
     await user.click(screen.getByLabelText('Allow Copies'))
     await user.click(screen.getByRole('button', { name: 'Save Private' }))
 
