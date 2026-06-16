@@ -5,6 +5,7 @@ const heroInfoFindOneMock = vi.hoisted(() => vi.fn())
 const weaponFindOneMock = vi.hoisted(() => vi.fn())
 const vitalityFindOneMock = vi.hoisted(() => vi.fn())
 const spiritFindOneMock = vi.hoisted(() => vi.fn())
+const abilityStatsFindOneMock = vi.hoisted(() => vi.fn())
 
 function createQueryMock<T>(value: T) {
   return {
@@ -37,11 +38,16 @@ vi.mock('@/lib/models/HeroInfo', () => ({
   },
 }))
 
-vi.mock('@/lib/models/WeaponStats', () => ({
-  default: {
-    findOne: weaponFindOneMock,
-  },
-}))
+vi.mock('@/lib/models/WeaponStats', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/models/WeaponStats')>()
+
+  return {
+    ...actual,
+    default: {
+      findOne: weaponFindOneMock,
+    },
+  }
+})
 
 vi.mock('@/lib/models/VitalityStats', () => ({
   default: {
@@ -52,6 +58,12 @@ vi.mock('@/lib/models/VitalityStats', () => ({
 vi.mock('@/lib/models/SpiritStats', () => ({
   default: {
     findOne: spiritFindOneMock,
+  },
+}))
+
+vi.mock('@/lib/models/AbilityStats', () => ({
+  default: {
+    findOne: abilityStatsFindOneMock,
   },
 }))
 
@@ -93,6 +105,7 @@ describe('getHeroStatsBySlug stat normalization', () => {
         spiritPowerStat: { label: 'Spirit Power', value: '0', unit: '', icon: 'spirit', scaling: 'none', scalingValue: '0' },
       }),
     )
+    abilityStatsFindOneMock.mockReturnValueOnce(createQueryMock(null))
 
     const stats = await getHeroStatsBySlug('apollo')
 

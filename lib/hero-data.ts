@@ -4,6 +4,9 @@ export interface HeroInfoDefinition {
   nameType: 'image' | 'text'
   nameValue: string
   nameColor: string
+  nameFontSize?: string
+  nameFontFamily?: string
+  nameFontWeight?: string
   tag1Text: string
   tag2Text: string
   tag3Text: string
@@ -60,6 +63,10 @@ const HERO_INFO_THEMES: HeroInfoTheme[] = [
 ]
 
 type AssetSlugMapping = string | { name?: string; abilities?: string }
+
+export const DEFAULT_HERO_NAME_FONT_SIZE = 'clamp(1.5rem, 3vw, 3.3rem)'
+export const DEFAULT_HERO_NAME_FONT_FAMILY = 'var(--block, VALVEPulp, "Noto Sans", sans-serif)'
+export const DEFAULT_HERO_NAME_FONT_WEIGHT = '900'
 
 const HERO_ASSET_SLUGS: Record<string, AssetSlugMapping> = {
   greytalon: 'grey_talon',
@@ -142,6 +149,9 @@ function createHeroInfo(nameAssetSlug: string, abilityAssetSlug: string, heroInd
     nameType: 'image',
     nameValue: `/panorama/images/heroes/hero_names/${nameAssetSlug}.svg`,
     nameColor: theme.nameColor,
+    nameFontSize: DEFAULT_HERO_NAME_FONT_SIZE,
+    nameFontFamily: DEFAULT_HERO_NAME_FONT_FAMILY,
+    nameFontWeight: DEFAULT_HERO_NAME_FONT_WEIGHT,
     tag1Text: theme.tagTexts[0],
     tag2Text: theme.tagTexts[1],
     tag3Text: theme.tagTexts[2],

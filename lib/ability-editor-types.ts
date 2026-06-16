@@ -58,6 +58,8 @@ export interface AbilityDefinition extends AbilityVariant {
 
 export interface AbilityStatsPayload {
   abilities: AbilityDefinition[]
+  secondaryAbilities?: AbilityDefinition[]
+  secondaryAbilityAnchorIndex?: number
 }
 
 interface AbilityHeroLike {
@@ -68,6 +70,7 @@ interface AbilityHeroLike {
 const DEFAULT_PROPERTY_ICON = '/panorama/images/icons/properties/cooldown.svg'
 const DEFAULT_GRID_ICON = '/panorama/images/icons/properties/damage_magic_color.svg'
 const DEFAULT_HEAL_ICON = '/panorama/images/icons/properties/heal.svg'
+export const DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX = 3
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -79,6 +82,14 @@ function getString(value: unknown, fallback = '') {
 
 function getBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
+}
+
+function getSecondaryAnchorIndex(value: unknown) {
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= 3
+    ? numericValue
+    : DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
 }
 
 function getScaling(value: unknown): ScalingType {
@@ -323,13 +334,40 @@ export function buildDefaultAbilityStats(hero: HeroDefinition | AbilityHeroLike)
   }
 }
 
+export function buildDefaultSecondaryAbilities(hero: HeroDefinition | AbilityHeroLike): AbilityDefinition[] {
+  return [1, 2, 3].map(slot => buildDefaultAbility(slot, hero))
+}
+
+export function getSecondaryAbilityIndexForPrimary(primaryIndex: number, anchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX) {
+  if (primaryIndex === anchorIndex || primaryIndex < 0 || primaryIndex > 3) {
+    return null
+  }
+
+  return primaryIndex < anchorIndex ? primaryIndex : primaryIndex - 1
+}
+
+export function getPrimaryAbilityIndexForSecondary(secondaryIndex: number, anchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX) {
+  const primaryIndexes = [0, 1, 2, 3].filter(primaryIndex => primaryIndex !== anchorIndex)
+
+  return primaryIndexes[secondaryIndex] ?? 0
+}
+
 export function normalizeAbilityStats(value: unknown, hero: HeroDefinition | AbilityHeroLike): AbilityStatsPayload {
   const defaults = buildDefaultAbilityStats(hero)
   const record = isRecord(value) ? value : {}
   const sourceAbilities = Array.isArray(record.abilities) ? record.abilities : []
   const abilities = defaults.abilities.map((fallback, index) => normalizeAbilityDefinition(sourceAbilities[index], fallback))
+  const secondaryFallbacks = buildDefaultSecondaryAbilities(hero)
+  const sourceSecondaryAbilities = Array.isArray(record.secondaryAbilities) ? record.secondaryAbilities : null
+  const secondaryAbilities = sourceSecondaryAbilities
+    ? secondaryFallbacks.map((fallback, index) => normalizeAbilityDefinition(sourceSecondaryAbilities[index], fallback))
+    : undefined
 
   return {
     abilities,
+    ...(secondaryAbilities ? {
+      secondaryAbilities,
+      secondaryAbilityAnchorIndex: getSecondaryAnchorIndex(record.secondaryAbilityAnchorIndex),
+    } : {}),
   }
 }

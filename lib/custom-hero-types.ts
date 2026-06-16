@@ -52,6 +52,7 @@ export interface CustomHeroSummary extends HeroDefinition {
   allowCopies: boolean
   background: string
   viewerCanEdit: boolean
+  abilityStats?: AbilityStatsPayload
   publishedAt: string | null
   createdAt: string
   updatedAt: string

@@ -9,11 +9,12 @@ import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
 import type { EditorRenderSelection } from '@/lib/editor-assets'
-import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
+import { buildDefaultAbilityStats, type AbilityStatsPayload } from '@/lib/ability-editor-types'
 import type { CustomHeroDetail, CustomHeroSavePayload, CustomHeroSort, CustomHeroSummary } from '@/lib/custom-hero-types'
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
-import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { HERO_TEMPLATES, type HeroTemplateDefinition } from '@/templates'
 
 import styles from './HeroGrid.module.css'
 
@@ -22,7 +23,7 @@ interface TabItem {
   disabled?: boolean
 }
 
-type PrimaryTab = 'Select' | 'Browse' | 'Feed' | 'Create'
+type PrimaryTab = 'Select' | 'Browse' | 'Bookmarks' | 'Create'
 
 interface HeroGridProps {
   initialTab?: PrimaryTab
@@ -31,13 +32,26 @@ interface HeroGridProps {
 const TAB_ITEMS: TabItem[] = [
   { label: 'Select' },
   { label: 'Browse' },
-  { label: 'Feed' },
+  { label: 'Bookmarks' },
   { label: 'Create' },
 ]
 
 const GRID_SIZE = 40
 const BROWSE_PAGE_SIZE = 24
 const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
+const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
+
+function getStoredShowDetails() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    return window.localStorage.getItem(SHOW_DETAILS_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 interface ActivityFeedItem {
   id: string
@@ -55,6 +69,10 @@ interface BrowsePagination {
   offset: number
   total: number
   hasMore: boolean
+}
+
+interface HeroStatsWithAbilityPayload extends HeroStatsPayload {
+  abilityStats?: AbilityStatsPayload
 }
 
 function cloneHeroInfo(heroInfo: HeroInfoDefinition): HeroInfoDefinition {
@@ -99,6 +117,18 @@ function getHeroResponseError(body: unknown, fallback: string) {
   return fallback
 }
 
+function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload, submittedAbilityStats: AbilityStatsPayload): AbilityStatsPayload {
+  if (!submittedAbilityStats.secondaryAbilities || savedAbilityStats.secondaryAbilities) {
+    return savedAbilityStats
+  }
+
+  return {
+    ...savedAbilityStats,
+    secondaryAbilities: submittedAbilityStats.secondaryAbilities,
+    secondaryAbilityAnchorIndex: submittedAbilityStats.secondaryAbilityAnchorIndex,
+  }
+}
+
 export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [activeTab, setActiveTab] = useState<PrimaryTab>(initialTab)
   const [browseSort, setBrowseSort] = useState<CustomHeroSort>('new')
@@ -118,6 +148,8 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [templateHero, setTemplateHero] = useState<CustomHeroSummary | null>(null)
   const [editingHeroStats, setEditingHeroStats] = useState<HeroStatsPayload | null>(null)
   const [editingAbilityStats, setEditingAbilityStats] = useState<AbilityStatsPayload | null>(null)
+  const [showDetails, setShowDetails] = useState(getStoredShowDetails)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
   const [isSavingHero, setIsSavingHero] = useState(false)
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
@@ -181,6 +213,55 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorRenderSelection(renderState.renderSelection)
     setActiveTab('Create')
     setSaveStatusMessage('Template loaded as a new draft.')
+  }, [])
+
+  const applyOfficialHeroToEditor = useCallback((hero: HeroDefinition, stats: HeroStatsPayload, abilityStats: AbilityStatsPayload) => {
+    const renderState = getSavedRenderSelection(hero.render)
+    const heroInfo = cloneHeroInfo(stats.heroInfo ?? hero.heroInfo)
+    const timestamp = new Date().toISOString()
+
+    setEditingCustomHero(null)
+    setTemplateHero({
+      ...hero,
+      id: `official-template-${hero.slug}`,
+      creatorId: 'template',
+      status: 'private',
+      likesCount: 0,
+      likedByCurrentUser: false,
+      bookmarkedByCurrentUser: false,
+      allowCopies: false,
+      background: getEditorBackgroundForHero(hero),
+      viewerCanEdit: false,
+      abilityStats,
+      publishedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    })
+    setEditingHeroStats({
+      ...stats,
+      heroInfo,
+    })
+    setEditingAbilityStats(abilityStats)
+    setEditorDraft(heroInfo)
+    setEditorBackground(getEditorBackgroundForHero(hero))
+    setEditorRenderSelection(renderState.renderSelection)
+    setActiveTab('Create')
+  }, [])
+
+  const startCreateFromTemplate = useCallback((template: HeroTemplateDefinition) => {
+    const hero = template.hero
+    const renderState = getSavedRenderSelection(hero.render)
+
+    setEditingCustomHero(null)
+    setTemplateHero(hero)
+    setEditingHeroStats(hero.stats)
+    setEditingAbilityStats(hero.abilityStats)
+    setEditorDraft(cloneHeroInfo(hero.heroInfo))
+    setEditorBackground(hero.background || renderState.background)
+    setEditorRenderSelection(renderState.renderSelection)
+    setActiveTab('Create')
+    setIsTemplateModalOpen(false)
+    setSaveStatusMessage(`${template.label} template loaded.`)
   }, [])
 
   const loadSavedHero = useCallback(async (heroId: string) => {
@@ -307,7 +388,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }, [activeTab, getBrowseUrl])
 
   useEffect(() => {
-    if (activeTab !== 'Feed') {
+    if (activeTab !== 'Bookmarks') {
       return undefined
     }
 
@@ -385,7 +466,10 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         throw new Error(getHeroResponseError(body, `Save request failed with ${response.status}`))
       }
 
-      applySavedHeroToEditor(body.hero)
+      applySavedHeroToEditor({
+        ...body.hero,
+        abilityStats: mergeSubmittedSecondaryAbilities(body.hero.abilityStats, payload.abilityStats),
+      })
       setSaveStatusMessage(body.hero.status === 'published' ? 'Hero published to Browse.' : 'Private hero saved to your profile.')
     } catch (error) {
       setSaveStatusMessage(error instanceof Error ? error.message : 'Failed to save hero.')
@@ -467,6 +551,69 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     }
   }
 
+  async function handleCreateFromSelectedHero(hero: HeroDefinition) {
+    const fallbackStats = buildHeroStatsSeed(hero)
+    const fallbackAbilityStats = buildDefaultAbilityStats(hero)
+
+    try {
+      setSaveStatusMessage(`Loading ${hero.displayName} as a new draft...`)
+
+      const response = await fetch(`/api/heroes/${encodeURIComponent(hero.slug)}/stats`)
+      const body = await response.json() as Partial<HeroStatsWithAbilityPayload>
+
+      if (!response.ok) {
+        throw new Error(getHeroResponseError(body, `Hero stats request failed with ${response.status}`))
+      }
+
+      const nextStats: HeroStatsPayload = {
+        hero: body.hero ?? fallbackStats.hero,
+        heroInfo: body.heroInfo ?? fallbackStats.heroInfo,
+        weapon: body.weapon ?? fallbackStats.weapon,
+        vitality: body.vitality ?? fallbackStats.vitality,
+        spirit: body.spirit ?? fallbackStats.spirit,
+      }
+      const nextHeroInfo = nextStats.heroInfo ?? hero.heroInfo
+      const nextAbilityStats = body.abilityStats ?? buildDefaultAbilityStats({ ...hero, heroInfo: nextHeroInfo })
+
+      applyOfficialHeroToEditor(hero, nextStats, nextAbilityStats)
+      setSaveStatusMessage(`${hero.displayName} loaded as a new draft.`)
+    } catch (error) {
+      applyOfficialHeroToEditor(hero, fallbackStats, fallbackAbilityStats)
+      setSaveStatusMessage(error instanceof Error ? `${hero.displayName} loaded with fallback stats. ${error.message}` : `${hero.displayName} loaded with fallback stats.`)
+    }
+  }
+
+  function handleTabSelect(tab: PrimaryTab) {
+    if (tab === 'Create') {
+      setIsTemplateModalOpen(true)
+      return
+    }
+
+    setActiveTab(tab)
+  }
+
+  function handleTemplateSelect(template: HeroTemplateDefinition) {
+    if (!template.available) {
+      return
+    }
+
+    startCreateFromTemplate(template)
+  }
+
+  function handleShowDetailsToggle() {
+    setShowDetails(current => {
+      const nextValue = !current
+
+      try {
+        window.localStorage.setItem(SHOW_DETAILS_STORAGE_KEY, String(nextValue))
+      } catch {
+        // Keep the in-memory preference even if storage is unavailable.
+      }
+
+      return nextValue
+    })
+  }
+
   return (
     <div className={styles.shell}>
       <div className={styles.backgroundLayer} />
@@ -508,7 +655,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                 aria-current={isActive ? 'page' : undefined}
                 className={`${styles.tabsButton} ${isActive ? styles.tabsButtonActive : ''} ${tab.disabled ? styles.tabsButtonDisabled : ''}`}
                 title={tab.disabled ? 'Coming soon' : undefined}
-                onClick={() => setActiveTab(tab.label)}
+                onClick={() => handleTabSelect(tab.label)}
               >
                 {tab.label}
               </button>
@@ -563,7 +710,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           </div>
         ) : null}
 
-        {activeTab === 'Feed' ? (
+        {activeTab === 'Bookmarks' ? (
           <main className={styles.activityMain}>
             {feedStatus ? <p className={styles.browseStatus} role="status">{feedStatus}</p> : null}
             <section className={styles.activityFeed} aria-label="Activity feed">
@@ -587,6 +734,16 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           </main>
         ) : !isCreateMode ? (
           <main className={`${styles.main} ${activeTab === 'Browse' ? styles.browseMain : ''}`}>
+            <button
+              type="button"
+              className={`${styles.detailsToggle} ${showDetails ? styles.detailsToggleActive : ''}`}
+              aria-label={showDetails ? 'Hide Details' : 'Show Details'}
+              aria-pressed={showDetails}
+              title={showDetails ? 'Hide scaling values' : 'Show scaling values'}
+              onClick={handleShowDetailsToggle}
+            >
+              <span aria-hidden="true" />
+            </button>
             {activeTab === 'Browse' && browseStatus ? <p className={styles.browseStatus} role="status">{browseStatus}</p> : null}
             <section className={styles.grid}>
               {Array.from({ length: activeTab === 'Browse' ? Math.max(GRID_SIZE, browseHeroes.length) : GRID_SIZE }).map((_, index) => {
@@ -700,14 +857,65 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           onSaveHero={handleSaveHero}
         />
       ) : activeTab === 'Browse' ? (
-        selectedBrowseHero ? <HeroInfoCluster hero={selectedBrowseHero} /> : null
-      ) : activeTab === 'Feed' ? (
+        selectedBrowseHero ? <HeroInfoCluster hero={selectedBrowseHero} showDetails={showDetails} /> : null
+      ) : activeTab === 'Bookmarks' ? (
         null
       ) : (
-        <HeroInfoCluster hero={activeHero} />
+        <HeroInfoCluster hero={activeHero} showDetails={showDetails} onCreateFromHero={() => void handleCreateFromSelectedHero(activeHero)} />
       )}
 
-      {isCreateMode ? <BackstoryModule hero={backstoryHero} /> : null}
+      {isCreateMode ? (
+        <BackstoryModule
+          hero={backstoryHero}
+          isEditable
+          onBackstoryChange={value => setEditorDraft(currentDraft => ({ ...currentDraft, backstory: value }))}
+        />
+      ) : null}
+
+      {isTemplateModalOpen ? (
+        <div className={styles.templateModalBackdrop}>
+          <section
+            className={styles.templateModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="template-picker-title"
+          >
+            <header className={styles.templateModalHeader}>
+              <div>
+                <p>CREATE CHARACTER</p>
+                <h2 id="template-picker-title">Choose Template</h2>
+              </div>
+              <button
+                type="button"
+                className={styles.templateModalClose}
+                aria-label="Close template picker"
+                onClick={() => setIsTemplateModalOpen(false)}
+              >
+                x
+              </button>
+            </header>
+            <div className={styles.templateGrid}>
+              {HERO_TEMPLATES.map(template => (
+                <button
+                  key={template.id}
+                  type="button"
+                  className={`${styles.templateCard} ${template.available ? styles.templateCardAvailable : styles.templateCardLocked}`}
+                  disabled={!template.available}
+                  aria-label={template.available ? `Use ${template.label} template` : `${template.label} template not available`}
+                  onClick={() => handleTemplateSelect(template)}
+                >
+                  <span className={styles.templateName}>{template.label}</span>
+                  {template.available ? (
+                    <span className={styles.templateStatusAvailable}>Available</span>
+                  ) : (
+                    <span className={styles.templateStatusLocked}>Not available</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

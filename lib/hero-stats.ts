@@ -1,9 +1,10 @@
 import 'server-only'
 
-import type { Types } from 'mongoose'
+import { Types } from 'mongoose'
 
 import dbConnect from '@/lib/dbConnect'
 import CustomHero from '@/lib/models/CustomHero'
+import AbilityStats from '@/lib/models/AbilityStats'
 import OfficialHero from '@/lib/models/Hero'
 import HeroInfo from '@/lib/models/HeroInfo'
 import SpiritStats from '@/lib/models/SpiritStats'
@@ -12,7 +13,9 @@ import WeaponStats from '@/lib/models/WeaponStats'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
 import type { PanelStat } from '@/components/panels/scaling-utils'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
-import type { HeroInfoDefinition } from '@/lib/hero-data'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroInfoDefinition } from '@/lib/hero-data'
+import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
+import { normalizeAbilityStats } from '@/lib/ability-editor-types'
 export { buildFallbackHeroStatsBySlug, buildHeroStatsSeed, buildHeroStatsSource } from '@/lib/hero-stats-shared'
 export type { HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
 
@@ -78,6 +81,16 @@ interface SpiritStatsRecord {
   maxChargesIncrease?: IPanelStat
   chargeCooldown?: IPanelStat
   spiritPowerStat?: IPanelStat
+}
+
+interface AbilityStatsRecord {
+  abilities: AbilityStatsPayload['abilities']
+  secondaryAbilities?: AbilityStatsPayload['secondaryAbilities']
+  secondaryAbilityAnchorIndex?: AbilityStatsPayload['secondaryAbilityAnchorIndex']
+}
+
+export interface HeroStatsWithAbilityPayload extends HeroStatsPayload {
+  abilityStats?: AbilityStatsPayload
 }
 
 type HeroInfoRecord = HeroInfoDefinition
@@ -179,6 +192,9 @@ function serializeStoredHeroInfo(heroInfo: HeroInfoRecord): HeroInfoDefinition {
     nameType: heroInfo.nameType,
     nameValue: heroInfo.nameValue,
     nameColor: heroInfo.nameColor,
+    nameFontSize: heroInfo.nameFontSize ?? DEFAULT_HERO_NAME_FONT_SIZE,
+    nameFontFamily: heroInfo.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY,
+    nameFontWeight: heroInfo.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT,
     tag1Text: heroInfo.tag1Text,
     tag2Text: heroInfo.tag2Text,
     tag3Text: heroInfo.tag3Text,
@@ -200,28 +216,34 @@ function serializeStoredHeroInfo(heroInfo: HeroInfoRecord): HeroInfoDefinition {
   }
 }
 
-export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsPayload | null> {
+export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbilityPayload | null> {
   await dbConnect()
 
-  const officialHero = await OfficialHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
-  const hero = officialHero ?? await CustomHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
+  const customHeroById = Types.ObjectId.isValid(slug)
+    ? await CustomHero.findById(slug).select('_id slug name portrait render').lean<HeroRecord | null>()
+    : null
+  const officialHero = customHeroById ? null : await OfficialHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
+  const hero = customHeroById ?? officialHero ?? await CustomHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
 
   if (!hero) {
     return null
   }
 
-  const [heroInfo, weapon, vitality, spirit] = await Promise.all([
+  const [heroInfo, weapon, vitality, spirit, abilityStats] = await Promise.all([
     HeroInfo.findOne({ heroId: hero._id })
-      .select('nameType nameValue nameColor tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
+      .select('nameType nameValue nameColor nameFontSize nameFontFamily nameFontWeight tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
       .lean<HeroInfoRecord | null>(),
     WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
     VitalityStats.findOne({ heroId: hero._id }).select('stats maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
     SpiritStats.findOne({ heroId: hero._id }).select('topStats spiritPower spiritPowerStat abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
+    AbilityStats.findOne({ heroId: hero._id }).lean<AbilityStatsRecord | null>(),
   ])
 
   if (!weapon || !vitality || !spirit) {
     return null
   }
+
+  const heroInfoPayload = heroInfo ? serializeStoredHeroInfo(heroInfo) : null
 
   return {
     hero: {
@@ -230,7 +252,13 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsPayload
       portrait: hero.portrait,
       render: hero.render,
     },
-    ...(heroInfo ? { heroInfo: serializeStoredHeroInfo(heroInfo) } : {}),
+    ...(heroInfoPayload ? { heroInfo: heroInfoPayload } : {}),
+    ...(abilityStats && heroInfoPayload ? {
+      abilityStats: normalizeAbilityStats(abilityStats, {
+        displayName: hero.name,
+        heroInfo: heroInfoPayload,
+      }),
+    } : {}),
     weapon: {
       weaponName: weapon.weaponName,
       weaponDesc: weapon.weaponDesc,

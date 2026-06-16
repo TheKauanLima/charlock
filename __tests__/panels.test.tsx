@@ -69,6 +69,7 @@ describe('migrated stat panels', () => {
     expect(scalingInput).toHaveAttribute('style', expect.stringContaining('-webkit-text-stroke: 3px #2c1139'))
     expect(scalingInput).toHaveClass('bg-transparent')
     expect(scalingInput).toHaveClass('border-0')
+    expect(scalingInput.parentElement).toHaveTextContent('x')
 
     await user.clear(scalingInput)
     await user.type(scalingInput, '12.345')
@@ -81,5 +82,25 @@ describe('migrated stat panels', () => {
     expect(bulletDamageInput).toHaveValue('8.5')
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('always shows scaling icons but hides numeric scaling values until showDetails is enabled', () => {
+    const weaponStats = [
+      { label: 'Bullet Damage', value: '13.5', unit: '', icon: 'bulletDamage', scaling: 'spirit' as const, scalingValue: '0.2' },
+    ]
+
+    const { rerender } = render(<WeaponPanel weaponStats={weaponStats} />)
+
+    expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
+    expect(screen.queryByLabelText('spirit scaling value x0.2')).not.toBeInTheDocument()
+
+    rerender(<WeaponPanel weaponStats={weaponStats} showDetails />)
+
+    expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2')).toBeInTheDocument()
+
+    rerender(<WeaponPanel weaponStats={weaponStats} isEditable />)
+
+    expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
   })
 })

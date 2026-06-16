@@ -118,12 +118,12 @@ export default function GlobalNav() {
 
       {isOpen ? (
         <div className={styles.menu} role="menu" aria-label="Profile navigation">
-          <Link className={styles.menuItem} href="/?tab=feed" role="menuitem" onClick={() => setIsOpen(false)}>
+          <Link className={styles.menuItem} href="/?tab=bookmarks" role="menuitem" onClick={() => setIsOpen(false)}>
             <span className={styles.notificationIcon}>
               <Bell aria-hidden="true" size={17} />
               {notificationCount > 0 ? <span className={styles.notificationDot} aria-label={`${notificationCount} new activity updates`} /> : null}
             </span>
-            <span>Activity Feed</span>
+            <span>Bookmarks</span>
           </Link>
           <Link className={styles.menuItem} href={profilePath} role="menuitem" onClick={() => setIsOpen(false)}>
             <UserRound aria-hidden="true" size={17} />

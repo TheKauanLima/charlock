@@ -45,7 +45,7 @@ describe('AbilityEditor', () => {
     expect(onHeroInfoChange).toHaveBeenCalledWith(expect.objectContaining({
       ability1Icon: hero.heroInfo.ability2Icon,
     }))
-    expect(onAbilityIconChange).toHaveBeenCalledWith(1, hero.heroInfo.ability2Icon)
+    expect(onAbilityIconChange).toHaveBeenCalledWith({ set: 'primary', index: 0 }, hero.heroInfo.ability2Icon)
 
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
     expect(onSave.mock.calls[0]?.[0].icon).toBe(hero.heroInfo.ability2Icon)
@@ -76,8 +76,38 @@ describe('AbilityEditor', () => {
     await user.type(screen.getByLabelText('Ability Name'), 'Edited First Ability')
     await user.click(screen.getByRole('button', { name: 'Edit Ability 2' }))
 
-    expect(onAbilitySelect).toHaveBeenCalledWith(2, expect.objectContaining({
+    expect(onAbilitySelect).toHaveBeenCalledWith({ set: 'primary', index: 1 }, expect.objectContaining({
       name: 'Edited First Ability',
+      slot: 1,
+    }))
+  })
+
+  it('shows a focused second ability set toggle next to the hero info cluster', async () => {
+    const user = userEvent.setup()
+    const onSecondAbilitySetToggle = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        isSecondAbilitySetEnabled={false}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onSecondAbilitySetToggle={onSecondAbilitySetToggle}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Toggle Commit Check')
+    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
+
+    expect(onSecondAbilitySetToggle).toHaveBeenCalledWith(true, expect.objectContaining({
+      name: 'Toggle Commit Check',
       slot: 1,
     }))
   })

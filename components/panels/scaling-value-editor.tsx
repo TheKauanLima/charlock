@@ -9,6 +9,8 @@ interface ScalingValueEditorProps {
   scaling: ScalingType
   scalingValue: string
   isEditable?: boolean
+  showValue?: boolean
+  position?: 'default' | 'raised'
   onChange?: (scalingValue: string) => void
 }
 
@@ -35,11 +37,17 @@ function getScalingValueStyle(scaling: Exclude<ScalingType, 'none'>): CSSPropert
   }
 }
 
-export default function ScalingValueEditor({ scaling, scalingValue, isEditable = false, onChange }: ScalingValueEditorProps) {
+export default function ScalingValueEditor({ scaling, scalingValue, isEditable = false, showValue = false, position = 'default', onChange }: ScalingValueEditorProps) {
   const scalingIconStyle = getScalingIconStyle(scaling)
 
   if (!scalingIconStyle) {
-    return null
+    return isEditable ? (
+      <span
+        className={`${styles.root} ${styles.rootEmpty} ${position === 'raised' ? styles.rootRaised : ''}`}
+        data-scaling-editor="true"
+        aria-hidden="true"
+      />
+    ) : null
   }
 
   function handleScalingValueChange(event: ChangeEvent<HTMLInputElement>) {
@@ -51,19 +59,27 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
   }
 
   return (
-    <span className={styles.root} title={`${scaling} scaling ${scalingValue}`}>
+    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''}`} data-scaling-editor="true" title={`${scaling} scaling ${scalingValue}`}>
       <span className={styles.icon} style={scalingIconStyle} aria-hidden="true" />
       {isEditable && scaling !== 'none' ? (
-        <input
-          type="text"
-          value={scalingValue}
-          onChange={handleScalingValueChange}
-          onClick={stopStatCellClick}
-          onMouseDown={stopStatCellClick}
-          aria-label={`${scaling} scaling value`}
-          className={`${styles.input} border-0 bg-transparent`}
-          style={getScalingValueStyle(scaling)}
-        />
+        <span className={styles.valueWrap} style={getScalingValueStyle(scaling)}>
+          <span className={styles.prefix} aria-hidden="true">x</span>
+          <input
+            type="text"
+            value={scalingValue}
+            onChange={handleScalingValueChange}
+            onClick={stopStatCellClick}
+            onMouseDown={stopStatCellClick}
+            aria-label={`${scaling} scaling value`}
+            className={`${styles.input} border-0 bg-transparent`}
+            style={getScalingValueStyle(scaling)}
+          />
+        </span>
+      ) : showValue && scaling !== 'none' ? (
+        <span className={`${styles.valueWrap} ${styles.valueWrapVisible}`} style={getScalingValueStyle(scaling)} aria-label={`${scaling} scaling value x${scalingValue}`}>
+          <span className={styles.prefix} aria-hidden="true">x</span>
+          <span className={styles.valueText}>{scalingValue}</span>
+        </span>
       ) : null}
     </span>
   )

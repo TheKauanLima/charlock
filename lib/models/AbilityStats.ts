@@ -40,6 +40,8 @@ export interface IAbilityDefinition extends IAbilityVariant {
 export interface IAbilityStats {
   heroId: Types.ObjectId
   abilities: IAbilityDefinition[]
+  secondaryAbilities?: IAbilityDefinition[]
+  secondaryAbilityAnchorIndex?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -163,6 +165,22 @@ const abilityStatsSchema = new Schema<IAbilityStats>(
         },
         message: 'AbilityStats must include at least 4 abilities.',
       },
+    },
+    secondaryAbilities: {
+      type: [abilityDefinitionSchema],
+      default: undefined,
+      validate: {
+        validator(abilities: IAbilityDefinition[]) {
+          return !abilities || abilities.length === 3
+        },
+        message: 'Secondary ability sets must include exactly 3 abilities.',
+      },
+    },
+    secondaryAbilityAnchorIndex: {
+      type: Number,
+      min: 0,
+      max: 3,
+      default: undefined,
     },
   },
   {

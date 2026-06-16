@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { ChangeEvent, CSSProperties } from 'react'
+import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode } from 'react'
 
 import { formatPanelValue, getNextScaling } from '@/components/panels/scaling-utils'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
@@ -28,11 +28,21 @@ interface WeaponPanelProps {
   showSecondaryWeapon?: boolean
   panelType?: 'weapon' | 'armor' | 'tech'
   isEditable?: boolean
+  showDetails?: boolean
   onStatsChange?: (stats: PanelStat[], changedStat: PanelStat) => void
+  weaponAttributesText?: string
+  weaponImageUploadControl?: ReactNode
+  onWeaponNameChange?: (value: string) => void
+  onWeaponDescChange?: (value: string) => void
+  onWeaponAttributesTextChange?: (value: string) => void
+  onWeaponMinRangeChange?: (value: string) => void
+  onWeaponMaxRangeChange?: (value: string) => void
+  onOpenWeaponAssetPicker?: () => void
 }
 
 interface CompactStatElementProps extends PanelStat {
   isEditable?: boolean
+  showDetails?: boolean
   panelType: 'weapon' | 'armor' | 'tech'
   onChange?: (updates: Partial<PanelStat>) => void
 }
@@ -118,6 +128,45 @@ function splitRows(items: PanelStat[]) {
   return rows
 }
 
+function getDescriptionRows(value: string) {
+  if (!value.trim()) {
+    return 2
+  }
+
+  const estimatedRows = value
+    .split('\n')
+    .reduce((rows, line) => rows + Math.max(1, Math.ceil(line.length / 58)), 0)
+
+  return Math.min(7, Math.max(2, estimatedRows))
+}
+
+function getEditableTagDraft(value: string) {
+  const parts = value.split(',')
+  const completed = parts.slice(0, -1).map(attribute => attribute.trim()).filter(Boolean)
+  const active = (parts.at(-1) ?? '').trimStart()
+
+  return { completed, active }
+}
+
+function serializeTagDraft(completed: string[], active: string, keepOpenTag = false) {
+  const cleanCompleted = completed.map(attribute => attribute.trim()).filter(Boolean)
+  const cleanActive = active.trimStart()
+
+  if (cleanCompleted.length && cleanActive) {
+    return `${cleanCompleted.join(', ')}, ${cleanActive}`
+  }
+
+  if (cleanCompleted.length && keepOpenTag) {
+    return `${cleanCompleted.join(', ')}, `
+  }
+
+  if (cleanCompleted.length) {
+    return cleanCompleted.join(', ')
+  }
+
+  return cleanActive
+}
+
 function getIconStyle(icon: string | undefined, iconColor: string): CSSProperties {
   const asset = ICON_ASSETS[icon ?? 'dot']
 
@@ -141,7 +190,7 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
   }
 }
 
-function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, panelType, onChange }: CompactStatElementProps) {
+function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, onChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
 
   function handleScalingClick() {
@@ -190,7 +239,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
         {unit ? <span className={styles.statUnit}>{unit}</span> : null}
         <span className={cn(styles.statLabel, theme.labelClassName)}>{label}</span>
       </span>
-      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
     </button>
   )
 }
@@ -211,7 +260,16 @@ export default function WeaponPanel({
   showSecondaryWeapon = true,
   panelType = 'weapon',
   isEditable = false,
+  showDetails = false,
   onStatsChange,
+  weaponAttributesText,
+  weaponImageUploadControl,
+  onWeaponNameChange,
+  onWeaponDescChange,
+  onWeaponAttributesTextChange,
+  onWeaponMinRangeChange,
+  onWeaponMaxRangeChange,
+  onOpenWeaponAssetPicker,
 }: WeaponPanelProps) {
   const theme = PANEL_THEMES[panelType]
   const sourceStats = weaponStats ?? (statsSource ? buildWeaponStatsArray(statsSource) : DEFAULT_WEAPON_STATS)
@@ -222,7 +280,42 @@ export default function WeaponPanel({
   const weaponStatRows = splitRows(displayStats)
   const primaryWeaponStatRows = weaponStatRows.slice(0, -1)
   const bottomWeaponStatRows = weaponStatRows.slice(-1)
-  const hasFalloffRange = weaponMinRange !== null || weaponMaxRange !== null
+  const hasFalloffRange = weaponMinRange !== null || weaponMaxRange !== null || isEditable
+  const editableAttributesText = weaponAttributesText ?? weaponAttributes.join(', ')
+  const editableTagDraft = getEditableTagDraft(editableAttributesText)
+
+  function handleAttributeInputChange(value: string) {
+    if (!onWeaponAttributesTextChange) {
+      return
+    }
+
+    if (value.includes(',')) {
+      const parts = value.split(',')
+      const nextCompleted = [
+        ...editableTagDraft.completed,
+        ...parts.slice(0, -1).map(attribute => attribute.trim()).filter(Boolean),
+      ]
+      const nextActive = (parts.at(-1) ?? '').trimStart()
+
+      onWeaponAttributesTextChange(serializeTagDraft(nextCompleted, nextActive, /,\s*$/.test(value)))
+      return
+    }
+
+    onWeaponAttributesTextChange(serializeTagDraft(editableTagDraft.completed, value, value === '' && editableTagDraft.completed.length > 0))
+  }
+
+  function handleAttributeInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== 'Backspace' || editableTagDraft.active || editableTagDraft.completed.length === 0 || !onWeaponAttributesTextChange) {
+      return
+    }
+
+    event.preventDefault()
+
+    const nextCompleted = editableTagDraft.completed.slice(0, -1)
+    const nextActive = editableTagDraft.completed.at(-1) ?? ''
+
+    onWeaponAttributesTextChange(serializeTagDraft(nextCompleted, nextActive))
+  }
 
   function handleStatChange(index: number, updates: Partial<PanelStat>) {
     const nextStats = displayStats.map((stat, statIndex) => (statIndex === index ? { ...stat, ...updates } : stat))
@@ -245,17 +338,58 @@ export default function WeaponPanel({
       <span className={styles.background} style={{ backgroundImage: `url('${theme.background}')` }} aria-hidden="true" />
 
       <div className={styles.header}>
-        <span className={styles.gunImage} role="img" aria-label={`${weaponName} weapon`} style={{ backgroundImage: `url('${gunImageSrc}')` }} />
+        <span className={styles.gunImage} role="img" aria-label={`${weaponName} weapon`} style={{ backgroundImage: `url('${gunImageSrc}')` }}>
+          {isEditable && (onOpenWeaponAssetPicker || weaponImageUploadControl) ? (
+            <span className={styles.weaponImageActions} aria-label="Weapon image actions">
+              {onOpenWeaponAssetPicker ? (
+                <button type="button" className={styles.weaponImageAction} onClick={onOpenWeaponAssetPicker}>
+                  Assets
+                </button>
+              ) : null}
+              {weaponImageUploadControl ? <span className={styles.weaponImageUpload}>{weaponImageUploadControl}</span> : null}
+            </span>
+          ) : null}
+        </span>
 
         <div className={styles.headerContent}>
           <span className={styles.eyebrow}>Weapon Stats</span>
-          <span className={styles.weaponName}>{weaponName}</span>
+          {isEditable && onWeaponNameChange ? (
+            <input
+              type="text"
+              className={styles.weaponNameInput}
+              value={weaponName}
+              onChange={event => onWeaponNameChange(event.target.value)}
+              aria-label="Weapon name"
+            />
+          ) : (
+            <span className={styles.weaponName}>{weaponName}</span>
+          )}
           <div className={styles.attributes} aria-label="Weapon attributes">
-            {weaponAttributes.map(attribute => (
-              <span key={attribute} className={styles.attribute}>
-                {attribute}
-              </span>
-            ))}
+            {isEditable && onWeaponAttributesTextChange ? (
+              <div className={styles.attributesEditor}>
+                {editableTagDraft.completed.map((attribute, index) => (
+                  <span key={`${attribute}-${index}`} className={styles.attribute}>
+                    {attribute}
+                  </span>
+                ))}
+                <input
+                  type="text"
+                  className={cn(styles.attribute, styles.attributeInput)}
+                  value={editableTagDraft.active}
+                  onChange={event => handleAttributeInputChange(event.target.value)}
+                  onKeyDown={handleAttributeInputKeyDown}
+                  placeholder="TANK, BRAWLER, DEFENDER"
+                  aria-label="Weapon tags"
+                  style={{ width: `${Math.max(editableTagDraft.active.length + 3, editableTagDraft.completed.length ? 9 : 26)}ch` }}
+                />
+              </div>
+            ) : (
+              weaponAttributes.map(attribute => (
+                <span key={attribute} className={styles.attribute}>
+                  {attribute}
+                </span>
+              ))
+            )}
           </div>
         </div>
 
@@ -276,7 +410,17 @@ export default function WeaponPanel({
               {weaponMinRange !== null ? (
                 <span className={styles.falloffValueFirst}>
                   <span className={styles.inlineValue}>
-                    <span>{formatPanelValue(weaponMinRange)}</span>
+                    {isEditable && onWeaponMinRangeChange ? (
+                      <input
+                        type="text"
+                        className={styles.falloffInput}
+                        value={weaponMinRange}
+                        onChange={event => onWeaponMinRangeChange(event.target.value)}
+                        aria-label="Minimum falloff range"
+                      />
+                    ) : (
+                      <span>{formatPanelValue(weaponMinRange)}</span>
+                    )}
                     <span className={styles.mutedUnit}>m</span>
                   </span>
                 </span>
@@ -285,7 +429,17 @@ export default function WeaponPanel({
               {weaponMaxRange !== null ? (
                 <span className={styles.falloffValue}>
                   <span className={styles.inlineValue}>
-                    <span>{formatPanelValue(weaponMaxRange)}</span>
+                    {isEditable && onWeaponMaxRangeChange ? (
+                      <input
+                        type="text"
+                        className={styles.falloffInput}
+                        value={weaponMaxRange}
+                        onChange={event => onWeaponMaxRangeChange(event.target.value)}
+                        aria-label="Maximum falloff range"
+                      />
+                    ) : (
+                      <span>{formatPanelValue(weaponMaxRange)}</span>
+                    )}
                     <span className={styles.mutedUnit}>m</span>
                   </span>
                 </span>
@@ -296,7 +450,18 @@ export default function WeaponPanel({
       </div>
 
       <div className={styles.body}>
-        {weaponDesc ? <p className={styles.description}>{weaponDesc}</p> : null}
+        {isEditable && onWeaponDescChange ? (
+          <textarea
+            className={styles.descriptionInput}
+            value={weaponDesc}
+            onChange={event => onWeaponDescChange(event.target.value)}
+            rows={getDescriptionRows(weaponDesc)}
+            aria-label="Weapon description"
+            placeholder="Describe this weapon..."
+          />
+        ) : weaponDesc ? (
+          <p className={styles.description}>{weaponDesc}</p>
+        ) : null}
         <div className={styles.rows}>
           {primaryWeaponStatRows.map((row, rowIndex) => (
             <div key={`weapon-row-${rowIndex}`} className={styles.row}>
@@ -309,6 +474,7 @@ export default function WeaponPanel({
                     {...stat}
                     panelType={panelType}
                     isEditable={isEditable}
+                    showDetails={showDetails}
                     onChange={updates => handleStatChange(absoluteIndex, updates)}
                   />
                 )
@@ -328,6 +494,7 @@ export default function WeaponPanel({
                     {...stat}
                     panelType={panelType}
                     isEditable={isEditable}
+                    showDetails={showDetails}
                     onChange={updates => handleStatChange(absoluteIndex, updates)}
                   />
                 )

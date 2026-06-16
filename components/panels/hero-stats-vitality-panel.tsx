@@ -16,12 +16,14 @@ interface HeroStatsVitalityPanelProps {
   statsSource?: StatsRow
   stats?: PanelStat[]
   isEditable?: boolean
+  showDetails?: boolean
   onStatsChange?: (stats: PanelStat[], changedStat: PanelStat) => void
 }
 
 interface VitalityStatCellProps extends PanelStat {
   isBottom?: boolean
   isEditable?: boolean
+  showDetails?: boolean
   onChange?: (updates: Partial<PanelStat>) => void
 }
 
@@ -77,7 +79,7 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, onChange }: VitalityStatCellProps) {
+function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, showDetails = false, onChange }: VitalityStatCellProps) {
   function handleClick() {
     const nextScaling = getNextScaling(scaling)
 
@@ -124,13 +126,13 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
         <span className={styles.label}>{label}</span>
       </span>
       <span className={styles.scalingWrap}>
-        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
       </span>
     </button>
   )
 }
 
-export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable = false, onStatsChange }: HeroStatsVitalityPanelProps) {
+export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable = false, showDetails = false, onStatsChange }: HeroStatsVitalityPanelProps) {
   const vitalityStats = stats ?? buildVitalityStatsArray(statsSource)
   const topRows = splitRows(vitalityStats.slice(0, 9))
   const bottomRows = splitRows(vitalityStats.slice(9))
@@ -157,7 +159,7 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         {topRows.map((row, rowIndex) => (
           <div key={`vitality-top-${rowIndex}`} className={styles.row}>
             {row.map((stat, statIndex) => (
-              <VitalityStatCell key={`vitality-top-${stat.label}`} {...stat} isEditable={isEditable} onChange={updates => handleStatChange(rowIndex * 2 + statIndex, updates)} />
+              <VitalityStatCell key={`vitality-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} onChange={updates => handleStatChange(rowIndex * 2 + statIndex, updates)} />
             ))}
           </div>
         ))}
@@ -167,7 +169,7 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         {bottomRows.map((row, rowIndex) => (
           <div key={`vitality-bottom-${rowIndex}`} className={styles.bottomRow}>
             {row.map((stat, statIndex) => (
-              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
+              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} showDetails={showDetails} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
             ))}
           </div>
         ))}

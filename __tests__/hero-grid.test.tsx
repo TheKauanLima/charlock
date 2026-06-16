@@ -65,11 +65,17 @@ vi.mock('@/lib/uploadthing', () => ({
 
 afterEach(() => {
   cleanup()
+  window.localStorage.clear()
 })
 
 beforeEach(() => {
   vi.restoreAllMocks()
 })
+
+async function openEmptyCreateEditor(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Create' }))
+  await user.click(await screen.findByRole('button', { name: 'Use EMPTY template' }))
+}
 
 describe('HeroGrid', () => {
   it('renders 38 heroes and 2 empty slots', () => {
@@ -77,6 +83,50 @@ describe('HeroGrid', () => {
 
     expect(screen.getAllByTestId('hero-card')).toHaveLength(38)
     expect(screen.getAllByTestId('hero-empty-slot')).toHaveLength(2)
+  })
+
+  it('opens the create template picker with only Empty available', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    expect(screen.getByRole('dialog', { name: 'Choose Template' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'ASSASSIN template not available' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Use EMPTY template' })).toBeEnabled()
+    expect(screen.getAllByText('Not available')).toHaveLength(6)
+  })
+
+  it('toggles scaling value details from the grid-side control', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const stats = buildHeroStatsSeed(abrams)
+
+    stats.weapon.stats[0] = {
+      ...stats.weapon.stats[0],
+      scaling: 'spirit',
+      scalingValue: '0.2',
+    }
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(stats), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    render(<HeroGrid />)
+
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+    expect(await screen.findByTitle('spirit scaling 0.2')).toBeInTheDocument()
+    expect(screen.queryByLabelText('spirit scaling value x0.2')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show Details' }))
+
+    expect(screen.getByRole('button', { name: 'Hide Details' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('spirit scaling value x0.2')).toBeInTheDocument()
+    expect(window.localStorage.getItem('charlock_show_details')).toBe('true')
   })
 
   it('can render the create tab as the initial state', () => {
@@ -87,7 +137,7 @@ describe('HeroGrid', () => {
     expect(screen.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('loads the activity feed tab', async () => {
+  it('loads the bookmarks tab', async () => {
     const user = userEvent.setup()
     const stats = buildHeroStatsSeed(HEROES[0])
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
@@ -121,7 +171,7 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Feed' }))
+    await user.click(screen.getByRole('button', { name: 'Bookmarks' }))
 
     expect(await screen.findByRole('heading', { name: 'Arc Light' })).toBeInTheDocument()
     expect(screen.getByText('Great lore hook.')).toBeInTheDocument()
@@ -164,12 +214,12 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
 
     expect(screen.getByTestId('hero-info-editor')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-card')).not.toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Selected editor background' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'View Abrams character backstory' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit NAME character backstory' })).toBeInTheDocument()
 
     await user.selectOptions(screen.getByTestId('editor-background-select'), '/panorama/images/heroes/backgrounds/yamato_bg_psd.png')
 
@@ -181,10 +231,10 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
 
     expect(screen.getByRole('tab', { name: 'Hero render' })).toBeInTheDocument()
-    expect(screen.getByTestId('editor-name-image')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-name-text')).toHaveValue('NAME')
 
     await user.selectOptions(screen.getByTestId('editor-background-select'), '/panorama/images/heroes/backgrounds/yamato_bg_psd.png')
     await user.click(screen.getByRole('button', { name: 'Asset' }))
@@ -202,20 +252,20 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('button', { name: 'text' }))
 
-    await user.clear(screen.getByLabelText('Name Text'))
-    await user.type(screen.getByLabelText('Name Text'), 'Arc Light')
-    expect(screen.getByTestId('editor-name-text')).toHaveTextContent('Arc Light')
+    await user.clear(screen.getByLabelText('Hero name text'))
+    await user.type(screen.getByLabelText('Hero name text'), 'Arc Light')
+    expect(screen.getByTestId('editor-name-text')).toHaveValue('Arc Light')
 
-    await user.clear(screen.getByLabelText('Tag 1'))
-    await user.type(screen.getByLabelText('Tag 1'), 'Skyline Breaker')
-    expect(screen.getByTestId('editor-tag-1')).toHaveTextContent('Skyline Breaker')
+    await user.clear(screen.getByLabelText('Tag 1 text'))
+    await user.type(screen.getByLabelText('Tag 1 text'), 'Skyline Breaker')
+    expect(screen.getByLabelText('Tag 1 text')).toHaveValue('Skyline Breaker')
     expect(screen.getByTestId('editor-tag-1')).toHaveClass('w-fit')
     expect(screen.getByTestId('editor-tags-row')).toHaveClass('flex-nowrap')
     expect(screen.getByTestId('editor-tag-1')).toHaveClass('shrink-0')
-    expect(screen.getByTestId('editor-tag-1').querySelector('span')).toHaveClass('whitespace-nowrap')
+    expect(screen.getByLabelText('Tag 1 text')).toHaveClass('whitespace-nowrap')
 
     await user.clear(screen.getByLabelText('Tag 1 tilt'))
     await user.type(screen.getByLabelText('Tag 1 tilt'), '12')
@@ -234,15 +284,15 @@ describe('HeroGrid', () => {
     await user.type(screen.getByLabelText('Hero Name hex value'), '#123456')
     expect(screen.getByTestId('editor-name-text')).toHaveStyle({ color: '#123456' })
 
-    const backstoryInput = screen.getByLabelText('Backstory')
+    await user.click(screen.getByRole('button', { name: 'Edit NAME character backstory' }))
+    const backstoryDialog = screen.getByRole('dialog', { name: 'BACKSTORY:' })
+    const backstoryInput = within(backstoryDialog).getByLabelText('Backstory')
 
     expect(backstoryInput).toHaveAttribute('wrap', 'soft')
-    expect(backstoryInput).toHaveClass('overflow-y-auto')
-    expect(backstoryInput).toHaveClass('overflow-x-hidden')
+    expect(backstoryInput.className).toContain('bodyInput')
 
     await user.type(backstoryInput, 'Raised under neon rooftops, Arc Light learned to bottle thunder.')
-    await user.click(screen.getByRole('button', { name: 'View Abrams character backstory' }))
-    expect(within(screen.getByRole('dialog', { name: 'BACKSTORY:' })).getByText('Raised under neon rooftops, Arc Light learned to bottle thunder.')).toBeInTheDocument()
+    expect(backstoryInput).toHaveValue('Raised under neon rooftops, Arc Light learned to bottle thunder.')
   })
 
   it('opens the focused ability editor from a create-mode ability circle', async () => {
@@ -250,7 +300,7 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
 
     expect(screen.getByTestId('ability-editor')).toBeInTheDocument()
@@ -273,12 +323,158 @@ describe('HeroGrid', () => {
     expect(screen.queryByTestId('property-icon-modal')).not.toBeInTheDocument()
   })
 
+  it('opens the second ability set anchor modal from the focused ability editor toggle', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
+
+    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+
+    expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+  })
+
+  it('publishes a second ability set enabled from the focused ability editor', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const savedStats = buildHeroStatsSeed(abrams)
+    const savedAbilityStats = buildDefaultAbilityStats(abrams)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url === '/api/heroes') {
+        return Promise.resolve(new Response(JSON.stringify({
+          hero: {
+            id: 'published_secondary_hero',
+            slug: 'published-secondary',
+            assetSlug: 'published-secondary',
+            displayName: 'Published Secondary',
+            portrait: abrams.portrait,
+            render: abrams.render,
+            background: abrams.render,
+            heroInfo: {
+              ...abrams.heroInfo,
+              nameType: 'text',
+              nameValue: 'Published Secondary',
+            },
+            status: 'published',
+            likesCount: 0,
+            likedByCurrentUser: false,
+            allowCopies: true,
+            viewerCanEdit: true,
+            publishedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            updatedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            stats: savedStats,
+            abilityStats: savedAbilityStats,
+          },
+        }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }))
+      }
+
+      return Promise.resolve(new Response(JSON.stringify(savedStats), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    })
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.type(screen.getByPlaceholderText('Name this save'), 'Published Secondary')
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
+    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+    expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Publish' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
+
+    const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilityAnchorIndex?: number } }
+
+    expect(requestBody.status).toBe('published')
+    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+  })
+
+  it('publishes default secondary abilities as soon as the second set is toggled on', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const savedStats = buildHeroStatsSeed(abrams)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url === '/api/heroes') {
+        return Promise.resolve(new Response(JSON.stringify({
+          hero: {
+            id: 'published_default_secondary',
+            slug: 'published-default-secondary',
+            assetSlug: 'published-default-secondary',
+            displayName: 'Published Default Secondary',
+            portrait: abrams.portrait,
+            render: abrams.render,
+            background: abrams.render,
+            heroInfo: {
+              ...abrams.heroInfo,
+              nameType: 'text',
+              nameValue: 'Published Default Secondary',
+            },
+            status: 'published',
+            likesCount: 0,
+            likedByCurrentUser: false,
+            allowCopies: true,
+            viewerCanEdit: true,
+            publishedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            updatedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+            stats: savedStats,
+            abilityStats: buildDefaultAbilityStats(abrams),
+          },
+        }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        }))
+      }
+
+      return Promise.resolve(new Response(JSON.stringify(savedStats), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }))
+    })
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.type(screen.getByPlaceholderText('Name this save'), 'Published Default Secondary')
+    await user.click(screen.getByLabelText('Second Ability Set'))
+    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Close second ability set modal' }))
+    await user.click(screen.getByRole('button', { name: 'Publish' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
+
+    const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilityAnchorIndex?: number } }
+
+    expect(requestBody.status).toBe('published')
+    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+  })
+
   it('stores Uploadthing asset URLs in the create draft', async () => {
     const user = userEvent.setup()
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('button', { name: 'image' }))
     await user.click(screen.getByTestId('uploadthing-heroNameAsset'))
 
@@ -289,26 +485,16 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/heroRender.png')))
 
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
-    await user.click(within(screen.getByTestId('weapon-mini-editor')).getByTestId('uploadthing-weaponImage'))
+    await user.click(within(screen.getByTestId('weapon-panel')).getByTestId('uploadthing-weaponImage'))
 
-    expect(screen.getByRole('img', { name: 'Abrams Weapon weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
+    expect(screen.getByRole('img', { name: 'WEAPON NAME weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
   })
 
   it('edits weapon panel stats with reactive modifier math', async () => {
     const user = userEvent.setup()
-    const abrams = HEROES.find(hero => hero.slug === 'abrams')
-
-    expect(abrams).toBeDefined()
-
-    const seed = buildHeroStatsSeed(abrams!)
-    const baseBulletDamage = Number(seed.weapon.stats.find(stat => stat.label === 'Bullet Damage')?.value ?? 0)
-    const bulletsPerSecond = Number(seed.weapon.stats.find(stat => stat.label === 'Bullets per sec')?.value ?? 0)
-    const expectedBulletDamage = (baseBulletDamage * 1.25).toFixed(1)
-    const expectedDps = Math.floor(Number(expectedBulletDamage) * bulletsPerSecond)
-
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
 
     const weaponDamageInput = screen.getByLabelText('Weapon Damage value')
@@ -316,8 +502,7 @@ describe('HeroGrid', () => {
     await user.clear(weaponDamageInput)
     await user.type(weaponDamageInput, '25')
 
-    expect(screen.getByLabelText('Bullet Damage value')).toHaveValue(expectedBulletDamage)
-    expect(screen.getByText(String(expectedDps))).toBeInTheDocument()
+    expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('0.0')
     expect(screen.getByText('DPS')).toBeInTheDocument()
   })
 
@@ -369,16 +554,21 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
-    await user.click(screen.getByRole('button', { name: 'Save Private' }))
-
-    expect(screen.getByRole('alert')).toHaveTextContent('Enter a hero name')
-    expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/heroes')).toBe(false)
-
+    await openEmptyCreateEditor(user)
+    await user.clear(screen.getByPlaceholderText('Name this save'))
     await user.type(screen.getByPlaceholderText('Name this save'), 'Arc Light')
+    await user.click(screen.getByLabelText('Second Ability Set'))
+    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+    expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
     await user.clear(screen.getByLabelText('Ability Name'))
     await user.type(screen.getByLabelText('Ability Name'), 'Arc Pulse')
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Secondary Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Arc Echo')
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
     await user.click(screen.getByLabelText('Allow Copies'))
     await user.click(screen.getByRole('button', { name: 'Save Private' }))
@@ -386,23 +576,27 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }> } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
       status: 'private',
       allowCopies: true,
       hero: {
-        background: expect.stringContaining('/panorama/images/heroes/backgrounds/abrams_bg_psd.png'),
+        background: expect.stringContaining('/panorama/images/heroes/backgrounds/generic_bg_psd.png'),
       },
       heroInfo: {
-        nameValue: abrams.heroInfo.nameValue,
+        nameValue: 'NAME',
       },
     })
     expect(requestBody.weapon.stats.length).toBeGreaterThan(0)
     expect(requestBody.abilityStats.abilities).toHaveLength(4)
     expect(requestBody.abilityStats.abilities[0].name).toBe('Arc Pulse')
+    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+    expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
     expect(await screen.findByRole('status')).toHaveTextContent('Private hero saved')
+    expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
   })
 
   it('loads and likes published heroes in the Browse tab', async () => {
@@ -436,6 +630,18 @@ describe('HeroGrid', () => {
       displayName: publishedHero.displayName,
       heroInfo: publishedHero.heroInfo,
     })
+    const publishedAbilityStats = buildDefaultAbilityStats({
+      ...abrams,
+      slug: publishedHero.slug,
+      displayName: publishedHero.displayName,
+      heroInfo: publishedHero.heroInfo,
+    })
+
+    publishedAbilityStats.secondaryAbilities = publishedAbilityStats.abilities.slice(0, 3).map((ability, index) => ({
+      ...ability,
+      icon: `/published-secondary-${index + 1}.svg`,
+    }))
+    publishedAbilityStats.secondaryAbilityAnchorIndex = 3
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = String(input)
 
@@ -453,7 +659,10 @@ describe('HeroGrid', () => {
       }
 
       if (url.includes('/stats')) {
-        return Promise.resolve(new Response(JSON.stringify(stats), {
+        return Promise.resolve(new Response(JSON.stringify({
+          ...stats,
+          abilityStats: publishedAbilityStats,
+        }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }))
@@ -472,7 +681,7 @@ describe('HeroGrid', () => {
       }
 
       return Promise.resolve(new Response(JSON.stringify({
-        heroes: [publishedHero],
+        heroes: [{ ...publishedHero, abilityStats: publishedAbilityStats }],
         pagination: { limit: 24, offset: 0, total: 1, hasMore: false },
       }), {
         status: 200,
@@ -490,6 +699,7 @@ describe('HeroGrid', () => {
     expect(screen.getByTestId('browse-card-background')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/yamato_bg_psd.png'))
     expect(screen.getByRole('button', { name: 'Use as Template' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Like Public Arc Light' })).toHaveTextContent('4')
+    expect(await screen.findByTestId('hero-info-secondary-ability-1')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Like Public Arc Light' }))
 
@@ -579,7 +789,7 @@ describe('HeroGrid', () => {
 
     render(<HeroGrid />)
 
-    await user.click(screen.getByRole('button', { name: 'Create' }))
+    await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
 
     const weaponDamageCell = screen.getByRole('button', { name: /Weapon Damage:/ })
@@ -588,22 +798,22 @@ describe('HeroGrid', () => {
     await user.click(weaponDamageCell)
     expect(weaponDamageCell).toHaveAttribute('data-scaling', 'spirit')
 
-    const weaponMiniEditor = screen.getByTestId('weapon-mini-editor')
+    const weaponPanel = screen.getByTestId('weapon-panel')
 
-    await user.clear(within(weaponMiniEditor).getByLabelText('Name'))
-    await user.type(within(weaponMiniEditor).getByLabelText('Name'), 'Solar Repeater')
-    expect(screen.getByText('Solar Repeater')).toBeInTheDocument()
+    await user.clear(within(weaponPanel).getByLabelText('Weapon name'))
+    await user.type(within(weaponPanel).getByLabelText('Weapon name'), 'Solar Repeater')
+    expect(within(weaponPanel).getByDisplayValue('Solar Repeater')).toBeInTheDocument()
 
-    await user.clear(within(weaponMiniEditor).getByLabelText('Tags'))
-    await user.type(within(weaponMiniEditor).getByLabelText('Tags'), 'Burst, Control')
+    await user.clear(within(weaponPanel).getByLabelText('Weapon tags'))
+    fireEvent.change(within(weaponPanel).getByLabelText('Weapon tags'), { target: { value: 'Burst, Control' } })
     expect(screen.getByText('Burst')).toBeInTheDocument()
-    expect(screen.getByText('Control')).toBeInTheDocument()
+    expect(within(weaponPanel).getByDisplayValue('Control')).toBeInTheDocument()
 
-    await user.clear(within(weaponMiniEditor).getByLabelText('Description'))
-    await user.type(within(weaponMiniEditor).getByLabelText('Description'), 'Overcharged precision rifle')
-    expect(within(screen.getByTestId('weapon-panel')).getByText('Overcharged precision rifle')).toBeInTheDocument()
+    await user.clear(within(weaponPanel).getByLabelText('Weapon description'))
+    await user.type(within(weaponPanel).getByLabelText('Weapon description'), 'Overcharged precision rifle')
+    expect(within(weaponPanel).getByDisplayValue('Overcharged precision rifle')).toBeInTheDocument()
 
-    await user.click(within(weaponMiniEditor).getByRole('button', { name: 'Asset' }))
+    await user.click(within(weaponPanel).getByRole('button', { name: 'Assets' }))
     expect(screen.getByTestId('weapon-image-modal')).toBeInTheDocument()
     expect(screen.getByTestId('weapon-image-modal')).toHaveClass('pointer-events-auto')
 

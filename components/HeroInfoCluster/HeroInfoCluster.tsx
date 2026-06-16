@@ -1,11 +1,14 @@
 'use client'
 
-import { Bookmark, Send, Trash2 } from 'lucide-react'
+import { Bookmark, Plus, Send, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 
+import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
+import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
+import type { AbilityIconTarget } from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
@@ -13,26 +16,34 @@ import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
+import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, buildDefaultAbilityStats } from '@/lib/ability-editor-types'
+import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
+import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import cn from '@/lib/utilsd'
-import type { HeroDefinition } from '@/lib/hero-data'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition } from '@/lib/hero-data'
 
 import styles from './HeroInfoCluster.module.css'
 
 interface HeroInfoClusterProps {
   hero: HeroDefinition
+  showDetails?: boolean
+  onCreateFromHero?: () => void
 }
-
-const ABILITY_SLOTS = [1, 2, 3, 4] as const
 
 interface SocialHeroDefinition extends HeroDefinition {
   id?: string
   bookmarkedByCurrentUser?: boolean
+  abilityStats?: AbilityStatsPayload
 }
 
 interface HeroStatsState {
-  heroSlug: string
-  data: HeroStatsPayload
+  heroKey: string
+  data: HeroStatsWithAbilityPayload
   error: string | null
+}
+
+interface HeroStatsWithAbilityPayload extends HeroStatsPayload {
+  abilityStats?: AbilityStatsPayload
 }
 
 interface CommentItem {
@@ -66,7 +77,7 @@ function formatNoteTime(value: string) {
   }).format(new Date(value))
 }
 
-export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
+export default function HeroInfoCluster({ hero, showDetails = false, onCreateFromHero }: HeroInfoClusterProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
   const heroId = getCustomHeroId(hero)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
@@ -76,20 +87,30 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
   const [commentsStatus, setCommentsStatus] = useState<string | null>(null)
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [bookmarkOverride, setBookmarkOverride] = useState<{ heroId: string; value: boolean } | null>(null)
+  const [selectedAbilityTarget, setSelectedAbilityTarget] = useState<AbilityIconTarget | null>(null)
+  const statsRequestKey = heroId ?? hero.slug
   const fallbackStats = useMemo(() => buildHeroStatsSeed(hero), [hero])
   const [statsState, setStatsState] = useState<HeroStatsState>(() => ({
-    heroSlug: hero.slug,
+    heroKey: statsRequestKey,
     data: fallbackStats,
     error: null,
   }))
-  const statsData = statsState.heroSlug === hero.slug ? statsState.data : fallbackStats
+  const statsData: HeroStatsWithAbilityPayload = statsState.heroKey === statsRequestKey ? statsState.data : fallbackStats
   const heroInfo = statsData.heroInfo ?? hero.heroInfo
   const displayHero = useMemo(() => ({ ...hero, heroInfo }), [hero, heroInfo])
+  const nameTextStyle = {
+    '--hero-info-name-color': heroInfo.nameColor,
+    color: heroInfo.nameColor,
+    fontSize: heroInfo.nameFontSize ?? DEFAULT_HERO_NAME_FONT_SIZE,
+    fontFamily: heroInfo.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY,
+    fontWeight: heroInfo.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT,
+  } as CSSProperties
   const shareUrl = heroId && typeof window !== 'undefined' ? getCharacterShareUrl(heroId, window.location.origin) : null
   const exportPayload = buildCharacterExportPayload(displayHero, statsData, {
     heroInfo,
     shareUrl,
   })
+  const fallbackAbilityStats = useMemo(() => buildDefaultAbilityStats(displayHero), [displayHero])
   const isBookmarked = bookmarkOverride?.heroId === heroId
     ? bookmarkOverride.value
     : Boolean((hero as SocialHeroDefinition).bookmarkedByCurrentUser)
@@ -100,7 +121,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
 
     async function loadHeroStats() {
       try {
-        const response = await fetch(`/api/heroes/${encodeURIComponent(hero.slug)}/stats`, {
+        const response = await fetch(`/api/heroes/${encodeURIComponent(statsRequestKey)}/stats`, {
           signal: abortController.signal,
         })
 
@@ -108,10 +129,10 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
           throw new Error(`Hero stats request failed with ${response.status}`)
         }
 
-        const data = (await response.json()) as HeroStatsPayload
+        const data = (await response.json()) as HeroStatsWithAbilityPayload
 
         setStatsState({
-          heroSlug: hero.slug,
+          heroKey: statsRequestKey,
           data,
           error: null,
         })
@@ -121,7 +142,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
         }
 
         setStatsState({
-          heroSlug: hero.slug,
+          heroKey: statsRequestKey,
           data: fallbackStats,
           error: error instanceof Error ? error.message : 'Failed to load hero stats',
         })
@@ -131,7 +152,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
     void loadHeroStats()
 
     return () => abortController.abort()
-  }, [fallbackStats, hero.slug])
+  }, [fallbackStats, statsRequestKey])
 
   useEffect(() => {
     if (!heroId || !isCommentsOpen) {
@@ -253,7 +274,15 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
     { text: heroInfo.tag3Text, tilt: heroInfo.tag3Tilt, offsetY: heroInfo.tag3OffsetY },
   ]
 
-  const abilities = [heroInfo.ability1Icon, heroInfo.ability2Icon, heroInfo.ability3Icon, heroInfo.ability4Icon]
+  const abilityStats = statsData.abilityStats ?? (hero as SocialHeroDefinition).abilityStats
+  const previewAbilityStats = abilityStats ?? fallbackAbilityStats
+  const secondaryAbilities = abilityStats?.secondaryAbilities ?? []
+  const secondaryAbilityAnchorIndex = abilityStats?.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
+  const selectedAbility = selectedAbilityTarget?.set === 'secondary'
+    ? secondaryAbilities[selectedAbilityTarget.index] ?? null
+    : selectedAbilityTarget
+      ? previewAbilityStats.abilities[selectedAbilityTarget.index] ?? null
+      : null
 
   return (
     <>
@@ -280,7 +309,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
                 } as CSSProperties}
               />
             ) : (
-              <span className={styles.nameText} data-testid="hero-info-name-text" style={{ '--hero-info-name-color': heroInfo.nameColor, color: heroInfo.nameColor } as CSSProperties}>
+              <span className={styles.nameText} data-testid="hero-info-name-text" style={nameTextStyle}>
                 {heroInfo.nameValue}
               </span>
             )}
@@ -299,31 +328,20 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
             ))}
           </div>
 
-          <div className={styles.abilities} aria-label="Hero abilities">
-            {ABILITY_SLOTS.map((slot, index) => {
-              const icon = abilities[index]
-
-              return (
-                <span
-                  key={`${hero.slug}-ability-${slot}`}
-                  className={styles.ability}
-                  data-testid={`hero-info-ability-${slot}`}
-                  style={{ '--hero-info-ability-circle-color': heroInfo.abilityCircleColor, backgroundColor: heroInfo.abilityCircleColor, color: heroInfo.abilityCircleColor } as CSSProperties}
-                >
-                  <span
-                    className={styles.abilityIcon}
-                    aria-hidden="true"
-                    style={{
-                      '--hero-info-ability-icon-color': heroInfo.abilityIconColor,
-                      backgroundColor: heroInfo.abilityIconColor,
-                      WebkitMaskImage: `url('${icon}')`,
-                      maskImage: `url('${icon}')`,
-                    } as CSSProperties}
-                  />
-                </span>
-              )
-            })}
-          </div>
+          <HeroAbilityIconRow
+            heroInfo={heroInfo}
+            secondaryAbilities={secondaryAbilities}
+            secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+            activeTarget={selectedAbilityTarget}
+            onAbilityClick={target => {
+              setSelectedAbilityTarget(current => (
+                current?.set === target.set && current.index === target.index ? null : target
+              ))
+            }}
+            className={styles.abilities}
+            primaryLabel={slot => `View Ability ${slot}`}
+            secondaryLabel={slot => `View Secondary Ability ${slot}`}
+          />
         </div>
       ) : null}
 
@@ -343,6 +361,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
           bulletDPS={statsData.weapon.bulletDPS}
           weaponMinRange={statsData.weapon.weaponMinRange}
           weaponMaxRange={statsData.weapon.weaponMaxRange}
+          showDetails={showDetails}
         />
       </div>
 
@@ -353,7 +372,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
         hidden={activeTabId !== 'vitality'}
         className={cn(activeTabId === 'vitality' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
-        <HeroStatsVitalityPanel hero={hero} stats={statsData.vitality.stats} />
+        <HeroStatsVitalityPanel hero={hero} stats={statsData.vitality.stats} showDetails={showDetails} />
       </div>
 
       <div
@@ -363,7 +382,7 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
         hidden={activeTabId !== 'spirit'}
         className={cn(activeTabId === 'spirit' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
-        <HeroStatsSpiritPanel hero={hero} stats={statsData.spirit.topStats} spiritPowerStat={statsData.spirit.spiritPowerStat} />
+        <HeroStatsSpiritPanel hero={hero} stats={statsData.spirit.topStats} spiritPowerStat={statsData.spirit.spiritPowerStat} showDetails={showDetails} />
       </div>
 
         {heroId ? (
@@ -437,7 +456,37 @@ export default function HeroInfoCluster({ hero }: HeroInfoClusterProps) {
 
         {statsState.error ? <span className="sr-only" role="status">Using fallback hero stats</span> : null}
       </aside>
-      <BackstoryModule hero={displayHero} />
+      {selectedAbility ? (
+        <AbilityEditor
+          key={`${selectedAbilityTarget?.set ?? 'primary'}-${selectedAbilityTarget?.index ?? 0}-${selectedAbility.slot}`}
+          ability={selectedAbility}
+          mode="preview"
+          className={styles.abilityViewerDock}
+          propertyIconGroups={PROPERTY_ICON_GROUPS}
+          hero={displayHero}
+          heroInfo={heroInfo}
+          activeAbilityTarget={selectedAbilityTarget ?? undefined}
+          secondaryAbilities={secondaryAbilities}
+          secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+          isSecondAbilitySetEnabled={secondaryAbilities.length > 0}
+          abilityIconGroups={ABILITY_ICON_GROUPS}
+          onAbilitySelect={target => setSelectedAbilityTarget(target)}
+          onCancel={() => setSelectedAbilityTarget(null)}
+        />
+      ) : null}
+      <BackstoryModule
+        hero={displayHero}
+        actionButton={onCreateFromHero ? (
+          <button
+            type="button"
+            className={styles.createFromHeroButton}
+            aria-label={`Create hero from ${displayHero.displayName}`}
+            onClick={onCreateFromHero}
+          >
+            <Plus aria-hidden="true" />
+          </button>
+        ) : null}
+      />
     </>
   )
 }

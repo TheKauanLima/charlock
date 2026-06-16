@@ -1,12 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import type { PointerEvent, WheelEvent } from 'react'
+import type { CSSProperties, PointerEvent, WheelEvent } from 'react'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
 import EditorAssetModal from '@/components/EditorAssetModal/EditorAssetModal'
+import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import type { PanelStat } from '@/components/panels/scaling-utils'
@@ -16,9 +17,16 @@ import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
-import { buildDefaultAbility, buildDefaultAbilityStats, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import {
+  DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+  buildDefaultAbility,
+  buildDefaultAbilityStats,
+  buildDefaultSecondaryAbilities,
+  getPrimaryAbilityIndexForSecondary,
+  normalizeAbilityStats,
+} from '@/lib/ability-editor-types'
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
-import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { UploadButton } from '@/lib/uploadthing'
 import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
@@ -77,6 +85,15 @@ interface AbilityControl {
   iconKey: 'ability1Icon' | 'ability2Icon' | 'ability3Icon' | 'ability4Icon'
 }
 
+type AbilitySetId = 'primary' | 'secondary'
+
+interface ActiveAbilityTarget {
+  set: AbilitySetId
+  index: number
+}
+
+type SecondAbilitySetModal = 'selectAnchor' | 'confirmRemove'
+
 interface TagRotationDrag {
   tag: TagControl
   startX: number
@@ -109,6 +126,13 @@ const TAG_TILT_MIN = -45
 const TAG_TILT_MAX = 45
 const TAG_WHEEL_STEP = 0.5
 const TAG_DRAG_PIXELS_PER_DEGREE = 6
+const NAME_FONT_OPTIONS = [
+  { label: 'Valve Pulp', value: DEFAULT_HERO_NAME_FONT_FAMILY },
+  { label: 'Sans', value: 'var(--sans, "Noto Sans", sans-serif)' },
+  { label: 'Mono', value: 'var(--font-geist-mono), "Roboto Mono", monospace' },
+  { label: 'Serif', value: 'Georgia, serif' },
+]
+const NAME_FONT_WEIGHTS = ['400', '600', '700', '800', '900']
 
 function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
   const uploadedAsset = uploadedAssets[0]
@@ -134,6 +158,15 @@ function parseTagControlNumber(value: string, fallbackValue: number) {
 
 function clampTagTilt(value: number) {
   return Number(Math.min(TAG_TILT_MAX, Math.max(TAG_TILT_MIN, value)).toFixed(1))
+}
+
+function getHeroNameTextStyle(heroInfo: HeroInfoDefinition): CSSProperties {
+  return {
+    color: heroInfo.nameColor,
+    fontSize: heroInfo.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE,
+    fontFamily: heroInfo.nameFontFamily || DEFAULT_HERO_NAME_FONT_FAMILY,
+    fontWeight: heroInfo.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT,
+  }
 }
 
 function formatCalculatedWeaponStat(label: string, value: number) {
@@ -247,20 +280,24 @@ export default function HeroInfoEditor({
   onSaveHero,
 }: HeroInfoEditorProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
-  const [activeAbilityIndex, setActiveAbilityIndex] = useState<number | null>(null)
+  const [activeAbilityTarget, setActiveAbilityTarget] = useState<ActiveAbilityTarget | null>(null)
   const [isWeaponAssetModalOpen, setIsWeaponAssetModalOpen] = useState(false)
   const [isHeroRenderAssetModalOpen, setIsHeroRenderAssetModalOpen] = useState(false)
+  const [secondAbilitySetModal, setSecondAbilitySetModal] = useState<SecondAbilitySetModal | null>(null)
   const [tagRotationDrag, setTagRotationDrag] = useState<TagRotationDrag | null>(null)
   const initialStatsDraft = initialStats ?? buildHeroStatsSeed(hero)
   const initialAbilityDraft = initialAbilityStats ?? buildDefaultAbilityStats(hero)
+  const normalizedInitialAbilityDraft = normalizeAbilityStats(initialAbilityDraft, hero)
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
-  const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizeAbilityStats(initialAbilityDraft, hero))
+  const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizedInitialAbilityDraft)
+  const [isSecondAbilitySetEnabled, setIsSecondAbilitySetEnabled] = useState(() => Boolean(normalizedInitialAbilityDraft.secondaryAbilities))
   const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(initialStatsDraft.weapon.stats))
   const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
   const [saveError, setSaveError] = useState<string | null>(null)
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
+  const heroNameTextStyle = getHeroNameTextStyle(draft)
   const exportHeroName = getDraftName() || heroNamePreview
   const exportShareUrl = savedHeroId && typeof window !== 'undefined' ? getCharacterShareUrl(savedHeroId, window.location.origin) : null
   const exportPayload = buildCharacterExportPayload(
@@ -425,11 +462,13 @@ export default function HeroInfoEditor({
       return explicitName
     }
 
-    if (savedHeroName.trim()) {
-      return savedHeroName.trim()
+    const draftTextName = draft.nameType === 'text' ? draft.nameValue.trim() : ''
+
+    if (draftTextName) {
+      return draftTextName
     }
 
-    return draft.nameType === 'text' ? draft.nameValue.trim() : ''
+    return savedHeroName.trim()
   }
 
   function handleGlobalSave(status: CustomHeroStatus) {
@@ -455,18 +494,41 @@ export default function HeroInfoEditor({
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
-      abilityStats: abilityStatsDraft,
+      abilityStats: isSecondAbilitySetEnabled
+        ? {
+          ...abilityStatsDraft,
+          secondaryAbilities: abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
+          secondaryAbilityAnchorIndex: abilityStatsDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+        }
+        : {
+          ...abilityStatsDraft,
+          secondaryAbilities: undefined,
+          secondaryAbilityAnchorIndex: undefined,
+        },
     })
   }
 
-  function commitAbilityDraft(nextAbility: AbilityDefinition) {
+  const secondaryAbilities = isSecondAbilitySetEnabled ? abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero) : []
+  const secondaryAbilityAnchorIndex = abilityStatsDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
+
+  function commitAbilityDraft(nextAbility: AbilityDefinition, target: ActiveAbilityTarget | null = activeAbilityTarget) {
+    if (!target) {
+      return
+    }
+
     const abilityControl = ABILITY_CONTROLS[nextAbility.slot - 1]
 
     setAbilityStatsDraft(currentDraft => ({
-      abilities: currentDraft.abilities.map((ability, index) => (index === nextAbility.slot - 1 ? nextAbility : ability)),
+      ...currentDraft,
+      abilities: target.set === 'primary'
+        ? currentDraft.abilities.map((ability, index) => (index === target.index ? nextAbility : ability))
+        : currentDraft.abilities,
+      secondaryAbilities: target.set === 'secondary'
+        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero)).map((ability, index) => (index === target.index ? nextAbility : ability))
+        : currentDraft.secondaryAbilities,
     }))
 
-    if (abilityControl) {
+    if (target.set === 'primary' && abilityControl) {
       updateDraft({
         [abilityControl.iconKey]: nextAbility.icon,
       })
@@ -475,26 +537,81 @@ export default function HeroInfoEditor({
 
   function handleAbilitySave(nextAbility: AbilityDefinition) {
     commitAbilityDraft(nextAbility)
-    setActiveAbilityIndex(null)
+    setActiveAbilityTarget(null)
   }
 
-  function handleFocusedAbilitySelect(slot: number, currentAbility: AbilityDefinition) {
+  function handleFocusedAbilitySelect(target: ActiveAbilityTarget, currentAbility: AbilityDefinition) {
     commitAbilityDraft(currentAbility)
-    setActiveAbilityIndex(slot - 1)
+    setActiveAbilityTarget(target)
   }
 
-  function handleAbilityIconChange(slot: number, iconPath: string) {
-    const abilityControl = ABILITY_CONTROLS[slot - 1]
+  function handleAbilityIconChange(target: ActiveAbilityTarget, iconPath: string) {
+    const abilityControl = ABILITY_CONTROLS[target.index]
 
-    if (abilityControl) {
+    if (target.set === 'primary' && abilityControl) {
       updateDraft({
         [abilityControl.iconKey]: iconPath,
       })
     }
 
     setAbilityStatsDraft(currentDraft => ({
-      abilities: currentDraft.abilities.map((ability, index) => (index === slot - 1 ? { ...ability, icon: iconPath } : ability)),
+      ...currentDraft,
+      abilities: target.set === 'primary'
+        ? currentDraft.abilities.map((ability, index) => (index === target.index ? { ...ability, icon: iconPath } : ability))
+        : currentDraft.abilities,
+      secondaryAbilities: target.set === 'secondary'
+        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero)).map((ability, index) => (index === target.index ? { ...ability, icon: iconPath } : ability))
+        : currentDraft.secondaryAbilities,
     }))
+  }
+
+  function handleSecondAbilitySetToggleRequest(enabled: boolean) {
+    if (enabled) {
+      setIsSecondAbilitySetEnabled(true)
+      setAbilityStatsDraft(currentDraft => ({
+        ...currentDraft,
+        secondaryAbilities: currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
+        secondaryAbilityAnchorIndex: currentDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+      }))
+      setSecondAbilitySetModal('selectAnchor')
+      return
+    }
+
+    setSecondAbilitySetModal('confirmRemove')
+  }
+
+  function enableSecondAbilitySet(anchorIndex: number) {
+    setIsSecondAbilitySetEnabled(true)
+    setAbilityStatsDraft(currentDraft => ({
+      ...currentDraft,
+      secondaryAbilities: currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
+      secondaryAbilityAnchorIndex: anchorIndex,
+    }))
+    setSecondAbilitySetModal(null)
+  }
+
+  function removeSecondAbilitySet() {
+    const nextPrimaryTarget = activeAbilityTarget?.set === 'secondary'
+      ? getPrimaryAbilityIndexForSecondary(activeAbilityTarget.index, secondaryAbilityAnchorIndex)
+      : null
+
+    setAbilityStatsDraft(currentDraft => ({
+      ...currentDraft,
+      secondaryAbilities: undefined,
+      secondaryAbilityAnchorIndex: undefined,
+    }))
+
+    setIsSecondAbilitySetEnabled(false)
+    setSecondAbilitySetModal(null)
+
+    if (nextPrimaryTarget !== null) {
+      setActiveAbilityTarget({ set: 'primary', index: nextPrimaryTarget })
+    }
+  }
+
+  function handleFocusedSecondAbilitySetToggle(enabled: boolean, currentAbility: AbilityDefinition) {
+    commitAbilityDraft(currentAbility, activeAbilityTarget)
+    handleSecondAbilitySetToggleRequest(enabled)
   }
 
   function updateTagTilt(tag: TagControl, tilt: number) {
@@ -542,23 +659,107 @@ export default function HeroInfoEditor({
     setTagRotationDrag(null)
   }
 
-  if (activeAbilityIndex !== null) {
-    const activeAbilityDraft = abilityStatsDraft.abilities[activeAbilityIndex] ?? buildDefaultAbility(activeAbilityIndex + 1, hero)
+  function renderSecondAbilitySetModal() {
+    if (!secondAbilitySetModal) {
+      return null
+    }
 
     return (
-      <AbilityEditor
-        key={activeAbilityDraft.slot}
-        ability={activeAbilityDraft}
-        propertyIconGroups={PROPERTY_ICON_GROUPS}
-        hero={hero}
-        heroInfo={draft}
-        abilityIconGroups={ABILITY_ICON_GROUPS}
-        onHeroInfoChange={onDraftChange}
-        onAbilityIconChange={handleAbilityIconChange}
-        onAbilitySelect={handleFocusedAbilitySelect}
-        onSave={handleAbilitySave}
-        onCancel={() => setActiveAbilityIndex(null)}
-      />
+      <div className={styles.secondSetModalBackdrop} role="presentation">
+        <section
+          className={styles.secondSetModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="second-set-modal-title"
+          data-testid="second-ability-set-modal"
+        >
+          {secondAbilitySetModal === 'selectAnchor' ? (
+            <>
+              <div className={styles.secondSetModalHeader}>
+                <h2 id="second-set-modal-title">SELECT AN ANCHOR POINT</h2>
+                <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
+                  X
+                </button>
+              </div>
+              <p className={styles.secondSetModalCopy}>
+                The anchored ability stays clean. The other three abilities receive a second ability icon.
+              </p>
+              <div className={styles.anchorAbilityGrid} aria-label="Second ability set anchor choices">
+                {ABILITY_CONTROLS.map((ability, index) => (
+                  <button
+                    key={ability.iconKey}
+                    type="button"
+                    className={styles.anchorAbilityButton}
+                    aria-label={`Anchor ${ability.label}`}
+                    onClick={() => enableSecondAbilitySet(index)}
+                  >
+                    <span
+                      className={styles.anchorAbilityIcon}
+                      aria-hidden="true"
+                      style={{
+                        backgroundColor: draft.abilityIconColor,
+                        WebkitMaskImage: `url('${draft[ability.iconKey]}')`,
+                        maskImage: `url('${draft[ability.iconKey]}')`,
+                      }}
+                    />
+                    <strong>{ability.label}</strong>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={styles.secondSetModalHeader}>
+                <h2 id="second-set-modal-title">REMOVE SECOND SET?</h2>
+                <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
+                  X
+                </button>
+              </div>
+              <p className={styles.secondSetModalCopy}>
+                Removing the second set will delete all secondary ability data as soon as the set disappears.
+              </p>
+              <div className={styles.secondSetConfirmActions}>
+                <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
+                  Keep Second Set
+                </button>
+                <button type="button" className={styles.secondSetDeleteButton} onClick={removeSecondAbilitySet}>
+                  Delete Second Set
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    )
+  }
+
+  if (activeAbilityTarget !== null) {
+    const activeAbilityDraft = activeAbilityTarget.set === 'primary'
+      ? abilityStatsDraft.abilities[activeAbilityTarget.index] ?? buildDefaultAbility(activeAbilityTarget.index + 1, hero)
+      : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero)[activeAbilityTarget.index]
+
+    return (
+      <>
+        <AbilityEditor
+          key={`${activeAbilityTarget.set}-${activeAbilityDraft.slot}`}
+          ability={activeAbilityDraft}
+          propertyIconGroups={PROPERTY_ICON_GROUPS}
+          hero={hero}
+          heroInfo={draft}
+          activeAbilityTarget={activeAbilityTarget}
+          secondaryAbilities={secondaryAbilities}
+          secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+          isSecondAbilitySetEnabled={isSecondAbilitySetEnabled}
+          abilityIconGroups={ABILITY_ICON_GROUPS}
+          onHeroInfoChange={onDraftChange}
+          onAbilityIconChange={handleAbilityIconChange}
+          onAbilitySelect={handleFocusedAbilitySelect}
+          onSecondAbilitySetToggle={handleFocusedSecondAbilitySetToggle}
+          onSave={handleAbilitySave}
+          onCancel={() => setActiveAbilityTarget(null)}
+        />
+        {renderSecondAbilitySetModal()}
+      </>
     )
   }
 
@@ -585,9 +786,16 @@ export default function HeroInfoEditor({
                   }}
                 />
               ) : (
-                <span className={styles.nameText} data-testid="editor-name-text" style={{ color: draft.nameColor }}>
-                  {heroNamePreview}
-                </span>
+                <input
+                  type="text"
+                  className={styles.nameTextInput}
+                  data-testid="editor-name-text"
+                  aria-label="Hero name text"
+                  value={draft.nameValue}
+                  placeholder={heroNamePreview}
+                  onChange={event => updateDraft({ nameValue: event.target.value })}
+                  style={heroNameTextStyle}
+                />
               )}
             </div>
 
@@ -611,109 +819,40 @@ export default function HeroInfoEditor({
                     color: draft.tagTextColor,
                   }}
                 >
-                  <span className={cn(styles.tagText, 'whitespace-nowrap')}>{tag.text || tag.label}</span>
+                  <input
+                    type="text"
+                    aria-label={`${tag.label} text`}
+                    className={cn(styles.tagTextInput, 'whitespace-nowrap')}
+                    value={tag.text}
+                    placeholder={tag.label}
+                    onChange={event => updateDraft({ [tag.textKey]: event.target.value })}
+                    onClick={event => event.stopPropagation()}
+                    onPointerDown={event => event.stopPropagation()}
+                    onWheel={event => event.stopPropagation()}
+                    style={{ width: `${Math.max((tag.text || tag.label).length + 1, tag.label.length, 5)}ch` }}
+                  />
                 </span>
               ))}
             </div>
 
-            <div className={styles.abilitiesRow} aria-label="Editable ability icons">
-              {ABILITY_CONTROLS.map((ability, index) => (
-                <button
-                  key={ability.iconKey}
-                  type="button"
-                  className={styles.abilityButton}
-                  data-testid={`editor-ability-${index + 1}`}
-                  aria-label={`Edit ${ability.label}`}
-                  style={{ backgroundColor: draft.abilityCircleColor }}
-                  onClick={() => setActiveAbilityIndex(index)}
-                >
-                  <span
-                    className={styles.abilityIcon}
-                    aria-hidden="true"
-                    style={{
-                      backgroundColor: draft.abilityIconColor,
-                      WebkitMaskImage: `url('${draft[ability.iconKey]}')`,
-                      maskImage: `url('${draft[ability.iconKey]}')`,
-                    }}
-                  />
-                </button>
-              ))}
-            </div>
+            <HeroAbilityIconRow
+              heroInfo={draft}
+              secondaryAbilities={secondaryAbilities}
+              secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+              onAbilityClick={setActiveAbilityTarget}
+              className={styles.abilitiesRow}
+              primaryTestIdPrefix="editor-ability"
+              secondaryTestIdPrefix="editor-secondary-ability"
+              primaryLabel={slot => `Edit Ability ${slot}`}
+              secondaryLabel={slot => `Edit Secondary Ability ${slot}`}
+              editable
+            />
       </div>
 
       {activeTabId !== 'overview' ? (
         <aside className={styles.statsAside}>
           {activeTabId === 'weapon' ? (
             <div className={styles.weaponStack}>
-              <div className={styles.miniEditor} data-testid="weapon-mini-editor">
-                <span className={styles.miniEditorTitle}>Weapon Info</span>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.compactLabel} htmlFor="editor-weapon-name">
-                    Name
-                    <input
-                      id="editor-weapon-name"
-                      type="text"
-                      value={statsDraft.weapon.weaponName}
-                      onChange={event => updateWeaponDraft({ weaponName: event.target.value })}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                  <label className={styles.compactLabel} htmlFor="editor-weapon-tags">
-                    Tags
-                    <input
-                      id="editor-weapon-tags"
-                      type="text"
-                      value={weaponTagsInput}
-                      onChange={event => handleWeaponTagChange(event.target.value)}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                </div>
-                <label className={styles.compactLabel} htmlFor="editor-weapon-description">
-                  Description
-                  <textarea
-                    id="editor-weapon-description"
-                    value={statsDraft.weapon.weaponDesc}
-                    onChange={event => updateWeaponDraft({ weaponDesc: event.target.value })}
-                    rows={2}
-                    wrap="soft"
-                    className={cn(styles.textarea, styles.compactTextarea)}
-                    placeholder="Describe this weapon..."
-                  />
-                </label>
-                <div className={styles.twoColumnGrid}>
-                  <label className={styles.compactLabel} htmlFor="editor-weapon-min-range">
-                    Min
-                    <input
-                      id="editor-weapon-min-range"
-                      type="text"
-                      value={statsDraft.weapon.weaponMinRange}
-                      onChange={event => updateWeaponDraft({ weaponMinRange: parseEditableNumber(event.target.value) })}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                  <label className={styles.compactLabel} htmlFor="editor-weapon-max-range">
-                    Max
-                    <input
-                      id="editor-weapon-max-range"
-                      type="text"
-                      value={statsDraft.weapon.weaponMaxRange}
-                      onChange={event => updateWeaponDraft({ weaponMaxRange: parseEditableNumber(event.target.value) })}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                </div>
-                <div className={styles.weaponActionGrid}>
-                  <button
-                    type="button"
-                    className={styles.assetButton}
-                    onClick={() => setIsWeaponAssetModalOpen(true)}
-                  >
-                    Asset
-                  </button>
-                  <CloudUploadButton endpoint="weaponImage" label="Upload" onUploaded={handleWeaponImageUpload} />
-                </div>
-              </div>
               <WeaponPanel
                 isEditable
                 weaponName={statsDraft.weapon.weaponName}
@@ -725,6 +864,14 @@ export default function HeroInfoEditor({
                 weaponMinRange={statsDraft.weapon.weaponMinRange}
                 weaponMaxRange={statsDraft.weapon.weaponMaxRange}
                 onStatsChange={handleWeaponStatsChange}
+                weaponAttributesText={weaponTagsInput}
+                onWeaponNameChange={value => updateWeaponDraft({ weaponName: value })}
+                onWeaponDescChange={value => updateWeaponDraft({ weaponDesc: value })}
+                onWeaponAttributesTextChange={handleWeaponTagChange}
+                onWeaponMinRangeChange={value => updateWeaponDraft({ weaponMinRange: parseEditableNumber(value) })}
+                onWeaponMaxRangeChange={value => updateWeaponDraft({ weaponMaxRange: parseEditableNumber(value) })}
+                onOpenWeaponAssetPicker={() => setIsWeaponAssetModalOpen(true)}
+                weaponImageUploadControl={<CloudUploadButton endpoint="weaponImage" label="Upload" onUploaded={handleWeaponImageUpload} />}
               />
             </div>
           ) : null}
@@ -820,16 +967,50 @@ export default function HeroInfoEditor({
             </div>
 
             {draft.nameType === 'text' ? (
-              <label className={styles.fieldLabel} htmlFor="editor-name-input">
-                Name Text
-                <input
-                  id="editor-name-input"
-                  type="text"
-                  value={draft.nameValue}
-                  onChange={event => updateDraft({ nameValue: event.target.value })}
-                  className={styles.input}
-                />
-              </label>
+              <>
+                <label className={styles.fieldLabel} htmlFor="editor-name-font">
+                  Font
+                  <select
+                    id="editor-name-font"
+                    value={draft.nameFontFamily || DEFAULT_HERO_NAME_FONT_FAMILY}
+                    onChange={event => updateDraft({ nameFontFamily: event.target.value })}
+                    className={styles.select}
+                  >
+                    {NAME_FONT_OPTIONS.map(option => (
+                      <option key={option.label} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className={styles.twoColumnGrid}>
+                  <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
+                    Font Size
+                    <input
+                      id="editor-name-font-size"
+                      type="text"
+                      value={draft.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE}
+                      onChange={event => updateDraft({ nameFontSize: event.target.value })}
+                      className={styles.input}
+                    />
+                  </label>
+                  <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
+                    Weight
+                    <select
+                      id="editor-name-font-weight"
+                      value={draft.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT}
+                      onChange={event => updateDraft({ nameFontWeight: event.target.value })}
+                      className={styles.select}
+                    >
+                      {NAME_FONT_WEIGHTS.map(weight => (
+                        <option key={weight} value={weight}>
+                          {weight}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </>
             ) : (
               <CloudUploadButton
                 endpoint="heroNameAsset"
@@ -840,33 +1021,11 @@ export default function HeroInfoEditor({
             )}
           </div>
 
-          <label className={styles.fieldLabel} htmlFor="editor-backstory">
-            Backstory
-            <textarea
-              id="editor-backstory"
-              value={draft.backstory ?? ''}
-              onChange={event => updateDraft({ backstory: event.target.value })}
-              rows={6}
-              wrap="soft"
-              className={cn(styles.textarea, 'overflow-y-auto overflow-x-hidden break-words')}
-              placeholder="Write this character's story..."
-            />
-          </label>
-
           <div className={styles.sectionGroup}>
-            <span className={styles.sectionTitle}>Tags</span>
+            <span className={styles.sectionTitle}>Tag Position</span>
             {TAG_CONTROLS.map(tag => (
               <div key={tag.textKey} className={styles.tagControl}>
-                <label className={styles.fieldLabel} htmlFor={`editor-${tag.textKey}`}>
-                  {tag.label}
-                  <input
-                    id={`editor-${tag.textKey}`}
-                    type="text"
-                    value={draft[tag.textKey]}
-                    onChange={event => updateDraft({ [tag.textKey]: event.target.value })}
-                    className={styles.input}
-                  />
-                </label>
+                <span className={styles.tagControlTitle}>{tag.label}</span>
                 <div className={styles.twoColumnGrid}>
                   <label className={cn(styles.compactLabel, styles.tinyLabel)} htmlFor={`editor-${tag.tiltKey}`}>
                     Tilt
@@ -907,6 +1066,16 @@ export default function HeroInfoEditor({
             <ColorField label="Tag Rectangles" value={draft.tagColor} onChange={value => updateDraft({ tagColor: value })} />
             <ColorField label="Ability Icons" value={draft.abilityIconColor} onChange={value => updateDraft({ abilityIconColor: value })} />
             <ColorField label="Ability Circles" value={draft.abilityCircleColor} onChange={value => updateDraft({ abilityCircleColor: value })} />
+            <label className={styles.copyToggle} htmlFor="editor-second-ability-set">
+              <input
+                id="editor-second-ability-set"
+                type="checkbox"
+                checked={isSecondAbilitySetEnabled}
+                onChange={event => handleSecondAbilitySetToggleRequest(event.target.checked)}
+              />
+              <span aria-hidden="true" />
+              <strong>Second Ability Set</strong>
+            </label>
           </div>
         </div>
 
@@ -956,6 +1125,74 @@ export default function HeroInfoEditor({
           {saveStatusMessage ? <p className={styles.actionStatus} role="status">{saveStatusMessage}</p> : null}
         </div>
       </div>
+
+      {secondAbilitySetModal ? (
+        <div className={styles.secondSetModalBackdrop} role="presentation">
+          <section
+            className={styles.secondSetModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="second-set-modal-title"
+            data-testid="second-ability-set-modal"
+          >
+            {secondAbilitySetModal === 'selectAnchor' ? (
+              <>
+                <div className={styles.secondSetModalHeader}>
+                  <h2 id="second-set-modal-title">SELECT AN ANCHOR POINT</h2>
+                  <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
+                    ×
+                  </button>
+                </div>
+                <p className={styles.secondSetModalCopy}>
+                  The anchored ability stays clean. The other three abilities receive a second ability icon.
+                </p>
+                <div className={styles.anchorAbilityGrid} aria-label="Second ability set anchor choices">
+                  {ABILITY_CONTROLS.map((ability, index) => (
+                    <button
+                      key={ability.iconKey}
+                      type="button"
+                      className={styles.anchorAbilityButton}
+                      aria-label={`Anchor ${ability.label}`}
+                      onClick={() => enableSecondAbilitySet(index)}
+                    >
+                      <span
+                        className={styles.anchorAbilityIcon}
+                        aria-hidden="true"
+                        style={{
+                          backgroundColor: draft.abilityIconColor,
+                          WebkitMaskImage: `url('${draft[ability.iconKey]}')`,
+                          maskImage: `url('${draft[ability.iconKey]}')`,
+                        }}
+                      />
+                      <strong>{ability.label}</strong>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={styles.secondSetModalHeader}>
+                  <h2 id="second-set-modal-title">REMOVE SECOND SET?</h2>
+                  <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
+                    ×
+                  </button>
+                </div>
+                <p className={styles.secondSetModalCopy}>
+                  Removing the second set will delete all secondary ability data as soon as the set disappears.
+                </p>
+                <div className={styles.secondSetConfirmActions}>
+                  <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
+                    Keep Second Set
+                  </button>
+                  <button type="button" className={styles.secondSetDeleteButton} onClick={removeSecondAbilitySet}>
+                    Delete Second Set
+                  </button>
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       {isHeroRenderAssetModalOpen ? (
         <EditorAssetModal

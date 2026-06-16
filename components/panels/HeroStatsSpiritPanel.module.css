@@ -1,7 +1,7 @@
 .panel {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 8px;
   background: rgba(12, 10, 8, 0.86);
   color: #fff;
@@ -16,6 +16,7 @@
     linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: 18px 18px;
+  border-radius: inherit;
   content: "";
   opacity: 0.4;
 }
@@ -27,6 +28,7 @@
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
+  border-radius: inherit;
 }
 
 .header {
@@ -81,6 +83,11 @@
 
 .cell:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.cell:has([data-scaling-editor]:hover),
+.cell:has([data-scaling-editor]:focus-within) {
+  z-index: 30;
 }
 
 .powerCell {
@@ -168,7 +175,7 @@
 .powerSection {
   position: relative;
   z-index: 1;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 0 0 8px 8px;
   margin-top: 2px;
   background: rgba(0, 0, 0, 0.4);

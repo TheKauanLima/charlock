@@ -23,6 +23,9 @@ describe('Mongoose model schemas', () => {
     expect(HeroInfo.schema.path('tag1OffsetY')).toBeDefined()
     expect(HeroInfo.schema.path('tag2OffsetY')).toBeDefined()
     expect(HeroInfo.schema.path('tag3OffsetY')).toBeDefined()
+    expect(HeroInfo.schema.path('nameFontSize')).toBeDefined()
+    expect(HeroInfo.schema.path('nameFontFamily')).toBeDefined()
+    expect(HeroInfo.schema.path('nameFontWeight')).toBeDefined()
     expect(HeroInfo.schema.path('backstory')).toBeDefined()
   })
 
@@ -35,6 +38,9 @@ describe('Mongoose model schemas', () => {
     const tierPath = AbilityStats.schema.path('abilities.tiers.tier')
     const tierUpgradeTextPath = AbilityStats.schema.path('abilities.tiers.upgradeText')
     const tierVariantSectionsPath = AbilityStats.schema.path('abilities.tiers.variant.sections')
+    const secondaryAbilitiesPath = AbilityStats.schema.path('secondaryAbilities')
+    const secondaryAbilityNamePath = AbilityStats.schema.path('secondaryAbilities.name')
+    const secondaryAbilityAnchorPath = AbilityStats.schema.path('secondaryAbilityAnchorIndex')
 
     expect(AbilityStats.collection.name).toBe('abilitystats')
     expect(AbilityStats.schema.path('heroId')).toBeDefined()
@@ -46,6 +52,9 @@ describe('Mongoose model schemas', () => {
     expect(tierPath).toHaveProperty('enumValues', [1, 2, 3])
     expect(tierUpgradeTextPath).toBeDefined()
     expect(tierVariantSectionsPath).toBeDefined()
+    expect(secondaryAbilitiesPath).toBeDefined()
+    expect(secondaryAbilityNamePath).toBeDefined()
+    expect(secondaryAbilityAnchorPath).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

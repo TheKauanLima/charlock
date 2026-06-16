@@ -6,6 +6,9 @@ export interface IHeroInfo {
   nameType: 'image' | 'text'
   nameValue: string
   nameColor: string
+  nameFontSize?: string
+  nameFontFamily?: string
+  nameFontWeight?: string
   tag1Text: string
   tag2Text: string
   tag3Text: string
@@ -54,6 +57,15 @@ const heroInfoSchema = new Schema<IHeroInfo>(
     nameColor: {
       type: String,
       required: true,
+    },
+    nameFontSize: {
+      type: String,
+    },
+    nameFontFamily: {
+      type: String,
+    },
+    nameFontWeight: {
+      type: String,
     },
     tag1Text: {
       type: String,

@@ -277,6 +277,51 @@
   width: min(41vw, 620px);
 }
 
+.detailsToggle {
+  position: absolute;
+  top: 6px;
+  left: -48px;
+  z-index: 4;
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  place-items: center;
+  border: 1px solid rgba(255, 239, 214, 0.5);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 0;
+  backdrop-filter: blur(8px);
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.detailsToggle span {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 239, 214, 0.56);
+  background: transparent;
+}
+
+.detailsToggle:hover {
+  border-color: rgba(47, 200, 144, 0.78);
+}
+
+.detailsToggleActive {
+  border-color: rgba(47, 200, 144, 0.9);
+  background: rgba(47, 200, 144, 0.14);
+  box-shadow: 0 0 18px rgba(47, 200, 144, 0.34);
+}
+
+.detailsToggleActive span {
+  border-color: #bafbe0;
+  background: #bafbe0;
+}
+
 .browseMain {
   flex-direction: column;
   gap: 14px;
@@ -541,4 +586,149 @@
 .loadMoreButton:disabled {
   cursor: wait;
   opacity: 0.62;
+}
+
+.templateModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 4, 4, 0.74);
+  padding: 24px;
+  backdrop-filter: blur(10px);
+}
+
+.templateModal {
+  width: min(760px, 100%);
+  border: 1px solid rgba(198, 154, 246, 0.72);
+  border-radius: 4px;
+  background: rgba(18, 14, 24, 0.96);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.65);
+  color: #ffefd6;
+  padding: 22px;
+}
+
+.templateModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.templateModalHeader p {
+  margin: 0 0 4px;
+  color: rgba(255, 239, 214, 0.52);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+}
+
+.templateModalHeader h2 {
+  margin: 0;
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  letter-spacing: 0;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.templateModalClose {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid rgba(198, 154, 246, 0.74);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffefd6;
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.templateModalClose:hover {
+  border-color: #c69af6;
+  background: rgba(198, 154, 246, 0.16);
+}
+
+.templateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.templateCard {
+  position: relative;
+  display: grid;
+  min-height: 108px;
+  align-content: space-between;
+  justify-items: start;
+  border: 1px solid rgba(255, 239, 214, 0.18);
+  border-radius: 4px;
+  padding: 14px;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.templateCardAvailable {
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(47, 200, 144, 0.2), rgba(47, 200, 144, 0.06));
+}
+
+.templateCardAvailable:hover,
+.templateCardAvailable:focus-visible {
+  border-color: #2fc890;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.24);
+}
+
+.templateCardLocked {
+  cursor: not-allowed;
+  border-color: rgba(255, 83, 83, 0.42);
+  background: rgba(86, 12, 12, 0.56);
+  color: rgba(255, 239, 214, 0.58);
+}
+
+.templateName {
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.templateStatusAvailable,
+.templateStatusLocked {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 2px;
+  padding: 5px 8px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.templateStatusAvailable {
+  border: 1px solid rgba(47, 200, 144, 0.72);
+  background: rgba(47, 200, 144, 0.18);
+  color: #c7ffe7;
+}
+
+.templateStatusLocked {
+  border: 1px solid rgba(255, 83, 83, 0.7);
+  background: rgba(255, 83, 83, 0.22);
+  color: #ffd5d5;
+}
+
+@media (max-width: 640px) {
+  .templateGrid {
+    grid-template-columns: 1fr;
+  }
 }

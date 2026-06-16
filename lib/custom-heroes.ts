@@ -5,8 +5,8 @@ import { Types, type PipelineStage } from 'mongoose'
 
 import dbConnect from '@/lib/dbConnect'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
-import { normalizeAbilityStats } from '@/lib/ability-editor-types'
-import { HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
+import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
@@ -55,6 +55,8 @@ interface SpiritStatsRecord {
 
 interface AbilityStatsRecord {
   abilities: AbilityStatsPayload['abilities']
+  secondaryAbilities?: AbilityStatsPayload['secondaryAbilities']
+  secondaryAbilityAnchorIndex?: AbilityStatsPayload['secondaryAbilityAnchorIndex']
 }
 
 interface HeroBundle {
@@ -68,6 +70,7 @@ interface HeroBundle {
 
 interface HeroAggregateRecord extends HeroRecord {
   heroInfo?: HeroInfoRecord | null
+  abilityStats?: AbilityStatsRecord | null
 }
 
 export class CustomHeroError extends Error {
@@ -136,6 +139,9 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
     nameType: record.nameType === 'text' ? 'text' : 'image',
     nameValue: getString(record.nameValue, DEFAULT_HERO_INFO.nameValue),
     nameColor: getString(record.nameColor, DEFAULT_HERO_INFO.nameColor),
+    nameFontSize: getString(record.nameFontSize, DEFAULT_HERO_INFO.nameFontSize ?? DEFAULT_HERO_NAME_FONT_SIZE),
+    nameFontFamily: getString(record.nameFontFamily, DEFAULT_HERO_INFO.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY),
+    nameFontWeight: getString(record.nameFontWeight, DEFAULT_HERO_INFO.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT),
     tag1Text: getString(record.tag1Text, DEFAULT_HERO_INFO.tag1Text),
     tag2Text: getString(record.tag2Text, DEFAULT_HERO_INFO.tag2Text),
     tag3Text: getString(record.tag3Text, DEFAULT_HERO_INFO.tag3Text),
@@ -153,7 +159,7 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
     ability4Icon: getString(record.ability4Icon, DEFAULT_HERO_INFO.ability4Icon),
     abilityCircleColor: getString(record.abilityCircleColor, DEFAULT_HERO_INFO.abilityCircleColor),
     abilityIconColor: getString(record.abilityIconColor, DEFAULT_HERO_INFO.abilityIconColor),
-    ...(getString(record.backstory) ? { backstory: getString(record.backstory) } : {}),
+    backstory: getString(record.backstory),
   }
 }
 
@@ -303,6 +309,9 @@ function serializeHeroInfo(heroInfo: HeroInfoRecord | null): HeroInfoDefinition 
     nameType: heroInfo.nameType,
     nameValue: heroInfo.nameValue,
     nameColor: heroInfo.nameColor,
+    nameFontSize: heroInfo.nameFontSize ?? DEFAULT_HERO_NAME_FONT_SIZE,
+    nameFontFamily: heroInfo.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY,
+    nameFontWeight: heroInfo.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT,
     tag1Text: heroInfo.tag1Text,
     tag2Text: heroInfo.tag2Text,
     tag3Text: heroInfo.tag3Text,
@@ -324,11 +333,18 @@ function serializeHeroInfo(heroInfo: HeroInfoRecord | null): HeroInfoDefinition 
   }
 }
 
-function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, actor: Actor | null = null, bookmarks: Set<string> | null = null): CustomHeroSummary {
+function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, actor: Actor | null = null, bookmarks: Set<string> | null = null, abilityStatsRecord: AbilityStatsRecord | null = null): CustomHeroSummary {
   const likedBy = hero.likedBy ?? []
   const viewerCanEdit = Boolean(actor?.ownerIds.some(ownerId => ownerId === hero.createdByUserId))
   const likedByCurrentUser = Boolean(actor?.ownerIds.some(ownerId => likedBy.includes(ownerId)))
   const heroId = hero._id.toString()
+  const heroInfoPayload = serializeHeroInfo(heroInfo)
+  const abilityStats = abilityStatsRecord
+    ? normalizeAbilityStats(abilityStatsRecord, {
+      displayName: hero.name,
+      heroInfo: heroInfoPayload,
+    })
+    : null
 
   return {
     id: heroId,
@@ -339,13 +355,14 @@ function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, act
     portrait: hero.portrait,
     render: hero.render,
     background: hero.background || hero.render || DEFAULT_BACKGROUND,
-    heroInfo: serializeHeroInfo(heroInfo),
+    heroInfo: heroInfoPayload,
     status: hero.status,
     likesCount: hero.likesCount ?? likedBy.length,
     likedByCurrentUser,
     bookmarkedByCurrentUser: bookmarks?.has(heroId) ?? false,
     allowCopies: hero.allowCopies ?? false,
     viewerCanEdit,
+    ...(abilityStats ? { abilityStats } : {}),
     publishedAt: serializeDate(hero.publishedAt),
     createdAt: hero.createdAt.toISOString(),
     updatedAt: hero.updatedAt.toISOString(),
@@ -476,6 +493,8 @@ async function buildHeroListPipeline(filters: CustomHeroListFilters): Promise<Pi
     { $match: { status: filters.status } },
     getLookupStage(HeroInfo.collection.name, 'heroInfo'),
     getUnwindStage('$heroInfo'),
+    getLookupStage(AbilityStats.collection.name, 'abilityStats'),
+    getUnwindStage('$abilityStats'),
     {
       $addFields: {
         recentLikeEvents: {
@@ -522,6 +541,12 @@ async function getHeroInfoMap(heroIds: Types.ObjectId[]) {
   const heroInfos = await HeroInfo.find({ heroId: { $in: heroIds } }).lean<HeroInfoRecord[]>()
 
   return new Map(heroInfos.map(heroInfo => [heroInfo.heroId.toString(), heroInfo]))
+}
+
+async function getAbilityStatsMap(heroIds: Types.ObjectId[]) {
+  const abilityStatsRecords = await AbilityStats.find({ heroId: { $in: heroIds } }).lean<Array<AbilityStatsRecord & { heroId: Types.ObjectId }>>()
+
+  return new Map(abilityStatsRecords.map(abilityStats => [abilityStats.heroId.toString(), abilityStats]))
 }
 
 async function getActorBookmarkSet(actor: Actor | null) {
@@ -571,7 +596,8 @@ export async function listCustomHeroPage(filters: CustomHeroListFilters): Promis
     { $limit: filters.limit },
   ])
   const bookmarks = await getActorBookmarkSet(actor)
-  const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks))
+  const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
+  const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
 
   return {
     heroes: summaries,
@@ -639,6 +665,7 @@ export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<Cust
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
+  const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
   const actor = {
     clerkId: ownerIds[0],
     storageUserId: ownerIds[0],
@@ -646,7 +673,7 @@ export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<Cust
   }
   const bookmarks = await getActorBookmarkSet(actor)
 
-  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks))
+  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks, abilityStatsById.get(hero._id.toString()) ?? null))
 }
 
 export async function listPrivateCustomHeroesForOwner(ownerIds: string[]): Promise<CustomHeroSummary[]> {
@@ -666,6 +693,7 @@ export async function listBookmarkedCustomHeroes(heroIds: Types.ObjectId[], owne
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
+  const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
   const actor = {
     clerkId: ownerIds[0],
     storageUserId: ownerIds[0],
@@ -673,7 +701,7 @@ export async function listBookmarkedCustomHeroes(heroIds: Types.ObjectId[], owne
   }
   const bookmarks = new Set(heroIds.map(heroId => heroId.toString()))
 
-  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks))
+  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks, abilityStatsById.get(hero._id.toString()) ?? null))
 }
 
 export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> {
@@ -727,6 +755,23 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
     throw new CustomHeroError('Failed to save hero', 500)
   }
 
+  const abilityStatsUpdate = {
+    $set: {
+      heroId: hero._id,
+      abilities: payload.abilityStats.abilities,
+      ...(payload.abilityStats.secondaryAbilities ? {
+        secondaryAbilities: payload.abilityStats.secondaryAbilities,
+        secondaryAbilityAnchorIndex: payload.abilityStats.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+      } : {}),
+    },
+    ...(!payload.abilityStats.secondaryAbilities ? {
+      $unset: {
+        secondaryAbilities: '',
+        secondaryAbilityAnchorIndex: '',
+      },
+    } : {}),
+  }
+
   await Promise.all([
     HeroInfo.findOneAndUpdate(
       { heroId: hero._id },
@@ -763,10 +808,7 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
     ),
     AbilityStats.findOneAndUpdate(
       { heroId: hero._id },
-      {
-        ...payload.abilityStats,
-        heroId: hero._id,
-      },
+      abilityStatsUpdate,
       { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
     ),
   ])
@@ -821,9 +863,12 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
     throw new CustomHeroError('Hero not found', 404)
   }
 
-  const heroInfo = await HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>()
+  const [heroInfo, abilityStats] = await Promise.all([
+    HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>(),
+    AbilityStats.findOne({ heroId: hero._id }).lean<AbilityStatsRecord | null>(),
+  ])
 
-  return serializeSummary(hero, heroInfo, actor)
+  return serializeSummary(hero, heroInfo, actor, null, abilityStats)
 }
 
 export async function recordCustomHeroCopy(id: string): Promise<void> {

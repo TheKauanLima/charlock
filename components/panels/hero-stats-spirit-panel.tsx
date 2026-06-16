@@ -17,6 +17,7 @@ interface HeroStatsSpiritPanelProps {
   stats?: PanelStat[]
   spiritPowerStat?: PanelStat
   isEditable?: boolean
+  showDetails?: boolean
   onStatsChange?: (stats: PanelStat[], changedStat: PanelStat) => void
   onSpiritPowerStatChange?: (stat: PanelStat) => void
 }
@@ -24,6 +25,7 @@ interface HeroStatsSpiritPanelProps {
 interface SpiritStatCellProps extends PanelStat {
   isPower?: boolean
   isEditable?: boolean
+  showDetails?: boolean
   onChange?: (updates: Partial<PanelStat>) => void
 }
 
@@ -66,7 +68,7 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, onChange }: SpiritStatCellProps) {
+function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, showDetails = false, onChange }: SpiritStatCellProps) {
   function handleClick() {
     const nextScaling = getNextScaling(scaling)
 
@@ -112,12 +114,12 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
         {unit ? <span className={styles.unit}>{unit}</span> : null}
         <span className={styles.label}>{label}</span>
       </span>
-      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
     </button>
   )
 }
 
-export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerStat: spiritPowerStatProp, isEditable = false, onStatsChange, onSpiritPowerStatChange }: HeroStatsSpiritPanelProps) {
+export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerStat: spiritPowerStatProp, isEditable = false, showDetails = false, onStatsChange, onSpiritPowerStatChange }: HeroStatsSpiritPanelProps) {
   const topStats = stats ?? buildTopSpiritStatsArray(statsSource)
   const spiritPowerStat = spiritPowerStatProp ?? buildSpiritPowerStat(statsSource)
 
@@ -149,7 +151,7 @@ export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerSt
       <div className={styles.topStats}>
         <div className={styles.row}>
           {topStats.map((stat, index) => (
-            <SpiritStatCell key={`spirit-top-${stat.label}`} {...stat} isEditable={isEditable} onChange={updates => handleTopStatChange(index, updates)} />
+            <SpiritStatCell key={`spirit-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} onChange={updates => handleTopStatChange(index, updates)} />
           ))}
         </div>
       </div>
@@ -159,7 +161,7 @@ export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerSt
           <h3 className={styles.powerTitle}>Spirit Power Impact</h3>
         </div>
         <div className={styles.powerContent}>
-          <SpiritStatCell {...spiritPowerStat} isPower isEditable={isEditable} onChange={handleSpiritPowerStatChange} />
+          <SpiritStatCell {...spiritPowerStat} isPower isEditable={isEditable} showDetails={showDetails} onChange={handleSpiritPowerStatChange} />
           {spiritPowerStat.description ? <p className={styles.description}>{spiritPowerStat.description}</p> : null}
         </div>
       </section>

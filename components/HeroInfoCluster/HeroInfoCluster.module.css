@@ -71,16 +71,33 @@
 }
 
 .abilities {
+  pointer-events: auto;
   display: flex;
   justify-content: center;
   gap: 10px;
 }
 
-.ability {
+.abilityViewerDock {
+  inset: 0;
+  z-index: 34;
+  width: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.abilityWrap {
+  position: relative;
   display: inline-flex;
   aspect-ratio: 1;
   width: clamp(54px, 4.5vw, 75px);
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.ability {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -89,9 +106,44 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
 
+.abilityWithSecondary {
+  overflow: visible;
+}
+
 .abilityIcon {
   width: 68%;
   height: 68%;
+  background: var(--hero-info-ability-icon-color);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.abilityIconWithSecondary {
+  transform: scale(0.96);
+}
+
+.secondaryAbility {
+  position: absolute;
+  right: -14%;
+  bottom: -14%;
+  z-index: 2;
+  display: inline-flex;
+  width: 68%;
+  min-width: 44px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
+}
+
+.secondaryAbilityIcon {
+  width: 72%;
+  height: 72%;
   background: var(--hero-info-ability-icon-color);
   mask-position: center;
   mask-repeat: no-repeat;
@@ -171,6 +223,44 @@
   border-color: rgba(47, 200, 144, 0.78);
   background: rgba(47, 200, 144, 0.14);
   color: #bafbe0;
+}
+
+.createFromHeroButton {
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 239, 215, 0.72);
+  border-radius: 999px;
+  background: rgba(123, 30, 28, 0.82);
+  color: #ffefd7;
+  opacity: 0.72;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.36),
+    0 10px 24px rgba(0, 0, 0, 0.34);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.createFromHeroButton svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 3;
+}
+
+.createFromHeroButton:hover,
+.createFromHeroButton:focus-visible {
+  background: rgba(181, 45, 42, 0.95);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.createFromHeroButton:focus-visible {
+  outline: 2px solid rgba(255, 239, 215, 0.95);
+  outline-offset: 3px;
 }
 
 .commentsToggle span {
@@ -299,6 +389,10 @@
     width: min(52vw, 500px);
   }
 
+  .abilityViewerDock {
+    width: auto;
+  }
+
   .tagText {
     font-size: 0.84rem;
   }
@@ -328,5 +422,9 @@
 
   .ability {
     width: 34px;
+  }
+
+  .abilityViewerDock {
+    width: auto;
   }
 }

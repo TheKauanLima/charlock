@@ -8,8 +8,63 @@
   pointer-events: none;
 }
 
+.focusShellPreview {
+  pointer-events: none;
+}
+
 .focusBackdrop {
   display: none;
+}
+
+.secondAbilityToggle {
+  position: absolute;
+  left: max(8px, calc(clamp(34px, 5vw, 92px) - 54px));
+  top: calc(50% + 92px);
+  z-index: 3;
+  display: grid;
+  width: 44px;
+  min-height: 54px;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  padding: 5px 4px;
+  border: 1px solid rgb(255 210 210 / 54%);
+  border-radius: 2px;
+  color: #fff1ee;
+  background: rgb(119 22 18 / 84%);
+  box-shadow: 0 10px 22px rgb(0 0 0 / 32%);
+  cursor: pointer;
+  pointer-events: auto;
+  text-transform: uppercase;
+}
+
+.secondAbilityToggle span,
+.secondAbilityToggle strong {
+  display: block;
+  line-height: 1;
+}
+
+.secondAbilityToggle span {
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.secondAbilityToggle strong {
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.secondAbilityToggleActive {
+  border-color: rgb(255 255 255 / 82%);
+  background: rgb(172 33 27 / 92%);
+  box-shadow:
+    0 10px 22px rgb(0 0 0 / 32%),
+    0 0 18px rgb(198 154 246 / 48%);
+}
+
+.secondAbilityToggle:focus-visible {
+  outline: 2px solid #fff3dd;
+  outline-offset: 3px;
 }
 
 .heroInfoCluster {
@@ -82,17 +137,29 @@
   gap: 10px;
 }
 
-.heroInfoAbility {
+.heroInfoAbilityWrap {
+  position: relative;
   display: inline-flex;
   aspect-ratio: 1;
   width: clamp(54px, 4.5vw, 75px);
   flex-shrink: 0;
+  overflow: visible;
+}
+
+.heroInfoAbility {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
   align-items: center;
   justify-content: center;
   border: 0;
   border-radius: 999px;
   box-shadow: 0 4px 10px rgb(0 0 0 / 18%);
   cursor: pointer;
+}
+
+.heroInfoAbilityWithSecondary {
+  overflow: visible;
 }
 
 .heroInfoAbilityActive {
@@ -121,6 +188,48 @@
   -webkit-mask-size: contain;
 }
 
+.heroInfoAbilityIconWithSecondary {
+  transform: scale(0.96);
+}
+
+.heroInfoSecondaryAbility {
+  position: absolute;
+  right: -14%;
+  bottom: -14%;
+  z-index: 2;
+  display: inline-flex;
+  width: 68%;
+  min-width: 44px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 28%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.heroInfoSecondaryAbilityActive {
+  outline: 2px solid #fff3dd;
+  outline-offset: 2px;
+  box-shadow:
+    0 4px 10px rgb(0 0 0 / 28%),
+    0 0 14px rgb(198 154 246 / 58%);
+}
+
+.heroInfoSecondaryAbilityIcon {
+  width: 72%;
+  height: 72%;
+  background: #ffe5b8;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
 .editorLayout {
   position: absolute;
   top: clamp(110px, 10vh, 190px);
@@ -138,7 +247,7 @@
   width: min(560px, calc(100vw - 72px));
   max-height: calc(100dvh - 170px);
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
   scrollbar-color: rgb(198 127 255 / 52%) rgb(255 255 255 / 8%);
   scrollbar-width: thin;
 }
@@ -147,12 +256,14 @@
   position: relative;
   width: 100%;
   min-height: auto;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .scrollContent {
   position: relative;
   min-height: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
   padding: 28px 30px 24px;
   background-image: url('/panorama/images/tooltips/ability/ability_tooltip_bg_png.png');
   background-size: 100% 100%;
@@ -322,11 +433,21 @@
 }
 
 .inlineStatEditor {
+  position: relative;
   display: grid;
   align-items: center;
   min-width: 0;
   color: #fff;
   cursor: pointer;
+}
+
+.inlineStatEditor:has([data-scaling-editor]:hover),
+.inlineStatEditor:has([data-scaling-editor]:focus-within),
+.mainCell:has([data-scaling-editor]:hover),
+.mainCell:has([data-scaling-editor]:focus-within),
+.lowerCell:has([data-scaling-editor]:hover),
+.lowerCell:has([data-scaling-editor]:focus-within) {
+  z-index: 30;
 }
 
 .inlineStatEditorTiming {
@@ -1037,6 +1158,8 @@
   grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
   width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .baseTierButton {
@@ -1346,7 +1469,8 @@
   grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
   gap: 8px;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-right: 4px;
   scrollbar-color: rgb(255 255 255 / 45%) rgb(255 255 255 / 8%);
   scrollbar-width: thin;
@@ -1553,17 +1677,20 @@
 }
 
 .inlineStatEditorSub {
-  display: inline-grid;
-  grid-template-columns: 18px max-content max-content max-content;
+  display: inline-flex;
   grid-template-areas: "icon value unit scaleButton";
-  column-gap: 4px;
+  column-gap: 0;
   align-items: center;
   width: max-content;
   min-width: 0;
+  max-width: max-content;
+  padding: 4px 10px;
 }
 
 .inlineStatEditorSub .iconButton {
   grid-area: icon;
+  flex: 0 0 18px;
+  margin-right: 4px;
 }
 
 .inlineStatEditorSub .valueInputLabel {
@@ -1573,6 +1700,7 @@
   width: max-content;
   min-width: 0;
   margin: 0;
+  flex: 0 0 auto;
 }
 
 .inlineStatEditorSub .unitInputLabel {
@@ -1581,7 +1709,8 @@
   align-items: center;
   width: max-content;
   min-width: 0;
-  margin: 0;
+  margin: 0 0 0 3px;
+  flex: 0 0 auto;
 }
 
 .inlineStatEditorSub .scalingValueWrap {
@@ -1589,13 +1718,17 @@
   display: inline-flex;
   align-items: center;
   width: max-content;
-  min-width: 34px;
+  min-width: 0;
   margin-left: 4px;
+}
+
+.inlineStatEditorSub .scalingValueWrap:empty {
+  display: none;
 }
 
 .inlineStatEditorSub .valueInput,
 .inlineStatEditorSub .unitInput {
-  min-width: 1.6em;
+  min-width: 0;
   padding-right: 2px;
   display: block;
   max-width: none;
