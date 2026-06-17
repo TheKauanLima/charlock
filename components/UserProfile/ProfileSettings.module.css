@@ -1,0 +1,312 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #050505;
+  color: #ffefd6;
+  font-family: Radiance, Arial, sans-serif;
+}
+
+.backgroundRender {
+  z-index: 0;
+  object-fit: contain;
+  object-position: right bottom;
+  opacity: 0.32;
+}
+
+.noiseLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image: url('/noise.png');
+  background-size: 220px 220px;
+  opacity: 0.07;
+}
+
+.panel {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  gap: 20px;
+  width: min(920px, calc(100% - 42px));
+  margin: 0 auto;
+  padding: 96px 0 54px;
+}
+
+.header,
+.section,
+.dangerZone {
+  border: 1px solid color-mix(in srgb, var(--settings-accent) 72%, #ffefd6 8%);
+  background:
+    linear-gradient(180deg, rgba(18, 19, 17, 0.94), rgba(8, 10, 9, 0.92)),
+    #111;
+  box-shadow: 0 0 26px color-mix(in srgb, var(--settings-accent) 22%, transparent), inset 0 0 0 1px rgba(255, 239, 214, 0.06);
+}
+
+.header {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 24px;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  clip-path: polygon(14% 0, 86% 0, 100% 22%, 100% 78%, 86% 100%, 14% 100%, 0 78%, 0 22%);
+  border: 2px solid var(--settings-accent);
+  background: rgba(0, 0, 0, 0.48);
+  overflow: hidden;
+  color: var(--settings-name);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 1.8rem;
+}
+
+.avatarImage {
+  object-fit: cover;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--settings-name);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  text-transform: uppercase;
+}
+
+.header h1,
+.section h2,
+.dangerZone h2 {
+  margin: 0;
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  font-size: clamp(3rem, 7vw, 5.4rem);
+}
+
+.identifier {
+  margin: 6px 0 0;
+  color: rgba(255, 239, 214, 0.68);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.form,
+.section {
+  display: grid;
+  gap: 18px;
+}
+
+.section {
+  padding: 22px;
+}
+
+.section h2,
+.dangerZone h2 {
+  font-size: 1.7rem;
+}
+
+.field,
+.textareaField {
+  display: grid;
+  gap: 8px;
+}
+
+.field span,
+.textareaField span {
+  color: var(--settings-name);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  text-transform: uppercase;
+}
+
+.field select,
+.textareaField textarea,
+.deleteForm input {
+  width: 100%;
+  border: 1px solid rgba(255, 239, 214, 0.22);
+  background: rgba(0, 0, 0, 0.48);
+  color: #ffefd6;
+  padding: 12px;
+  font: inherit;
+  outline: none;
+}
+
+.textareaField textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.field select:focus,
+.textareaField textarea:focus,
+.deleteForm input:focus {
+  border-color: var(--settings-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--settings-accent) 26%, transparent);
+}
+
+.toggle {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle span {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  border: 1px solid rgba(255, 239, 214, 0.28);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.52);
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.toggle span::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(255, 239, 214, 0.7);
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+
+.toggle input:checked + span {
+  border-color: var(--settings-accent);
+  background: color-mix(in srgb, var(--settings-accent) 28%, rgba(0, 0, 0, 0.52));
+}
+
+.toggle input:checked + span::after {
+  transform: translateX(24px);
+  background: #ffefd6;
+}
+
+.toggle strong {
+  color: rgba(255, 239, 214, 0.84);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.saveButton,
+.secondaryAction,
+.deleteForm button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
+}
+
+.saveButton {
+  justify-self: start;
+  border: 1px solid var(--settings-accent);
+  background: color-mix(in srgb, var(--settings-accent) 18%, transparent);
+  color: #ffefd6;
+  padding: 0 22px;
+}
+
+.saveButton:hover,
+.secondaryAction:hover {
+  border-color: #ffefd6;
+  background: rgba(255, 239, 214, 0.12);
+}
+
+.securitySection {
+  background:
+    repeating-linear-gradient(135deg, rgba(236, 189, 57, 0.2) 0 12px, rgba(0, 0, 0, 0.18) 12px 24px),
+    linear-gradient(180deg, rgba(18, 19, 17, 0.95), rgba(8, 10, 9, 0.94));
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.secondaryAction {
+  border: 1px solid rgba(255, 239, 214, 0.32);
+  background: transparent;
+  color: #ffefd6;
+  padding: 0 18px;
+}
+
+.dangerZone {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border-color: rgba(254, 52, 53, 0.82);
+  background:
+    repeating-linear-gradient(135deg, rgba(254, 52, 53, 0.16) 0 10px, rgba(0, 0, 0, 0.2) 10px 20px),
+    linear-gradient(180deg, rgba(36, 8, 8, 0.96), rgba(8, 5, 5, 0.94));
+}
+
+.dangerZone p {
+  margin: 0;
+  color: rgba(255, 239, 214, 0.78);
+}
+
+.dangerZone strong {
+  color: #ffefd6;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+}
+
+.error {
+  border: 1px solid rgba(254, 52, 53, 0.58);
+  background: rgba(254, 52, 53, 0.16);
+  padding: 10px 12px;
+}
+
+.deleteForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.deleteForm button {
+  border: 1px solid #fe3435;
+  background: rgba(254, 52, 53, 0.2);
+  color: #ffefd6;
+  padding: 0 20px;
+}
+
+.deleteForm button:hover {
+  background: rgba(254, 52, 53, 0.34);
+}
+
+@media (max-width: 720px) {
+  .panel {
+    width: min(100% - 28px, 920px);
+    padding-top: 88px;
+  }
+
+  .header,
+  .deleteForm {
+    grid-template-columns: 1fr;
+  }
+
+  .header {
+    display: grid;
+  }
+}

@@ -1,5 +1,45 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Valve Pulp';
+  src: url('/font/ValvePulp-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Valve Occult';
+  src: url('/font/ValveOccult-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Retail Demo';
+  src: url('/font/retaildemo-regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Retail Demo';
+  src: url('/font/retaildemo-bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Radiance';
+  src: url('/font/Radiance-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

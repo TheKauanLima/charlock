@@ -1,0 +1,87 @@
+.root {
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: -5px;
+  margin-right: -5px;
+}
+
+.rootEmpty {
+  visibility: hidden;
+}
+
+.root::after {
+  position: absolute;
+  top: -8px;
+  left: 100%;
+  z-index: 19;
+  width: 150px;
+  height: 40px;
+  content: "";
+}
+
+.rootRaised {
+  transform: translateY(-15px);
+}
+
+.icon {
+  display: block;
+  width: 34px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+.valueWrap {
+  pointer-events: auto;
+  position: absolute;
+  top: 50%;
+  left: calc(100% - 2px);
+  z-index: 40;
+  transform: translateY(-50%);
+  display: inline-flex;
+  min-width: 56px;
+  min-height: 40px;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 8px 10px 8px 2px;
+  opacity: 0;
+  outline: none;
+  transition: opacity 150ms ease-out;
+}
+
+.prefix {
+  margin-right: 2px;
+}
+
+.input {
+  pointer-events: auto;
+  width: 42px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  -webkit-text-stroke: inherit;
+  paint-order: inherit;
+  outline: none;
+}
+
+.valueText {
+  pointer-events: none;
+}
+
+.valueWrapVisible {
+  pointer-events: none;
+  opacity: 1;
+}
+
+.root:hover .valueWrap,
+.valueWrap:hover,
+.valueWrap:focus-within {
+  opacity: 1;
+}

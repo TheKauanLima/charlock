@@ -1,0 +1,555 @@
+.panel {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+  border-radius: 8px;
+  background: rgba(12, 10, 8, 0.86);
+  color: #ffefd7;
+}
+
+.panel::before {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 18px 18px;
+  border-radius: inherit;
+  content: "";
+  opacity: 0.4;
+}
+
+.background {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border-radius: inherit;
+}
+
+.header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 110px;
+  min-height: 110px;
+  overflow: visible;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.gunImage {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  width: 270px;
+  height: 110px;
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.9;
+}
+
+.weaponImageActions {
+  position: absolute;
+  top: 36px;
+  right: 10px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.weaponImageAction,
+.weaponImageUpload :global(button) {
+  display: inline-flex;
+  min-height: 28px;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 239, 214, 0.45);
+  border-radius: 3px;
+  background: rgba(16, 19, 13, 0.88);
+  padding: 5px 8px;
+  color: #ffefd7;
+  font-family: sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.weaponImageAction:hover,
+.weaponImageUpload :global(button:hover) {
+  border-color: rgba(255, 239, 214, 0.85);
+  background: rgba(16, 19, 13, 0.9);
+}
+
+.weaponImageUpload :global(label),
+.weaponImageUpload :global([data-ut-element="allowed-content"]),
+.weaponImageUpload :global([data-ut-element="label"]) {
+  display: none;
+}
+
+.headerContent {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 15px 15px;
+}
+
+.eyebrow {
+  display: block;
+  font-family: serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.weaponName {
+  display: block;
+  margin-top: 2px;
+  font-family: sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.weaponNameInput {
+  display: block;
+  width: min(370px, calc(100% - 160px));
+  border: 0;
+  margin-top: 2px;
+  background: transparent;
+  padding: 0;
+  color: #ffefd7;
+  font-family: sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+  outline: none;
+}
+
+.attributes {
+  display: flex;
+  width: min(370px, calc(100% - 140px));
+  min-height: 27px;
+  flex-wrap: wrap;
+}
+
+.attributes > .attribute {
+  margin-top: 12px;
+  margin-right: 8px;
+}
+
+.attributesEditor {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  gap: 8px;
+  cursor: text;
+}
+
+.attributesEditor .attribute {
+  margin-top: 0;
+  margin-right: 0;
+}
+
+.attributeInput {
+  box-sizing: content-box;
+  max-width: none;
+  flex: 0 0 auto;
+  border: 0;
+  color: #ffefd7;
+  outline: none;
+}
+
+.attributeInput::placeholder {
+  color: rgba(255, 239, 215, 0.42);
+}
+
+.attribute {
+  max-width: none;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  background: rgba(16, 19, 13, 0.5);
+  padding: 0 6px 1px;
+  font-family: sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.dps {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 8px);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  font-family: sans-serif;
+  font-size: 105%;
+  font-weight: 700;
+}
+
+.dpsIcon {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background: url('/panorama/images/icons/properties/damage_bullet_color.svg') center / contain no-repeat;
+}
+
+.inlineValue {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.mutedUnit {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 0.9em;
+  font-weight: 700;
+}
+
+.falloff {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  width: max-content;
+  flex-direction: column;
+  background: rgba(16, 19, 13, 0.93);
+  padding: 0 6px 4px;
+}
+
+.falloffLabel {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  margin: 0 auto -6px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.35;
+}
+
+.falloffValues {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.falloffValue,
+.falloffValueFirst {
+  display: flex;
+  min-width: 42px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 0 3px;
+}
+
+.falloffValueFirst {
+  margin-right: 0;
+}
+
+.falloffInput {
+  width: 28px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #ffefd7;
+  font: inherit;
+  font-weight: 800;
+  text-align: right;
+  outline: none;
+}
+
+.falloffArrow {
+  width: 18px;
+  height: 20px;
+  align-self: center;
+  background: url('/panorama/images/control_icons/arrow_right_png.png') center / contain no-repeat;
+}
+
+.body {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  overflow: visible;
+  border-radius: 0 0 8px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 14px 16px 0;
+}
+
+.description {
+  margin: -2px 0 10px;
+  font-family: sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.descriptionInput {
+  min-height: 46px;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  margin: -2px 0 10px;
+  background: transparent;
+  padding: 0;
+  color: #ffefd7;
+  font-family: sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.25;
+  opacity: 0.9;
+  outline: none;
+}
+
+.descriptionInput::placeholder {
+  color: rgba(255, 239, 215, 0.35);
+}
+
+.rows {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.row,
+.bottomRow {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 1fr;
+  gap: 4px;
+}
+
+.bottomBand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 0 0 8px 8px;
+  margin: 12px -16px 0;
+  overflow: visible;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 16px;
+}
+
+.statCell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-height: 36px;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  overflow: visible;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 8px;
+  color: #fff;
+  text-align: left;
+  font-family: sans-serif;
+}
+
+.statCell:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.statCell:has([data-scaling-editor]:hover),
+.statCell:has([data-scaling-editor]:focus-within) {
+  z-index: 30;
+}
+
+.editableCell {
+  border: 0;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.editableCell:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.statIcon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.statContent {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+  overflow: visible;
+  font-family: sans-serif;
+  line-height: 1.1;
+}
+
+.statInput {
+  width: auto;
+  min-width: 32px;
+  max-width: 64px;
+  flex-shrink: 0;
+  border: 0;
+  border-bottom: 1px dashed rgba(255, 239, 215, 0.55);
+  background: transparent;
+  padding: 0;
+  font-family: sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  outline: none;
+  transition: border-color 150ms ease-out;
+}
+
+.statInput:focus {
+  border-color: #2fc890;
+}
+
+.statValue {
+  flex-shrink: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.statUnit {
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.statLabel {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+.weaponLabel {
+  color: rgba(255, 239, 215, 0.95);
+}
+
+.weaponValue {
+  color: #ffefd7;
+}
+
+.armorLabel {
+  color: rgba(243, 247, 239, 0.9);
+}
+
+.armorValue {
+  color: #f3f7ef;
+}
+
+.techLabel {
+  color: rgba(240, 215, 255, 0.95);
+}
+
+.techValue {
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid rgba(138, 85, 179, 0.2);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.saveButton,
+.cancelButton {
+  border: 0;
+  border-radius: 3px;
+  padding: 6px 16px;
+  color: rgba(255, 255, 255, 0.95);
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  transition:
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.saveButton {
+  background: rgba(22, 163, 74, 0.8);
+}
+
+.saveButton:hover {
+  background: rgb(22, 163, 74);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.cancelButton {
+  background: rgba(220, 38, 38, 0.7);
+}
+
+.cancelButton:hover {
+  background: rgba(220, 38, 38, 0.9);
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.3);
+}
+
+@media (min-width: 900px) {
+  .row,
+  .bottomRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .gunImage {
+    opacity: 0.35;
+  }
+
+  .attributes {
+    width: 100%;
+  }
+}

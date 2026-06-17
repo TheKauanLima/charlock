@@ -1,0 +1,1764 @@
+.focusShell {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  min-height: 100dvh;
+  color: #f4ecd8;
+  font-family: "Retail Demo", var(--font-geist-sans), Arial, sans-serif;
+  pointer-events: none;
+}
+
+.focusShellPreview {
+  pointer-events: none;
+}
+
+.focusBackdrop {
+  display: none;
+}
+
+.secondAbilityToggle {
+  position: absolute;
+  left: max(8px, calc(clamp(34px, 5vw, 92px) - 54px));
+  top: calc(50% + 92px);
+  z-index: 3;
+  display: grid;
+  width: 44px;
+  min-height: 54px;
+  align-content: center;
+  justify-items: center;
+  gap: 1px;
+  padding: 5px 4px;
+  border: 1px solid rgb(255 210 210 / 54%);
+  border-radius: 2px;
+  color: #fff1ee;
+  background: rgb(119 22 18 / 84%);
+  box-shadow: 0 10px 22px rgb(0 0 0 / 32%);
+  cursor: pointer;
+  pointer-events: auto;
+  text-transform: uppercase;
+}
+
+.secondAbilityToggle span,
+.secondAbilityToggle strong {
+  display: block;
+  line-height: 1;
+}
+
+.secondAbilityToggle span {
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.secondAbilityToggle strong {
+  font-size: 0.74rem;
+  font-weight: 950;
+}
+
+.secondAbilityToggleActive {
+  border-color: rgb(255 255 255 / 82%);
+  background: rgb(172 33 27 / 92%);
+  box-shadow:
+    0 10px 22px rgb(0 0 0 / 32%),
+    0 0 18px rgb(198 154 246 / 48%);
+}
+
+.secondAbilityToggle:focus-visible {
+  outline: 2px solid #fff3dd;
+  outline-offset: 3px;
+}
+
+.heroInfoCluster {
+  position: absolute;
+  left: clamp(34px, 5vw, 92px);
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  width: min(42vw, 560px);
+  gap: 14px;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.heroInfoNameRow {
+  display: flex;
+  justify-content: center;
+}
+
+.heroInfoNameImage {
+  display: block;
+  aspect-ratio: 1701 / 564;
+  width: 100%;
+  background: #ffefd6;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.heroInfoNameText {
+  font-size: clamp(1.3rem, 2vw, 2.7rem);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.heroInfoTags {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 10px;
+  margin-block: 12px;
+}
+
+.heroInfoTag {
+  display: inline-flex;
+  width: fit-content;
+  min-width: 0;
+  min-height: 28px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 18%);
+}
+
+.heroInfoTag span {
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.heroInfoAbilities {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.heroInfoAbilityWrap {
+  position: relative;
+  display: inline-flex;
+  aspect-ratio: 1;
+  width: clamp(54px, 4.5vw, 75px);
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.heroInfoAbility {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 18%);
+  cursor: pointer;
+}
+
+.heroInfoAbilityWithSecondary {
+  overflow: visible;
+}
+
+.heroInfoAbilityActive {
+  outline: 2px solid #fff3dd;
+  outline-offset: 4px;
+  box-shadow:
+    0 4px 10px rgb(0 0 0 / 18%),
+    0 0 0 3px rgb(198 154 246 / 42%),
+    0 0 22px rgb(198 154 246 / 55%);
+}
+
+.heroInfoAbility:focus-visible {
+  outline: 2px solid #fff3dd;
+  outline-offset: 4px;
+}
+
+.heroInfoAbilityIcon {
+  width: 68%;
+  height: 68%;
+  background: #ffe5b8;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.heroInfoAbilityIconWithSecondary {
+  transform: scale(0.96);
+}
+
+.heroInfoSecondaryAbility {
+  position: absolute;
+  right: -14%;
+  bottom: -14%;
+  z-index: 2;
+  display: inline-flex;
+  width: 68%;
+  min-width: 44px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgb(0 0 0 / 28%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.heroInfoSecondaryAbilityActive {
+  outline: 2px solid #fff3dd;
+  outline-offset: 2px;
+  box-shadow:
+    0 4px 10px rgb(0 0 0 / 28%),
+    0 0 14px rgb(198 154 246 / 58%);
+}
+
+.heroInfoSecondaryAbilityIcon {
+  width: 72%;
+  height: 72%;
+  background: #ffe5b8;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.editorLayout {
+  position: absolute;
+  top: clamp(110px, 10vh, 190px);
+  right: clamp(44px, 11vw, 210px);
+  display: grid;
+  grid-template-columns: 46px minmax(500px, 560px);
+  gap: 10px;
+  align-items: start;
+  pointer-events: auto;
+}
+
+.mainEditorColumn {
+  display: grid;
+  gap: 10px;
+  width: min(560px, calc(100vw - 72px));
+  max-height: calc(100dvh - 170px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-color: rgb(198 127 255 / 52%) rgb(255 255 255 / 8%);
+  scrollbar-width: thin;
+}
+
+.tooltipSurface {
+  position: relative;
+  width: 100%;
+  min-height: auto;
+  overflow: hidden;
+}
+
+.scrollContent {
+  position: relative;
+  min-height: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 28px 30px 24px;
+  background-image: url('/panorama/images/tooltips/ability/ability_tooltip_bg_png.png');
+  background-size: 100% 100%;
+  background-position: center;
+}
+
+.tooltipTexture {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.0;
+  background-image: url('/panorama/images/tooltips/ability/ability_texture_layer_png.png');
+  background-size: cover;
+  mix-blend-mode: screen;
+}
+
+.header,
+.subStats,
+.sections {
+  position: relative;
+  z-index: 1;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 162px;
+  gap: 16px;
+  align-items: start;
+}
+
+.titleGroup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.abilityIconButton {
+  display: none;
+}
+
+.nameInputWrap input {
+  width: 100%;
+  border: 0;
+  color: #fff5dc;
+  background: transparent;
+  font-family: "Valve Occult", Georgia, 'Times New Roman', serif;
+  font-size: 2.15rem;
+  font-weight: 900;
+  line-height: 1;
+  outline: none;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 55%);
+}
+
+.nameInputWrap input:focus,
+.sectionTitleLabel input:focus,
+.richEditable:focus,
+.inlineStatEditor input:focus {
+  outline: none;
+  /* outline: 1px solid rgb(206 146 255 / 68%); */
+  outline-offset: 2px;
+}
+
+.timingPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+}
+
+.chargeToggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: rgb(255 255 255 / 72%);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.chargeToggle input {
+  accent-color: #a77cdf;
+}
+
+.chargeGrid {
+  display: flex;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.subStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0px;
+  margin-top: 0px;
+}
+
+.sections {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.section {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding-inline: 22px;
+}
+
+.sectionTitleLabel input,
+.mainCellTitleLabel input {
+  width: 100%;
+  border: 0;
+  color: rgb(255 255 255 / 62%);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sideTabs {
+  display: grid;
+  gap: 8px;
+  margin-top: 76px;
+}
+
+.sideTabs button,
+.returnPanel button,
+.richToolbar button,
+.gridActions button,
+.iconHeader button,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(189 126 255 / 55%);
+  color: #f7e9ff;
+  background: rgb(21 16 27 / 58%);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 22%);
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+}
+
+.sideTabs button {
+  width: 38px;
+  min-height: 38px;
+  border-radius: 2px;
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sideTabs svg,
+.returnPanel svg,
+.richToolbar svg,
+.iconHeader svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sideTabs button:hover,
+.returnPanel button:hover,
+.richToolbar button:hover,
+.gridActions button:hover,
+.iconButton:hover {
+  border-color: rgb(235 204 255 / 88%);
+  background: rgb(73 36 94 / 78%);
+}
+
+.inlineStatEditor {
+  position: relative;
+  display: grid;
+  align-items: center;
+  min-width: 0;
+  color: #fff;
+  cursor: pointer;
+}
+
+.inlineStatEditor:has([data-scaling-editor]:hover),
+.inlineStatEditor:has([data-scaling-editor]:focus-within),
+.mainCell:has([data-scaling-editor]:hover),
+.mainCell:has([data-scaling-editor]:focus-within),
+.lowerCell:has([data-scaling-editor]:hover),
+.lowerCell:has([data-scaling-editor]:focus-within) {
+  z-index: 30;
+}
+
+.inlineStatEditorTiming {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 4px 12px;
+  background: rgb(255 255 255 / 15%);
+  color: #170f1f;
+  width: fit-content;
+}
+
+.inlineStatEditorTiming .iconButton {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-right: 3px;
+}
+
+.inlineStatEditorTiming .valueInputLabel,
+.inlineStatEditorTiming .unitInputLabel,
+.inlineStatEditorTiming .statLabelInputLabel {
+  display: flex;
+  align-items: center;
+  grid-area: auto;
+}
+
+.inlineStatEditorTiming .valueInput {
+  color: #fffbeb;
+  text-align: left;
+}
+
+.inlineStatEditorTiming .unitInput {
+  color: #afabaf;
+  text-align: left;
+}
+
+.inlineStatEditorSub {
+  display: inline-grid;
+  grid-template-columns: 18px max-content max-content max-content;
+  grid-template-areas: "icon value unit scaleButton";
+  align-items: center;
+  justify-content: start;
+  column-gap: 4px;
+  width: max-content;
+  min-width: 0;
+  padding: 4px 22px 4px 9px;
+  background: rgb(255 255 255 / 15%);
+  color: #170f1f;
+}
+
+.inlineStatEditorSub .iconButton {
+  width: 18px;
+  height: 18px;
+  margin-right: 0;
+}
+
+.inlineStatEditorSub .valueInputLabel,
+.inlineStatEditorSub .unitInputLabel,
+.inlineStatEditorSub .statLabelInputLabel {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  grid-area: auto;
+}
+
+.inlineStatEditorSub .valueInput {
+  color: #fffbeb;
+  text-align: left;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  margin-left: -60px;
+}
+
+.inlineStatEditorSub .unitInput {
+  color: #afabaf;
+  text-align: left;
+}
+
+.inlineStatEditorSub .statLabelInputLabel {
+  min-width: 0px;
+  margin-right: 0px;
+}
+
+.inlineStatEditorSub .statLabelInput {
+  text-align: center;
+}
+
+.inlineStatEditorScaled {
+  box-shadow: inset 0 0 0 1px rgb(198 127 255 / 62%);
+}
+
+.inlineStatEditorMain {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 65px;
+  padding: 0px 12px 0px;
+  background: rgb(255 255 255 / 16%);
+  border: 1px solid transparent;
+}
+
+.mainRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.inlineStatEditorLower {
+  width: max-content;
+  grid-template-columns: 26px max-content max-content 1fr max-content;
+  grid-template-areas: "icon value append label scaleButton";
+  align-items: center;
+  column-gap: 0px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.iconButton {
+  grid-area: icon;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.propertyIcon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.inlineStatEditorTiming .propertyIcon,
+.inlineStatEditorSub .propertyIcon {
+  color: #7e61a1;
+}
+
+.valueInputLabel {
+  grid-area: value;
+}
+
+.unitInputLabel {
+  grid-area: unit;
+}
+
+.appendInputLabel {
+  grid-area: append;
+  min-width: 3ch;
+  margin-inline: -3px 3px;
+}
+
+.statLabelInputLabel {
+  grid-area: label;
+}
+
+.scaleInputLabel {
+  grid-area: scale;
+}
+
+.scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: 2px;
+}
+
+.scalingValueWrap:empty {
+  display: none;
+}
+
+.scalingValueWrap > span {
+  margin-top: 0;
+  margin-right: -5px;
+}
+
+.inlineStatEditor input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font-family: "Retail Demo", sans-serif;
+  outline: none;
+  text-align: center;
+}
+
+.valueInput {
+  max-width: 58px;
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.inlineStatEditorMain .valueInput {
+  max-width: 72px;
+  font-size: 1.55rem;
+  color: rgb(251 240 208 / 100%);
+}
+
+.inlineStatEditorMain .iconButton {
+  width: 20px;
+  height: 20px;
+}
+
+.inlineStatEditorMain .propertyIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.inlineStatEditorMain .iconButton {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .valueInputLabel {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .appendInputLabel {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorMain .unitInputLabel {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+  margin-top: -9px;
+  width: 100%;
+}
+
+.inlineStatEditorMain .unitInput {
+  color: rgb(251 240 208 / 100%);
+  text-align: center;
+  flex: 0 0 auto;
+  max-width: none;
+}
+
+.inlineStatEditorMain .appendInputLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+}
+
+.inlineStatEditorMain .appendInput {
+  color: rgb(169 166 166 / 100%);
+  font-size: 1.1rem;
+  font-weight: 950;
+  text-align: left;
+}
+
+.inlineStatEditorMain .scalingValueWrap {
+  position: absolute;
+  top: -12px;
+  right: 5px;
+  margin: 0;
+}
+
+.inlineStatEditorMain .scalingValueWrap > span {
+  margin: 0;
+}
+
+.inlineStatEditorMain.inlineStatEditorScaled {
+  box-shadow: none;
+}
+
+.inlineStatEditorLower.inlineStatEditorScaled {
+  box-shadow: none;
+}
+
+.inlineStatEditorMain[data-scaling="spirit"] {
+  border-color: #48315e;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(50 31 65 / 100%) 70%),
+    rgb(255 255 255 / 0%);
+}
+
+.inlineStatEditorMain[data-scaling="courage"],
+.inlineStatEditorMain[data-scaling="melee"] {
+  border-color: #4d311a;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(48 35 18 / 100%) 70%),
+    rgb(255 255 255 / 0%);
+}
+
+.inlineStatEditorMain[data-scaling="boon"] {
+  border-color: #36554a;
+  border-width: 2px;
+  background:
+    radial-gradient(ellipse at center, transparent 10%, rgb(36 60 51 / 100%) 100%),
+    rgb(255 255 255 / 0%);
+}
+
+.unitInput {
+  max-width: 36px;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.statLabelInput {
+  color: rgb(255 255 255 / 88%);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+.inlineStatEditorTiming .valueInput,
+.inlineStatEditorTiming .unitInput,
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput,
+.inlineStatEditorLower .valueInput,
+.inlineStatEditorLower .unitInput,
+.appendInput {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  min-width: 0;
+}
+
+.inlineStatEditorLower .valueInput {
+  width: 100%;
+  max-width: 42px;
+  color: rgb(251 240 208 / 100%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .unitInput {
+  width: 100%;
+  max-width: 24px;
+  color: rgb(251 240 208 / 80%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .appendInputLabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  margin-left: 2px;
+}
+
+.inlineStatEditorLower .appendInput {
+  width: 100%;
+  color: rgb(169 166 166 / 100%);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: left;
+}
+
+.inlineStatEditorLower .statLabelInput {
+  width: 100%;
+  color: rgb(255 255 255 / 84%);
+  text-align: left;
+}
+
+.inlineStatEditorLower .scalingValueWrap {
+  justify-self: start;
+  width: max-content;
+  min-width: 0;
+  margin-left: 3px;
+}
+
+.inlineStatEditorLower .scalingValueWrap > span {
+  margin: 0;
+}
+
+.richTextEditor {
+  display: grid;
+  gap: 8px;
+}
+
+.richToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.richToolbar button,
+.gridActions button {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 2px;
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.richEditable {
+  width: 100%;
+  min-height: 2.7em;
+  border: 0;
+  color: #f0e8dc;
+  background: transparent;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.35;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.richEditable strong {
+  font-weight: 900;
+}
+
+.richEditable:empty::before {
+  color: rgb(255 255 255 / 38%);
+  content: 'Write ability text...';
+}
+
+.richPreview strong {
+  color: #fff;
+}
+
+.darkenText {
+  color: #80776f;
+}
+
+.richColorSpirit {
+  color: #d6a1ff;
+}
+
+.richColorHealing {
+  color: #51f596;
+}
+
+.richColorDamage {
+  color: #ffb05a;
+}
+
+.richColorWarning {
+  color: #f7d65a;
+}
+
+.inlineIcon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0 3px;
+  vertical-align: -4px;
+  background: currentColor;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.inlineIconOriginalColor {
+  background-color: transparent;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.inlineIconCaret {
+  display: inline;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+}
+
+.inlineIconPending {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin: 0 3px;
+  vertical-align: -4px;
+  border: 1px solid currentColor;
+  opacity: 0.65;
+}
+
+.swatchMenu {
+  position: relative;
+  display: inline-flex;
+}
+
+.swatchPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid rgb(205 142 255 / 28%);
+  background: rgb(20 18 25 / 94%);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+}
+
+.swatchPanel button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 30%);
+  box-shadow: none;
+}
+
+.swatchPanel .swatchSpirit {
+  background-color: #d6a1ff;
+}
+
+.swatchPanel .swatchHealing {
+  background-color: #51f596;
+}
+
+.swatchPanel .swatchDamage {
+  background-color: #ffb05a;
+}
+
+.swatchPanel .swatchWarning {
+  background-color: #f7d65a;
+}
+
+.swatchPanel .swatchSpirit:hover {
+  background-color: #d6a1ff;
+}
+
+.swatchPanel .swatchHealing:hover {
+  background-color: #51f596;
+}
+
+.swatchPanel .swatchDamage:hover {
+  background-color: #ffb05a;
+}
+
+.swatchPanel .swatchWarning:hover {
+  background-color: #f7d65a;
+}
+
+.gridEditor {
+  display: grid;
+  gap: 7px;
+}
+
+.gridActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gridActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.mainCellGrid {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+}
+
+.mainCell,
+.subStat {
+  min-width: 0;
+}
+
+.mainCell {
+  position: relative;
+  display: grid;
+  gap: 4px;
+}
+
+.mainCellTitleLabel {
+  display: block;
+  min-width: 0;
+}
+
+.mainCellTitleLabel input {
+  min-width: 0;
+  color: rgb(255 255 255 / 82%);
+  font-size: 0.7rem;
+  text-align: left;
+}
+
+.subStat {
+  position: relative;
+}
+
+.removeStatButton {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 72%);
+  background: rgb(0 0 0 / 18%);
+  opacity: 0.72;
+}
+
+.removeStatButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeStatButton svg {
+  width: 10px;
+  height: 10px;
+}
+
+.removeGridCellButton,
+.removeLowerCellButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 72%);
+  background: rgb(0 0 0 / 18%);
+  opacity: 0.72;
+}
+
+.removeGridCellButton:hover,
+.removeLowerCellButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeGridCellButton svg,
+.removeLowerCellButton svg {
+  width: 10px;
+  height: 10px;
+}
+
+.removeGridCellButton {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  z-index: 3;
+}
+
+.removeLowerCellButton {
+  flex: 0 0 auto;
+  margin-left: 5px;
+}
+
+.inlineStatEditorSub .valueInputLabel {
+  grid-area: value;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  grid-area: unit;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-width: 34px;
+  margin-left: 2px;
+}
+
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput {
+  min-width: 0;
+  max-width: none;
+}
+
+.lowerCellGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 5px;
+  padding: 9px 12px;
+  column-gap: 14px;
+  row-gap: 8px;
+  background: rgb(255 255 255 / 16%);
+}
+
+.lowerCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.tierSystem {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.baseTierButton {
+  position: fixed;
+  z-index: 245;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid rgb(255 210 210 / 54%);
+  border-radius: 2px;
+  color: #fff1ee;
+  background: rgb(119 22 18 / 84%);
+  font-size: 1rem;
+  font-weight: 950;
+  box-shadow: 0 10px 22px rgb(0 0 0 / 32%);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.baseTierButtonActive {
+  border-color: rgb(255 255 255 / 82%);
+  background: rgb(172 33 27 / 92%);
+}
+
+.tierBoxes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.tierBox {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr 5fr;
+  aspect-ratio: 163 / 163;
+  min-height: 0;
+  overflow: hidden;
+  border: 0;
+  color: #f5eadb;
+  background-image: url('/panorama/images/tooltips/ability/ap_rect_cant_afford_png.png');
+  background-size: 100% 100%;
+  background-position: center;
+  cursor: pointer;
+  transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.tierBox::after {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: '';
+  background-image: url('/panorama/images/tooltips/ability/ap_rect_owned_png.png');
+  background-size: 100% 100%;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 640ms ease;
+}
+
+.tierBoxActive {
+  background-image: url('/panorama/images/tooltips/ability/ap_rect_default_png.png');
+}
+
+.tierBoxFlashing {
+  filter: brightness(1.18);
+}
+
+.tierBoxFlashing::after {
+  opacity: 1;
+}
+
+.tierHeader {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 0;
+  background: #11130e;
+  margin: 3px 3px 0 3px; 
+  color: #f7e9ff;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.tierApIcon {
+  width: 14px;
+  height: 14px;
+  background: #c69af6;
+  mask-image: url('/panorama/images/hud/ap_icon.svg');
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.tierTextShell {
+  position: relative;
+  z-index: 1;
+  display: block;
+  min-height: 0;
+  padding: 4px 8px 8px;
+}
+
+.tierTextToolbar {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.tierTextBoldButton {
+  position: relative;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgb(198 154 246 / 60%);
+  color: #f7e9ff;
+  background: rgb(17 19 14 / 80%);
+  font-size: 0.72rem;
+  font-weight: 950;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.tierTextBoldButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.tierTextEditor {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  align-items: center;
+  width: 100%;
+  min-height: calc(100% - 4px);
+  padding: 8px 8px 6px;
+  border: 1px solid rgb(245 234 219 / 22%);
+  border-radius: 2px;
+  color: #f5eadb;
+  background: rgb(255 255 255 / 7%);
+  font-size: 1.6rem;
+  font-weight: 100;
+  line-height: 1.18;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: text;
+  outline: none;
+  overflow: hidden;
+}
+
+.tierTextEditorDense {
+  font-size: 1rem;
+  line-height: 1.08;
+}
+
+.tierTextEditor strong {
+  color: #fff7e7;
+  font-weight: 950;
+}
+
+.returnPanel {
+  position: absolute;
+  right: 0;
+  top: -50px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: end;
+  grid-column: 2;
+}
+
+.returnPanel p,
+.returnPanel h2 {
+  display: none;
+}
+
+.saveReturnButton,
+.cancelButton {
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 2px;
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.saveReturnButton {
+  color: #201827;
+  border-color: rgb(242 214 255 / 88%);
+  background: rgb(255 255 255 / 78%);
+}
+
+.cancelButton {
+  color: #efe2ff;
+  background: rgb(21 16 27 / 58%);
+}
+
+.iconBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgb(0 0 0 / 52%);
+  pointer-events: auto;
+}
+
+.iconModal {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  width: min(700px, 100%);
+  max-height: min(700px, calc(100dvh - 44px));
+  overflow: hidden;
+  padding: 16px;
+  border: 1px solid rgb(198 127 255 / 46%);
+  border-radius: 3px;
+  background: rgb(20 18 25 / 94%);
+  box-shadow: 0 24px 70px rgb(0 0 0 / 55%);
+}
+
+.iconModalAbility {
+  width: min(820px, calc(100vw - 44px));
+}
+
+.iconHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  gap: 10px;
+}
+
+.iconHeader label {
+  position: relative;
+  display: grid;
+}
+
+.iconHeader label svg {
+  position: absolute;
+  left: 10px;
+  bottom: 9px;
+  color: rgb(255 255 255 / 58%);
+}
+
+.iconHeader input {
+  height: 38px;
+  min-width: 0;
+  padding: 0 10px 0 34px;
+  border: 1px solid rgb(205 142 255 / 34%);
+  color: #f8ecff;
+  background: rgb(255 255 255 / 10%);
+  outline: none;
+}
+
+.iconHeader button {
+  width: 38px;
+  height: 38px;
+}
+
+.iconColorPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.iconColorSwatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgb(205 142 255 / 34%);
+  color: #efe2ff;
+  background: rgb(255 255 255 / 9%);
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.iconColorSwatch:not(:empty) {
+  min-width: 70px;
+}
+
+.iconColorSwatchActive {
+  border-color: rgb(255 255 255 / 86%);
+  box-shadow: 0 0 0 1px rgb(198 127 255 / 42%);
+}
+
+.iconGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(126px, 1fr));
+  gap: 8px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgb(255 255 255 / 45%) rgb(255 255 255 / 8%);
+  scrollbar-width: thin;
+}
+
+.iconGrid button {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid rgb(205 142 255 / 24%);
+  border-radius: 2px;
+  color: #efe2ff;
+  background: rgb(255 255 255 / 9%);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.iconGridAbility {
+  grid-template-columns: repeat(2, max-content);
+  align-items: start;
+  justify-content: center;
+  justify-items: center;
+  column-gap: 34px;
+  row-gap: 14px;
+  max-height: min(520px, calc(100dvh - 150px));
+  padding: 2px 6px 2px 2px;
+}
+
+.iconGridTitle {
+  margin: 0;
+  color: #f5eadb;
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.iconAbilityGroup {
+  display: grid;
+  grid-template-columns: repeat(4, 72px);
+  gap: 10px;
+}
+
+.iconAbilityGroupTitle {
+  grid-column: 1 / -1;
+  margin: 0 0 -2px;
+  color: rgb(245 234 219 / 82%);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.iconGridAbility button {
+  display: inline-flex;
+  width: 72px;
+  min-width: 72px;
+  height: 72px;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  background: rgb(255 255 255 / 10%);
+  text-align: center;
+}
+
+.iconGridAbility button:hover,
+.iconGridAbility button:focus-visible {
+  border-color: rgb(255 255 255 / 78%);
+  background: rgb(255 255 255 / 18%);
+}
+
+.iconPreview {
+  width: 24px;
+  height: 24px;
+  background: #ffffff;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.iconPreviewAbility {
+  width: 46px;
+  height: 46px;
+  background-color: #ffffff;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+}
+
+.iconPreviewImage {
+  background-color: transparent;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.propertyIconOriginalColor,
+.iconPreviewOriginalColor {
+  background-color: transparent;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.inlineStatEditorSub .valueInputLabel,
+.inlineStatEditorSub .unitInputLabel,
+.inlineStatEditorSub .statLabelInputLabel,
+.inlineStatEditorSub .scalingValueWrap {
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorSub .statLabelInputLabel {
+  min-width: 0;
+  margin-left: 8px;
+  margin-right: 6px;
+}
+
+.inlineStatEditorSub .statLabelInput {
+  min-width: 0;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  margin-left: 6px;
+}
+
+.inlineStatEditorSub + .removeStatButton,
+.removeStatButton {
+  width: 14px;
+  height: 14px;
+}
+
+.removeStatButton svg {
+  width: 9px;
+  height: 9px;
+}
+
+@media (max-width: 1100px) {
+  .editorLayout {
+    right: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .editorLayout {
+    top: 86px;
+    right: 16px;
+    left: 16px;
+    grid-template-columns: 1fr;
+  }
+
+  .sideTabs {
+    display: flex;
+    margin: 0;
+  }
+
+  .tooltipSurface {
+    width: 100%;
+    min-height: auto;
+    padding: 24px 18px;
+  }
+
+  .header {
+    grid-template-columns: 1fr;
+  }
+
+  .returnPanel {
+    position: relative;
+    top: auto;
+    grid-column: 1;
+    justify-content: start;
+    order: -1;
+  }
+
+  .mainCellGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inlineStatEditorSub {
+  display: inline-flex;
+  grid-template-areas: "icon value unit scaleButton";
+  column-gap: 0;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  max-width: max-content;
+  padding: 4px 10px;
+}
+
+.inlineStatEditorSub .iconButton {
+  grid-area: icon;
+  flex: 0 0 18px;
+  margin-right: 4px;
+}
+
+.inlineStatEditorSub .valueInputLabel {
+  grid-area: value;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorSub .unitInputLabel {
+  grid-area: unit;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  margin: 0 0 0 3px;
+  flex: 0 0 auto;
+}
+
+.inlineStatEditorSub .scalingValueWrap {
+  grid-area: scaleButton;
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  min-width: 0;
+  margin-left: 4px;
+}
+
+.inlineStatEditorSub .scalingValueWrap:empty {
+  display: none;
+}
+
+.inlineStatEditorSub .valueInput,
+.inlineStatEditorSub .unitInput {
+  min-width: 0;
+  padding-right: 2px;
+  display: block;
+  max-width: none;
+  text-align: left;
+}
+
+.removeSectionButton {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  color: rgb(255 255 255 / 70%);
+  background: rgb(255 255 255 / 10%);
+  opacity: 0.78;
+}
+
+.removeSectionButton:hover {
+  color: #fff;
+  background: rgb(0 0 0 / 34%);
+  opacity: 1;
+}
+
+.removeSectionButton svg {
+  width: 12px;
+  height: 12px;
+}

@@ -1,0 +1,898 @@
+.editor {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+}
+
+.previewStage {
+  pointer-events: auto;
+  position: absolute;
+  left: clamp(100px, 32vw, 300px);
+  bottom: clamp(280px, 12vh, 280px);
+  display: flex;
+  min-height: 230px;
+  width: min(52vw, 780px);
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+}
+
+.nameRow {
+  display: flex;
+  justify-content: center;
+}
+
+.nameImage {
+  display: block;
+  aspect-ratio: 1701 / 564;
+  width: 100%;
+  max-width: 360px;
+  background: var(--hero-info-name-color);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.nameText {
+  max-width: 100%;
+  color: var(--hero-info-name-color);
+  text-align: center;
+  font-size: clamp(1.5rem, 3vw, 3.3rem);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+
+.nameTextInput {
+  width: 100%;
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--hero-info-name-color);
+  text-align: center;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  outline: none;
+  overflow-wrap: break-word;
+}
+
+.nameTextInput::placeholder {
+  color: currentColor;
+  opacity: 0.58;
+}
+
+.nameTextInput:focus-visible {
+  text-shadow: none;
+}
+
+.tagsRow {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  overflow: visible;
+  padding: 0 4px;
+}
+
+.tagPreview {
+  --tag-horizontal-padding: 6px;
+  display: inline-grid;
+  position: relative;
+  min-height: 32px;
+  width: fit-content;
+  flex-shrink: 0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  align-items: center;
+  justify-content: center;
+  padding: 4px var(--tag-horizontal-padding);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transition: filter 150ms ease-out;
+}
+
+.tagPreview::after {
+  grid-area: 1 / 1;
+  min-width: 1ch;
+  visibility: hidden;
+  color: inherit;
+  content: attr(data-tag-text);
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: clamp(1.05rem, 1.45vw, 1.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tagPreview:hover {
+  filter: brightness(1.1);
+}
+
+.tagPreview:active {
+  cursor: grabbing;
+}
+
+.tagText {
+  color: inherit;
+  text-align: center;
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: clamp(1.05rem, 1.45vw, 1.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+  white-space: nowrap;
+}
+
+.tagTextInput {
+  position: absolute;
+  inset: 4px var(--tag-horizontal-padding);
+  width: calc(100% - (var(--tag-horizontal-padding) * 2));
+  height: calc(100% - 8px);
+  min-width: 0;
+  max-width: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: clamp(1.05rem, 1.45vw, 1.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+  outline: none;
+  padding: 0;
+  text-transform: uppercase;
+  overflow: visible;
+}
+
+.tagTextInput::placeholder {
+  color: currentColor;
+  opacity: 0.62;
+}
+
+.abilitiesRow {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.abilityButtonWrap {
+  position: relative;
+  display: inline-flex;
+  aspect-ratio: 1;
+  width: clamp(54px, 5vw, 75px);
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.abilityButton {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 239, 214, 0.1);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  transition: transform 150ms ease-out;
+}
+
+.abilityButtonWithSecondary {
+  overflow: visible;
+}
+
+.abilityButton:hover {
+  transform: scale(1.05);
+}
+
+.abilityButton:focus-visible {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.abilityIcon {
+  width: 68%;
+  height: 68%;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.abilityIconWithSecondary {
+  transform: scale(0.96);
+}
+
+.secondaryAbilityCircle {
+  position: absolute;
+  right: -14%;
+  bottom: -14%;
+  z-index: 2;
+  display: inline-flex;
+  width: 68%;
+  min-width: 44px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.secondaryAbilityCircle:focus-visible {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.secondaryAbilityIcon {
+  width: 72%;
+  height: 72%;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.statsAside {
+  pointer-events: auto;
+  position: absolute;
+  right: clamp(72px, 5vw, 120px);
+  bottom: clamp(36px, 4vw, 60px);
+  z-index: 30;
+  width: min(43vw, 560px);
+}
+
+.weaponStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.miniEditor {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 239, 214, 0.14);
+  border-radius: 4px;
+  background: rgba(6, 29, 39, 0.82);
+  padding: 12px;
+  color: #ffefd6;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.miniEditorTitle,
+.sectionTitle {
+  color: rgba(255, 239, 214, 0.75);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.miniEditorTitle {
+  color: rgba(255, 239, 214, 0.72);
+  font-size: 0.62rem;
+}
+
+.controlRail {
+  pointer-events: auto;
+  position: absolute;
+  top: 88px;
+  left: clamp(18px, 2vw, 36px);
+  max-height: calc(100vh - 122px);
+  width: min(30vw, 360px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 239, 214, 0.14);
+  border-radius: 4px;
+  background: rgba(6, 29, 39, 0.8);
+  padding: 16px;
+  color: #ffefd6;
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
+  backdrop-filter: blur(24px);
+}
+
+.railHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.railTitle {
+  font-size: 0.875rem;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.railSubtitle {
+  margin-top: 4px;
+  color: rgba(255, 239, 214, 0.58);
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+}
+
+.liveBadge {
+  border: 1px solid rgba(47, 200, 144, 0.35);
+  border-radius: 999px;
+  background: rgba(47, 200, 144, 0.1);
+  padding: 4px 10px;
+  color: #bafbe0;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.railContent,
+.fieldGroup,
+.sectionGroup {
+  display: grid;
+}
+
+.railContent {
+  gap: 16px;
+}
+
+.fieldGroup {
+  gap: 8px;
+}
+
+.sectionGroup {
+  gap: 12px;
+}
+
+.segmentedGrid,
+.renderModeGrid,
+.twoColumnGrid {
+  display: grid;
+  gap: 8px;
+}
+
+.segmentedGrid,
+.twoColumnGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.renderModeGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.fieldLabel,
+.compactLabel {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 239, 214, 0.75);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.fieldLabel {
+  font-size: 0.64rem;
+  letter-spacing: 0.22em;
+}
+
+.compactLabel {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+}
+
+.tinyLabel {
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 239, 214, 0.62);
+}
+
+.input,
+.textarea,
+.select {
+  border: 1px solid rgba(255, 239, 214, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffefd6;
+  outline: none;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.input,
+.select {
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
+.compactInput {
+  padding: 6px 8px;
+  font-size: 0.75rem;
+}
+
+.compactTextarea {
+  min-height: 58px;
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  line-height: 1.05rem;
+  letter-spacing: 0.02em;
+}
+
+.select {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+}
+
+.textarea {
+  min-height: 128px;
+  resize: vertical;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  line-height: 1.25rem;
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.textarea::placeholder {
+  color: rgba(255, 239, 214, 0.28);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: #2fc890;
+  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.25);
+}
+
+.segmentedButton,
+.assetButton,
+.uploadButton,
+.cloudUploadButton {
+  border: 1px solid rgba(255, 239, 214, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px 12px;
+  color: rgba(255, 239, 214, 0.58);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.segmentedButton:focus-visible,
+.assetButton:focus-visible,
+.uploadButton:focus-visible,
+.cloudUploadButton:focus-visible {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.segmentedButtonActive {
+  border-color: #2fc890;
+  background: rgba(47, 200, 144, 0.18);
+  color: #bafbe0;
+}
+
+.segmentedButtonInactive:hover,
+.assetButton:hover,
+.uploadButton:hover,
+.cloudUploadButton:hover {
+  border-color: rgba(47, 200, 144, 0.7);
+  color: #bafbe0;
+}
+
+.uploadButton,
+.cloudUploadButton {
+  display: flex;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  border-color: rgba(255, 239, 214, 0.2);
+}
+
+.cloudUploadWrap {
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  gap: 4px;
+}
+
+.cloudUploadContainer {
+  width: 100%;
+}
+
+.cloudUploadButton {
+  width: 100%;
+  min-height: 36px;
+}
+
+.cloudUploadButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.cloudUploadAllowed {
+  display: none;
+}
+
+.inlineUploadError {
+  color: #ff9b8e;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.62rem;
+  line-height: 1rem;
+}
+
+.uploadNameButton {
+  gap: 8px;
+}
+
+.uploadNameButton .cloudUploadButton {
+  padding: 12px;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  color: rgba(255, 239, 214, 0.78);
+}
+
+.tagControl {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 239, 214, 0.1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 10px;
+}
+
+.tagControlTitle {
+  color: rgba(255, 239, 214, 0.68);
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.weaponActionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.globalActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 239, 214, 0.1);
+}
+
+.heroNamePrompt,
+.copyToggle,
+.saveError,
+.actionStatus,
+.exportActionButton {
+  grid-column: 1 / -1;
+}
+
+.heroNamePrompt {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 239, 214, 0.75);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.copyToggle {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  color: rgba(255, 239, 214, 0.78);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.copyToggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.copyToggle span {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border: 1px solid rgba(255, 239, 214, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.44);
+  transition: border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.copyToggle span::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: rgba(255, 239, 214, 0.66);
+  transition: transform 150ms ease-out, background-color 150ms ease-out;
+}
+
+.copyToggle input:checked + span {
+  border-color: #2fc890;
+  background: rgba(47, 200, 144, 0.18);
+}
+
+.copyToggle input:checked + span::after {
+  transform: translateX(16px);
+  background: #bafbe0;
+}
+
+.copyToggle input:focus-visible + span {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.secondSetModalBackdrop {
+  pointer-events: auto;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(3, 9, 13, 0.58);
+  backdrop-filter: blur(8px);
+}
+
+.secondSetModal {
+  width: min(92vw, 620px);
+  border: 1px solid rgba(198, 154, 246, 0.62);
+  border-radius: 4px;
+  background:
+    linear-gradient(135deg, rgba(48, 37, 58, 0.96), rgba(13, 12, 19, 0.96)),
+    #11130e;
+  padding: 18px;
+  color: #fff3dd;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+}
+
+.secondSetModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.secondSetModalHeader h2 {
+  color: #fff3dd;
+  font-size: 1rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.secondSetModalClose {
+  display: inline-flex;
+  width: 34px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(198, 154, 246, 0.62);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff3dd;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.secondSetModalCopy {
+  margin-top: 10px;
+  max-width: 52ch;
+  color: rgba(255, 243, 221, 0.74);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.anchorAbilityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.anchorAbilityButton {
+  display: grid;
+  min-height: 132px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  border: 1px solid rgba(198, 154, 246, 0.42);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff3dd;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.anchorAbilityButton:hover,
+.anchorAbilityButton:focus-visible {
+  border-color: rgba(255, 243, 221, 0.88);
+  background: rgba(198, 154, 246, 0.16);
+  transform: translateY(-1px);
+}
+
+.anchorAbilityIcon {
+  width: 58px;
+  aspect-ratio: 1;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
+.anchorAbilityButton strong {
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.secondSetConfirmActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.secondSetCancelButton,
+.secondSetDeleteButton {
+  min-height: 38px;
+  border: 1px solid rgba(198, 154, 246, 0.52);
+  border-radius: 2px;
+  padding: 0 14px;
+  color: #fff3dd;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.secondSetCancelButton {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.secondSetDeleteButton {
+  border-color: rgba(255, 210, 210, 0.58);
+  background: rgba(158, 28, 25, 0.82);
+}
+
+.saveActionButton,
+.publishActionButton,
+.exportActionButton {
+  border: 1px solid rgba(255, 239, 214, 0.3);
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  transition: all 150ms ease-out;
+}
+
+.saveActionButton {
+  background: rgba(255, 239, 214, 0.05);
+  color: #ffefd6;
+}
+
+.saveActionButton:hover {
+  background: rgba(255, 239, 214, 0.15);
+  border-color: #ffefd6;
+}
+
+.publishActionButton {
+  background: rgba(47, 200, 144, 0.15);
+  border-color: rgba(47, 200, 144, 0.5);
+  color: #bafbe0;
+}
+
+.publishActionButton:hover {
+  background: rgba(47, 200, 144, 0.25);
+  border-color: #2fc890;
+  box-shadow: 0 0 15px rgba(47, 200, 144, 0.15);
+}
+
+.saveActionButton:disabled,
+.publishActionButton:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.saveError,
+.actionStatus {
+  margin: 0;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.2rem;
+}
+
+.saveError {
+  color: #ff9b8e;
+}
+
+.actionStatus {
+  color: #bafbe0;
+}
+
+.uploadIcon {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 1024px) {
+  .previewStage {
+    left: clamp(360px, 38vw, 420px);
+    width: min(44vw, 560px);
+  }
+
+  .statsAside {
+    width: min(52vw, 500px);
+  }
+
+  .controlRail {
+    width: min(34vw, 340px);
+  }
+}
+
+@media (max-width: 640px) {
+  .previewStage {
+    left: 12px;
+    width: min(92vw, 520px);
+  }
+
+  .statsAside {
+    right: 12px;
+    bottom: 12px;
+    width: min(88vw, 380px);
+  }
+
+  .controlRail {
+    left: 12px;
+    width: min(88vw, 360px);
+  }
+}

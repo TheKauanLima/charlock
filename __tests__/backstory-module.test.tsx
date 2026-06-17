@@ -1,0 +1,90 @@
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it } from 'vitest'
+
+import BackstoryModule from '@/components/backstory/BackstoryModule'
+import type { HeroDefinition } from '@/lib/hero-data'
+
+const TEST_HERO = {
+  slug: 'test-hero',
+  assetSlug: 'test-hero',
+  displayName: 'Test Hero',
+  portrait: '/panorama/images/heroes/abrams.png',
+  render: '/render/Abrams_Render.png',
+  heroInfo: {
+    nameType: 'text',
+    nameValue: 'Test Hero',
+    nameColor: '#ffefd6',
+    tag1Text: 'Pressure',
+    tag2Text: 'Frontline',
+    tag3Text: 'Burst',
+    tagColor: '#123456',
+    tagTextColor: '#fff4df',
+    tag1Tilt: 0,
+    tag2Tilt: 0,
+    tag3Tilt: 0,
+    tag1OffsetY: 0,
+    tag2OffsetY: 0,
+    tag3OffsetY: 0,
+    ability1Icon: '/panorama/images/hud/abilities/abrams/1.png',
+    ability2Icon: '/panorama/images/hud/abilities/abrams/2.png',
+    ability3Icon: '/panorama/images/hud/abilities/abrams/3.png',
+    ability4Icon: '/panorama/images/hud/abilities/abrams/4.png',
+    abilityCircleColor: '#2fc890',
+    abilityIconColor: '#ffe5b8',
+    backstory: 'A first line of backstory.\n\nA second line survives formatting.',
+  },
+} satisfies HeroDefinition
+
+afterEach(() => {
+  cleanup()
+})
+
+describe('BackstoryModule', () => {
+  it('opens a themed dialog with hero backstory content', async () => {
+    const user = userEvent.setup()
+
+    render(<BackstoryModule hero={TEST_HERO} />)
+
+    await user.click(screen.getByRole('button', { name: 'View Test Hero character backstory' }))
+
+    expect(screen.getByRole('dialog', { name: 'BACKSTORY:' })).toBeInTheDocument()
+    expect(screen.getByText(/A first line of backstory/)).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveAttribute('style', expect.stringContaining('--backstory-accent: #2fc890'))
+  })
+
+  it('closes from the close button and Escape key', async () => {
+    const user = userEvent.setup()
+
+    render(<BackstoryModule hero={TEST_HERO} />)
+
+    await user.click(screen.getByRole('button', { name: 'View Test Hero character backstory' }))
+    await user.click(screen.getByRole('button', { name: 'CLOSE' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'View Test Hero character backstory' }))
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows an empty-state message when no backstory exists', async () => {
+    const user = userEvent.setup()
+    const heroWithoutBackstory = {
+      ...TEST_HERO,
+      heroInfo: {
+        ...TEST_HERO.heroInfo,
+        backstory: undefined,
+      },
+    } satisfies HeroDefinition
+
+    render(<BackstoryModule hero={heroWithoutBackstory} />)
+
+    await user.click(screen.getByRole('button', { name: 'View Test Hero character backstory' }))
+
+    expect(screen.getByText('No character backstory has been added yet.')).toBeInTheDocument()
+  })
+})

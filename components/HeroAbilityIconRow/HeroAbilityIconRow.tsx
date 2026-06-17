@@ -1,0 +1,145 @@
+'use client'
+
+import type { CSSProperties, MouseEventHandler } from 'react'
+
+import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, getSecondaryAbilityIndexForPrimary } from '@/lib/ability-editor-types'
+import type { AbilityDefinition } from '@/lib/ability-editor-types'
+import type { HeroInfoDefinition } from '@/lib/hero-data'
+import cn from '@/lib/utilsd'
+
+import styles from './HeroAbilityIconRow.module.css'
+
+export type AbilityIconTarget = {
+  set: 'primary' | 'secondary'
+  index: number
+}
+
+type AbilityIconKey = 'ability1Icon' | 'ability2Icon' | 'ability3Icon' | 'ability4Icon'
+
+interface HeroAbilityIconRowProps {
+  heroInfo: HeroInfoDefinition
+  secondaryAbilities?: AbilityDefinition[]
+  secondaryAbilityAnchorIndex?: number
+  activeTarget?: AbilityIconTarget | null
+  onAbilityClick?: (target: AbilityIconTarget) => void
+  className?: string
+  primaryTestIdPrefix?: string
+  secondaryTestIdPrefix?: string
+  primaryLabel?: (slot: number, isActive: boolean) => string
+  secondaryLabel?: (slot: number, isActive: boolean) => string
+  editable?: boolean
+}
+
+const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
+
+export default function HeroAbilityIconRow({
+  heroInfo,
+  secondaryAbilities = [],
+  secondaryAbilityAnchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+  activeTarget = null,
+  onAbilityClick,
+  className,
+  primaryTestIdPrefix = 'hero-info-ability',
+  secondaryTestIdPrefix = 'hero-info-secondary-ability',
+  primaryLabel = slot => `Ability ${slot}`,
+  secondaryLabel = slot => `Secondary Ability ${slot}`,
+  editable = false,
+}: HeroAbilityIconRowProps) {
+  return (
+    <div className={cn(styles.row, className)} aria-label={editable ? 'Editable hero ability icons' : 'Hero abilities'}>
+      {ABILITY_ICON_KEYS.map((iconKey, index) => {
+        const slot = index + 1
+        const primaryTarget: AbilityIconTarget = { set: 'primary', index }
+        const isPrimaryActive = activeTarget?.set === 'primary' && activeTarget.index === index
+        const secondaryIndex = secondaryAbilities.length
+          ? getSecondaryAbilityIndexForPrimary(index, secondaryAbilityAnchorIndex)
+          : null
+        const secondaryAbility = secondaryIndex !== null ? secondaryAbilities[secondaryIndex] : undefined
+        const isSecondaryActive = secondaryIndex !== null && activeTarget?.set === 'secondary' && activeTarget.index === secondaryIndex
+        const hasSecondary = Boolean(secondaryAbility)
+        const primaryStyle = {
+          background: hasSecondary
+            ? `radial-gradient(circle at 80% 80%, transparent 0 32%, ${heroInfo.abilityCircleColor} 33%)`
+            : heroInfo.abilityCircleColor,
+          color: heroInfo.abilityCircleColor,
+        } as CSSProperties
+        const primaryIconStyle = {
+          background: hasSecondary
+            ? `radial-gradient(circle at 80% 80%, transparent 0 32%, ${heroInfo.abilityIconColor} 33%)`
+            : heroInfo.abilityIconColor,
+          WebkitMaskImage: `url('${heroInfo[iconKey]}')`,
+          maskImage: `url('${heroInfo[iconKey]}')`,
+        } as CSSProperties
+        const primaryClick: MouseEventHandler<HTMLButtonElement> | undefined = onAbilityClick
+          ? () => onAbilityClick(primaryTarget)
+          : undefined
+
+        return (
+          <span key={iconKey} className={styles.wrap}>
+            {onAbilityClick ? (
+              <button
+                type="button"
+                className={cn(styles.ability, hasSecondary && styles.abilityWithSecondary, isPrimaryActive && styles.abilityActive)}
+                data-testid={`${primaryTestIdPrefix}-${slot}`}
+                aria-label={primaryLabel(slot, isPrimaryActive)}
+                aria-pressed={isPrimaryActive}
+                style={primaryStyle}
+                onClick={primaryClick}
+              >
+                <span className={cn(styles.abilityIcon, hasSecondary && styles.abilityIconWithSecondary)} aria-hidden="true" style={primaryIconStyle} />
+              </button>
+            ) : (
+              <span
+                className={cn(styles.ability, hasSecondary && styles.abilityWithSecondary)}
+                data-testid={`${primaryTestIdPrefix}-${slot}`}
+                style={primaryStyle}
+              >
+                <span className={cn(styles.abilityIcon, hasSecondary && styles.abilityIconWithSecondary)} aria-hidden="true" style={primaryIconStyle} />
+              </span>
+            )}
+
+            {hasSecondary && secondaryAbility && secondaryIndex !== null ? (
+              onAbilityClick ? (
+                <button
+                  type="button"
+                  className={cn(styles.secondaryAbility, isSecondaryActive && styles.secondaryAbilityActive)}
+                  data-testid={`${secondaryTestIdPrefix}-${secondaryIndex + 1}`}
+                  aria-label={secondaryLabel(secondaryIndex + 1, isSecondaryActive)}
+                  aria-pressed={isSecondaryActive}
+                  style={{ backgroundColor: heroInfo.abilityCircleColor }}
+                  onClick={() => onAbilityClick({ set: 'secondary', index: secondaryIndex })}
+                >
+                  <span
+                    className={styles.secondaryAbilityIcon}
+                    aria-hidden="true"
+                    style={{
+                      backgroundColor: heroInfo.abilityIconColor,
+                      WebkitMaskImage: `url('${secondaryAbility.icon}')`,
+                      maskImage: `url('${secondaryAbility.icon}')`,
+                    }}
+                  />
+                </button>
+              ) : (
+                <span
+                  className={styles.secondaryAbility}
+                  data-testid={`${secondaryTestIdPrefix}-${secondaryIndex + 1}`}
+                  style={{ backgroundColor: heroInfo.abilityCircleColor }}
+                >
+                  <span
+                    className={styles.secondaryAbilityIcon}
+                    aria-hidden="true"
+                    style={{
+                      backgroundColor: heroInfo.abilityIconColor,
+                      WebkitMaskImage: `url('${secondaryAbility.icon}')`,
+                      maskImage: `url('${secondaryAbility.icon}')`,
+                    }}
+                  />
+                </span>
+              )
+            ) : null}
+          </span>
+        )
+      })}
+    </div>
+  )
+}

@@ -6,21 +6,40 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "seed:heroes": "node scripts/seed-heroes.cjs",
+    "migrate:hero-collections": "node scripts/migrate-hero-collections.cjs"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.4.2",
+    "@types/mongoose": "^5.11.96",
+    "@uploadthing/react": "^7.3.3",
+    "html-to-image": "^1.11.13",
+    "lucide-react": "^1.17.0",
+    "mongoose": "^9.6.3",
     "next": "16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "resend": "^6.12.4",
+    "svix": "^1.95.1",
+    "uploadthing": "^7.7.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.7"
   }
 }

@@ -43,3 +43,10 @@ next-env.d.ts
 /context
 AGENTS.md
 CLAUDE.md
+.env.local
+.env
+/references
+/.agents
+
+# clerk configuration (can include secrets)
+/.clerk/
