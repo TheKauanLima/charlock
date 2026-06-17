@@ -1,17 +1,9 @@
 import type { NextRequest } from 'next/server'
 
-import { CustomHeroError, getEditableCustomHero, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
+import { enforceJsonMutationRequest, readJsonRequestBody } from '@/lib/api-guards'
+import { toApiErrorResponse } from '@/lib/api-errors'
+import { getEditableCustomHero, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
 import type { CustomHeroSort, CustomHeroStatus } from '@/lib/custom-hero-types'
-
-function toErrorResponse(error: unknown) {
-  if (error instanceof CustomHeroError) {
-    return Response.json({ error: error.message }, { status: error.status })
-  }
-
-  const message = error instanceof Error ? error.message : 'Hero request failed'
-
-  return Response.json({ error: message }, { status: 500 })
-}
 
 function getStatus(value: string | null): CustomHeroStatus {
   return value === 'private' ? 'private' : 'published'
@@ -55,28 +47,30 @@ export async function GET(request: NextRequest) {
 
     return Response.json(result)
   } catch (error) {
-    return toErrorResponse(error)
+    return toApiErrorResponse(error, 'Hero request failed')
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json()
+    enforceJsonMutationRequest(request)
+    const payload = await readJsonRequestBody(request)
     const hero = await saveCustomHero(payload)
 
     return Response.json({ hero }, { status: 201 })
   } catch (error) {
-    return toErrorResponse(error)
+    return toApiErrorResponse(error, 'Hero request failed')
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const payload = await request.json()
+    enforceJsonMutationRequest(request)
+    const payload = await readJsonRequestBody(request)
     const hero = await saveCustomHero(payload)
 
     return Response.json({ hero })
   } catch (error) {
-    return toErrorResponse(error)
+    return toApiErrorResponse(error, 'Hero request failed')
   }
 }

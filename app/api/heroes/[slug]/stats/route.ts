@@ -1,3 +1,4 @@
+import { toApiErrorResponse } from '@/lib/api-errors'
 import { getHeroStatsBySlug } from '@/lib/hero-stats'
 
 export async function GET(_request: Request, context: { params: Promise<{ slug: string }> }) {
@@ -12,8 +13,6 @@ export async function GET(_request: Request, context: { params: Promise<{ slug: 
 
     return Response.json(stats)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch hero stats'
-
-    return Response.json({ error: message }, { status: 500 })
+    return toApiErrorResponse(error, 'Failed to fetch hero stats')
   }
 }

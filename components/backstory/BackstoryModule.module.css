@@ -8,11 +8,6 @@
   gap: 8px;
 }
 
-.actionSlot {
-  display: inline-flex;
-  align-items: center;
-}
-
 .toggleButton {
   position: relative;
   display: inline-flex;
@@ -33,9 +28,48 @@
     border-color 150ms ease-out;
 }
 
+.createButton {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 239, 215, 0.72);
+  border-radius: 999px;
+  background: rgba(123, 30, 28, 0.82);
+  color: #ffefd7;
+  opacity: 0.78;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.36),
+    0 10px 24px rgba(0, 0, 0, 0.34);
+  transition:
+    opacity 150ms ease-out,
+    transform 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.createButton svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 3;
+}
+
+.createButton:hover,
+.createButton:focus-visible {
+  background: rgba(181, 45, 42, 0.95);
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+.createButton:focus-visible {
+  outline: 2px solid rgba(255, 239, 215, 0.95);
+  outline-offset: 3px;
+}
+
 .toggleButton:hover,
-.toggleButton:focus-visible,
-.toggleWrap:hover .toggleButton {
+.toggleButton:focus-visible {
   border-color: rgba(255, 239, 215, 0.95);
   background: rgba(255, 239, 215, 0.88);
   opacity: 1;
@@ -60,8 +94,7 @@
 }
 
 .toggleButton:hover .learnIcon,
-.toggleButton:focus-visible .learnIcon,
-.toggleWrap:hover .learnIcon {
+.toggleButton:focus-visible .learnIcon {
   background: #163438;
 }
 
@@ -89,8 +122,10 @@
   white-space: nowrap;
 }
 
-.toggleWrap:hover .tooltip,
-.toggleWrap:focus-within .tooltip {
+.createButton:hover ~ .createTooltip,
+.createButton:focus-visible ~ .createTooltip,
+.toggleButton:hover ~ .backstoryTooltip,
+.toggleButton:focus-visible ~ .backstoryTooltip {
   opacity: 1;
   transform: translateX(0);
 }

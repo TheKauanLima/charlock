@@ -83,7 +83,9 @@
 }
 
 .tagPreview {
-  display: inline-flex;
+  --tag-horizontal-padding: 6px;
+  display: inline-grid;
+  position: relative;
   min-height: 32px;
   width: fit-content;
   flex-shrink: 0;
@@ -92,9 +94,25 @@
   user-select: none;
   align-items: center;
   justify-content: center;
-  padding: 4px 12px;
+  padding: 4px var(--tag-horizontal-padding);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
   transition: filter 150ms ease-out;
+}
+
+.tagPreview::after {
+  grid-area: 1 / 1;
+  min-width: 1ch;
+  visibility: hidden;
+  color: inherit;
+  content: attr(data-tag-text);
+  font-family: "Valve_Pulp", sans-serif;
+  font-size: clamp(1.05rem, 1.45vw, 1.3rem);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .tagPreview:hover {
@@ -117,8 +135,12 @@
 }
 
 .tagTextInput {
-  min-width: 5ch;
-  max-width: min(42vw, 28ch);
+  position: absolute;
+  inset: 4px var(--tag-horizontal-padding);
+  width: calc(100% - (var(--tag-horizontal-padding) * 2));
+  height: calc(100% - 8px);
+  min-width: 0;
+  max-width: none;
   border: 0;
   background: transparent;
   color: inherit;
@@ -129,7 +151,9 @@
   letter-spacing: 0.06em;
   line-height: 0.92;
   outline: none;
+  padding: 0;
   text-transform: uppercase;
+  overflow: visible;
 }
 
 .tagTextInput::placeholder {

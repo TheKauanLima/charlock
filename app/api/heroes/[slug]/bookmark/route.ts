@@ -1,23 +1,15 @@
-import { CustomHeroError } from '@/lib/custom-heroes'
+import { enforceJsonMutationRequest } from '@/lib/api-guards'
+import { toApiErrorResponse } from '@/lib/api-errors'
 import { toggleHeroBookmark } from '@/lib/social-engagement'
 
-function toErrorResponse(error: unknown) {
-  if (error instanceof CustomHeroError) {
-    return Response.json({ error: error.message }, { status: error.status })
-  }
-
-  const message = error instanceof Error ? error.message : 'Bookmark request failed'
-
-  return Response.json({ error: message }, { status: 500 })
-}
-
-export async function POST(_request: Request, context: { params: Promise<{ slug: string }> }) {
+export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   try {
+    enforceJsonMutationRequest(request)
     const { slug } = await context.params
     const bookmark = await toggleHeroBookmark(slug)
 
     return Response.json({ bookmark })
   } catch (error) {
-    return toErrorResponse(error)
+    return toApiErrorResponse(error, 'Bookmark request failed')
   }
 }

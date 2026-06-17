@@ -209,6 +209,32 @@ describe('HeroGrid', () => {
     expect(screen.getByTestId('weapon-panel')).not.toHaveTextContent('Abrams Weapon')
   })
 
+  it('creates a new draft from the selected official hero button', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const stats = buildHeroStatsSeed(abrams)
+    const abilityStats = buildDefaultAbilityStats(abrams)
+
+    stats.weapon.weaponName = 'Copied Abrams Weapon'
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(
+      new Response(JSON.stringify({ ...stats, abilityStats }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    ))
+
+    render(<HeroGrid />)
+
+    await user.click(screen.getByRole('button', { name: 'Create hero from Abrams' }))
+
+    expect(await screen.findByTestId('hero-info-editor')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+
+    expect(screen.getByDisplayValue('Copied Abrams Weapon')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes/abrams/stats')
+  })
+
   it('opens the create editor and updates the render background', async () => {
     const user = userEvent.setup()
 

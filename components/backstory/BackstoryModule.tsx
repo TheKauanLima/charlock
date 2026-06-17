@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, MouseEvent } from 'react'
+import { Plus } from 'lucide-react'
 
 import type { HeroDefinition } from '@/lib/hero-data'
 
@@ -10,7 +11,7 @@ import styles from './BackstoryModule.module.css'
 interface BackstoryModuleProps {
   hero: HeroDefinition
   isEditable?: boolean
-  actionButton?: ReactNode
+  onCreateFromHero?: () => void
   onBackstoryChange?: (value: string) => void
 }
 
@@ -21,13 +22,14 @@ type BackstoryStyle = CSSProperties & {
 const BOOK_ICON_PATH = '/panorama/images/icons/icon_book.svg'
 const FALLBACK_BACKSTORY = 'No character backstory has been added yet.'
 
-export default function BackstoryModule({ hero, isEditable = false, actionButton = null, onBackstoryChange }: BackstoryModuleProps) {
+export default function BackstoryModule({ hero, isEditable = false, onCreateFromHero, onBackstoryChange }: BackstoryModuleProps) {
   const [isOpen, setIsOpen] = useState(false)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const titleId = `backstory-title-${hero.slug}`
   const bodyId = `backstory-body-${hero.slug}`
-  const tooltipId = `backstory-tooltip-${hero.slug}`
+  const backstoryTooltipId = `backstory-tooltip-${hero.slug}`
+  const createTooltipId = `copy-hero-tooltip-${hero.slug}`
   const editableBackstory = hero.heroInfo.backstory ?? ''
   const backstory = isEditable ? editableBackstory : hero.heroInfo.backstory?.trim() || FALLBACK_BACKSTORY
   const rowCount = Math.min(20, Math.max(5, editableBackstory.split(/\r\n|\r|\n/).length + 2))
@@ -64,15 +66,32 @@ export default function BackstoryModule({ hero, isEditable = false, actionButton
   return (
     <>
       <div className={styles.toggleWrap}>
-        <span id={tooltipId} className={styles.tooltip} role="tooltip">
-          {isEditable ? 'Edit Character Backstory.' : 'View Character Backstory.'}
-        </span>
-        {actionButton ? <span className={styles.actionSlot}>{actionButton}</span> : null}
+        {onCreateFromHero ? (
+          <>
+            <button
+              type="button"
+              className={styles.createButton}
+              aria-label={`Create hero from ${hero.displayName}`}
+              aria-describedby={createTooltipId}
+              onPointerDown={event => event.stopPropagation()}
+              onClick={event => {
+                event.preventDefault()
+                event.stopPropagation()
+                onCreateFromHero()
+              }}
+            >
+              <Plus aria-hidden="true" />
+            </button>
+            <span id={createTooltipId} className={`${styles.tooltip} ${styles.createTooltip}`} role="tooltip">
+              Copy This Hero.
+            </span>
+          </>
+        ) : null}
         <button
           type="button"
           className={styles.toggleButton}
           aria-label={`${isEditable ? 'Edit' : 'View'} ${hero.displayName} character backstory`}
-          aria-describedby={tooltipId}
+          aria-describedby={backstoryTooltipId}
           aria-haspopup="dialog"
           aria-expanded={isOpen}
           onClick={() => setIsOpen(true)}
@@ -86,6 +105,9 @@ export default function BackstoryModule({ hero, isEditable = false, actionButton
             }}
           />
         </button>
+        <span id={backstoryTooltipId} className={`${styles.tooltip} ${styles.backstoryTooltip}`} role="tooltip">
+          {isEditable ? 'Edit Character Backstory.' : 'View Character Backstory.'}
+        </span>
       </div>
 
       {isOpen ? (

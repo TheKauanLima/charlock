@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const heroFindOneMock = vi.hoisted(() => vi.fn())
 const heroInfoFindOneMock = vi.hoisted(() => vi.fn())
@@ -6,6 +6,7 @@ const weaponFindOneMock = vi.hoisted(() => vi.fn())
 const vitalityFindOneMock = vi.hoisted(() => vi.fn())
 const spiritFindOneMock = vi.hoisted(() => vi.fn())
 const abilityStatsFindOneMock = vi.hoisted(() => vi.fn())
+const dbConnectMock = vi.hoisted(() => vi.fn())
 
 function createQueryMock<T>(value: T) {
   return {
@@ -15,7 +16,7 @@ function createQueryMock<T>(value: T) {
 }
 
 vi.mock('@/lib/dbConnect', () => ({
-  default: vi.fn().mockResolvedValue(undefined),
+  default: dbConnectMock,
 }))
 
 vi.mock('server-only', () => ({}))
@@ -70,6 +71,17 @@ vi.mock('@/lib/models/AbilityStats', () => ({
 import { getHeroStatsBySlug } from '@/lib/hero-stats'
 
 describe('getHeroStatsBySlug stat normalization', () => {
+  beforeEach(() => {
+    dbConnectMock.mockReset()
+    dbConnectMock.mockResolvedValue(undefined)
+    heroFindOneMock.mockReset()
+    heroInfoFindOneMock.mockReset()
+    weaponFindOneMock.mockReset()
+    vitalityFindOneMock.mockReset()
+    spiritFindOneMock.mockReset()
+    abilityStatsFindOneMock.mockReset()
+  })
+
   it('returns the standard stat rows when stored hero documents are partial or malformed', async () => {
     heroFindOneMock.mockReturnValueOnce(createQueryMock({ _id: 'hero-1', slug: 'apollo', name: 'Apollo', portrait: '/portrait.png', render: '/render.png' }))
     heroInfoFindOneMock.mockReturnValueOnce(createQueryMock(null))
@@ -137,5 +149,15 @@ describe('getHeroStatsBySlug stat normalization', () => {
     ])
     expect(stats?.weapon.stats[0]).toMatchObject({ value: '18', icon: 'bulletDamage' })
     expect(stats?.vitality.stats[14]).toMatchObject({ label: 'Dash Speed', value: '0' })
+  })
+
+  it('returns generated official hero stats when MongoDB is unavailable', async () => {
+    dbConnectMock.mockRejectedValueOnce(new Error('Failed to connect to MongoDB'))
+
+    const stats = await getHeroStatsBySlug('abrams')
+
+    expect(stats?.hero.slug).toBe('abrams')
+    expect(stats?.weapon.stats.length).toBeGreaterThan(0)
+    expect(heroFindOneMock).not.toHaveBeenCalled()
   })
 })

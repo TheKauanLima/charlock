@@ -3,9 +3,11 @@ import 'server-only'
 import { auth } from '@clerk/nextjs/server'
 import { Types, type PipelineStage } from 'mongoose'
 
-import dbConnect from '@/lib/dbConnect'
+import dbConnect, { isDatabaseConnectionError } from '@/lib/dbConnect'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { ApiRequestError } from '@/lib/api-errors'
+import { customHeroSaveSchema } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
@@ -18,6 +20,7 @@ import VitalityStats from '@/lib/models/VitalityStats'
 import WeaponStats from '@/lib/models/WeaponStats'
 import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
+import { enforceRateLimit } from '@/lib/rate-limit'
 
 interface Actor {
   clerkId: string
@@ -73,13 +76,10 @@ interface HeroAggregateRecord extends HeroRecord {
   abilityStats?: AbilityStatsRecord | null
 }
 
-export class CustomHeroError extends Error {
-  status: number
-
+export class CustomHeroError extends ApiRequestError {
   constructor(message: string, status: number) {
-    super(message)
+    super(message, status)
     this.name = 'CustomHeroError'
-    this.status = status
   }
 }
 
@@ -163,16 +163,13 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
   }
 }
 
-function parseSavePayload(value: unknown): CustomHeroSavePayload {
-  if (!isRecord(value)) {
-    throw new CustomHeroError('Hero payload is required', 400)
-  }
-
-  const heroRecord = isRecord(value.hero) ? value.hero : {}
-  const weaponRecord = isRecord(value.weapon) ? value.weapon : {}
-  const vitalityRecord = isRecord(value.vitality) ? value.vitality : {}
-  const spiritRecord = isRecord(value.spirit) ? value.spirit : {}
-  const abilityStatsRecord = isRecord(value.abilityStats) ? value.abilityStats : {}
+function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
+  const value = customHeroSaveSchema.parse(rawValue)
+  const heroRecord = value.hero
+  const weaponRecord = value.weapon
+  const vitalityRecord = value.vitality
+  const spiritRecord = value.spirit
+  const abilityStatsRecord = value.abilityStats
   const name = getString(value.name)
   const status = normalizeStatus(value.status)
   const allowCopies = value.allowCopies === true
@@ -581,32 +578,64 @@ async function getHeroBundle(hero: HeroRecord): Promise<HeroBundle> {
 export async function listCustomHeroPage(filters: CustomHeroListFilters): Promise<CustomHeroListResult> {
   const actor = await getOptionalActor()
 
-  await dbConnect()
+  try {
+    await dbConnect()
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return {
+        heroes: [],
+        pagination: {
+          limit: filters.limit,
+          offset: filters.offset,
+          total: 0,
+          hasMore: false,
+        },
+      }
+    }
 
-  const pipeline = await buildHeroListPipeline(filters)
-  const totalResult = await CustomHero.aggregate<{ total: number }>([
-    ...pipeline,
-    { $count: 'total' },
-  ])
-  const total = totalResult[0]?.total ?? 0
-  const heroes = await CustomHero.aggregate<HeroAggregateRecord>([
-    ...pipeline,
-    { $sort: getSortStage(filters.sort) },
-    { $skip: filters.offset },
-    { $limit: filters.limit },
-  ])
-  const bookmarks = await getActorBookmarkSet(actor)
-  const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
-  const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
+    throw error
+  }
 
-  return {
-    heroes: summaries,
-    pagination: {
-      limit: filters.limit,
-      offset: filters.offset,
-      total,
-      hasMore: filters.offset + summaries.length < total,
-    },
+  try {
+    const pipeline = await buildHeroListPipeline(filters)
+    const totalResult = await CustomHero.aggregate<{ total: number }>([
+      ...pipeline,
+      { $count: 'total' },
+    ])
+    const total = totalResult[0]?.total ?? 0
+    const heroes = await CustomHero.aggregate<HeroAggregateRecord>([
+      ...pipeline,
+      { $sort: getSortStage(filters.sort) },
+      { $skip: filters.offset },
+      { $limit: filters.limit },
+    ])
+    const bookmarks = await getActorBookmarkSet(actor)
+    const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
+    const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
+
+    return {
+      heroes: summaries,
+      pagination: {
+        limit: filters.limit,
+        offset: filters.offset,
+        total,
+        hasMore: filters.offset + summaries.length < total,
+      },
+    }
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return {
+        heroes: [],
+        pagination: {
+          limit: filters.limit,
+          offset: filters.offset,
+          total: 0,
+          hasMore: false,
+        },
+      }
+    }
+
+    throw error
   }
 }
 
@@ -706,6 +735,11 @@ export async function listBookmarkedCustomHeroes(heroIds: Types.ObjectId[], owne
 
 export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> {
   const actor = await getActor()
+  enforceRateLimit({
+    key: `custom-hero-save:user:${actor.storageUserId}`,
+    limit: 20,
+    windowMs: 60 * 1000,
+  })
   const payload = parseSavePayload(value)
   const isPublishing = payload.status === 'published'
 

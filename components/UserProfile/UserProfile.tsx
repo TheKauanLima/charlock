@@ -83,6 +83,9 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     try {
       const response = await fetch(`/api/users/${encodeURIComponent(data.user.clerkId)}/follow`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       const body = await response.json() as { follow?: { following: boolean; followerCount: number }; error?: string }
 

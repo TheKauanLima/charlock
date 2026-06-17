@@ -1,6 +1,6 @@
 'use client'
 
-import { Bookmark, Plus, Send, Trash2 } from 'lucide-react'
+import { Bookmark, Send, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 
@@ -202,6 +202,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
     try {
       const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/bookmark`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       const body = await response.json() as { bookmark?: { bookmarked: boolean }; error?: string }
 
@@ -255,6 +258,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
     try {
       const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/comments?commentId=${encodeURIComponent(commentId)}`, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       const body = await response.json() as { deleted?: boolean; error?: string }
 
@@ -476,16 +482,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       ) : null}
       <BackstoryModule
         hero={displayHero}
-        actionButton={onCreateFromHero ? (
-          <button
-            type="button"
-            className={styles.createFromHeroButton}
-            aria-label={`Create hero from ${displayHero.displayName}`}
-            onClick={onCreateFromHero}
-          >
-            <Plus aria-hidden="true" />
-          </button>
-        ) : null}
+        onCreateFromHero={onCreateFromHero}
       />
     </>
   )

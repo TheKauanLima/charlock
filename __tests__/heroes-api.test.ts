@@ -35,6 +35,17 @@ function buildNextRequest(url: string) {
   } as NextRequest
 }
 
+function buildMutationRequest(url: string, init: RequestInit = {}) {
+  return new Request(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'http://localhost',
+      ...init.headers,
+    },
+  })
+}
+
 describe('heroes API route', () => {
   it('lists published heroes with requested sort', async () => {
     serviceMocks.listCustomHeroPage.mockResolvedValueOnce({
@@ -76,11 +87,11 @@ describe('heroes API route', () => {
 
     const createPayload = { name: 'New Hero', status: 'private' }
     const updatePayload = { id: 'old_hero', name: 'Old Hero', status: 'published' }
-    const createResponse = await POST(new Request('http://localhost/api/heroes', {
+    const createResponse = await POST(buildMutationRequest('http://localhost/api/heroes', {
       method: 'POST',
       body: JSON.stringify(createPayload),
     }))
-    const updateResponse = await PUT(new Request('http://localhost/api/heroes', {
+    const updateResponse = await PUT(buildMutationRequest('http://localhost/api/heroes', {
       method: 'PUT',
       body: JSON.stringify(updatePayload),
     }))
@@ -94,7 +105,7 @@ describe('heroes API route', () => {
   it('toggles likes for a published hero', async () => {
     serviceMocks.likeCustomHero.mockResolvedValueOnce({ id: 'liked_hero', likesCount: 8, likedByCurrentUser: true })
 
-    const response = await POST_LIKE(new Request('http://localhost/api/heroes/liked_hero/like', { method: 'POST' }), {
+    const response = await POST_LIKE(buildMutationRequest('http://localhost/api/heroes/liked_hero/like', { method: 'POST' }), {
       params: Promise.resolve({ slug: 'liked_hero' }),
     })
 
@@ -108,7 +119,7 @@ describe('heroes API route', () => {
   it('records template copy engagement for a published hero', async () => {
     serviceMocks.recordCustomHeroCopy.mockResolvedValueOnce(undefined)
 
-    const response = await POST_COPY(new Request('http://localhost/api/heroes/copied_hero/copy', { method: 'POST' }), {
+    const response = await POST_COPY(buildMutationRequest('http://localhost/api/heroes/copied_hero/copy', { method: 'POST' }), {
       params: Promise.resolve({ slug: 'copied_hero' }),
     })
 

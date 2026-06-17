@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
 
+import ProfileUnavailable from '@/components/UserProfile/ProfileUnavailable'
 import ProfileSettings from '@/components/UserProfile/ProfileSettings'
 import { HEROES } from '@/lib/hero-data'
-import { getCurrentProfileUser, getProfilePathSegment, getUserProfile } from '@/lib/profile'
+import { getCurrentProfileUser, getProfilePathSegment, getUserProfile, isProfileUnavailableError } from '@/lib/profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,13 +14,34 @@ interface ProfileSettingsPageProps {
 }
 
 export default async function ProfileSettingsPage({ searchParams }: ProfileSettingsPageProps) {
-  const [query, currentUser] = await Promise.all([searchParams, getCurrentProfileUser()])
+  const query = await searchParams
+  let currentUser
+
+  try {
+    currentUser = await getCurrentProfileUser()
+  } catch (error) {
+    if (isProfileUnavailableError(error)) {
+      return <ProfileUnavailable />
+    }
+
+    throw error
+  }
 
   if (!currentUser) {
     redirect('/sign-in')
   }
 
-  const data = await getUserProfile(getProfilePathSegment(currentUser))
+  let data
+
+  try {
+    data = await getUserProfile(getProfilePathSegment(currentUser))
+  } catch (error) {
+    if (isProfileUnavailableError(error)) {
+      return <ProfileUnavailable />
+    }
+
+    throw error
+  }
 
   return (
     <ProfileSettings

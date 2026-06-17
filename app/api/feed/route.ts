@@ -1,15 +1,5 @@
-import { CustomHeroError } from '@/lib/custom-heroes'
+import { toApiErrorResponse } from '@/lib/api-errors'
 import { getActivityFeed } from '@/lib/social-engagement'
-
-function toErrorResponse(error: unknown) {
-  if (error instanceof CustomHeroError) {
-    return Response.json({ error: error.message }, { status: error.status })
-  }
-
-  const message = error instanceof Error ? error.message : 'Activity feed request failed'
-
-  return Response.json({ error: message }, { status: 500 })
-}
 
 export async function GET() {
   try {
@@ -17,6 +7,6 @@ export async function GET() {
 
     return Response.json({ items })
   } catch (error) {
-    return toErrorResponse(error)
+    return toApiErrorResponse(error, 'Activity feed request failed')
   }
 }

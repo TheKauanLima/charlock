@@ -148,8 +148,15 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [templateHero, setTemplateHero] = useState<CustomHeroSummary | null>(null)
   const [editingHeroStats, setEditingHeroStats] = useState<HeroStatsPayload | null>(null)
   const [editingAbilityStats, setEditingAbilityStats] = useState<AbilityStatsPayload | null>(null)
-  const [showDetails, setShowDetails] = useState(getStoredShowDetails)
+  const [editorRevision, setEditorRevision] = useState(0)
+  const [showDetails, setShowDetails] = useState(false)
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setShowDetails(getStoredShowDetails()), 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [])
   const [isSavingHero, setIsSavingHero] = useState(false)
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
@@ -191,6 +198,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorDraft(cloneHeroInfo(hero.heroInfo))
     setEditorBackground(hero.background || renderState.background)
     setEditorRenderSelection(renderState.renderSelection)
+    setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
   }, [])
 
@@ -211,6 +219,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorDraft(cloneHeroInfo(hero.heroInfo))
     setEditorBackground(hero.background || renderState.background)
     setEditorRenderSelection(renderState.renderSelection)
+    setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
     setSaveStatusMessage('Template loaded as a new draft.')
   }, [])
@@ -245,6 +254,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorDraft(heroInfo)
     setEditorBackground(getEditorBackgroundForHero(hero))
     setEditorRenderSelection(renderState.renderSelection)
+    setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
   }, [])
 
@@ -259,6 +269,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorDraft(cloneHeroInfo(hero.heroInfo))
     setEditorBackground(hero.background || renderState.background)
     setEditorRenderSelection(renderState.renderSelection)
+    setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
     setIsTemplateModalOpen(false)
     setSaveStatusMessage(`${template.label} template loaded.`)
@@ -482,6 +493,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     try {
       const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/like`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
       const body = await response.json() as { hero?: CustomHeroSummary; error?: string }
 
@@ -526,6 +540,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     try {
       await fetch(`/api/heroes/${encodeURIComponent(heroId)}/copy`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       })
     } catch {
       // Copy tracking should not block a user from starting a new draft.
@@ -555,9 +572,10 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     const fallbackStats = buildHeroStatsSeed(hero)
     const fallbackAbilityStats = buildDefaultAbilityStats(hero)
 
-    try {
-      setSaveStatusMessage(`Loading ${hero.displayName} as a new draft...`)
+    applyOfficialHeroToEditor(hero, fallbackStats, fallbackAbilityStats)
+    setSaveStatusMessage(`Loading ${hero.displayName} stats...`)
 
+    try {
       const response = await fetch(`/api/heroes/${encodeURIComponent(hero.slug)}/stats`)
       const body = await response.json() as Partial<HeroStatsWithAbilityPayload>
 
@@ -578,7 +596,6 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       applyOfficialHeroToEditor(hero, nextStats, nextAbilityStats)
       setSaveStatusMessage(`${hero.displayName} loaded as a new draft.`)
     } catch (error) {
-      applyOfficialHeroToEditor(hero, fallbackStats, fallbackAbilityStats)
       setSaveStatusMessage(error instanceof Error ? `${hero.displayName} loaded with fallback stats. ${error.message}` : `${hero.displayName} loaded with fallback stats.`)
     }
   }
@@ -838,7 +855,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       {isCreateMode ? (
         <HeroInfoEditor
-          key={editingCustomHero ? `${editingCustomHero.id}:${editingCustomHero.displayName}` : templateHero ? templateHero.id : activeHero.slug}
+          key={`${editingCustomHero ? `${editingCustomHero.id}:${editingCustomHero.displayName}` : templateHero ? templateHero.id : activeHero.slug}:${editorRevision}`}
           hero={editorHero}
           draft={editorDraft}
           backgroundOptions={HERO_BACKGROUND_OPTIONS}

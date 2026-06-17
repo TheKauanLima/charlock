@@ -3,6 +3,7 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 
+import { toApiErrorResponse } from '@/lib/api-errors'
 import dbConnect from '@/lib/dbConnect'
 import User from '@/lib/models/User'
 
@@ -162,7 +163,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ignored: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown webhook error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return toApiErrorResponse(error, 'Unknown webhook error')
   }
 }

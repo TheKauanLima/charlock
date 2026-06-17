@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getProfileHero, getProfilePathSegment, getUserLevel } from '@/lib/profile'
+import { getProfileHero, getProfilePathSegment, getUserLevel, isProfileUnavailableError, ProfileUnavailableError } from '@/lib/profile'
 
 describe('profile helpers', () => {
   it('calculates user level from contribution count', () => {
@@ -17,5 +17,10 @@ describe('profile helpers', () => {
   it('uses username before clerk id for profile paths', () => {
     expect(getProfilePathSegment({ username: 'profile one', clerkId: 'clerk_123' })).toBe('profile%20one')
     expect(getProfilePathSegment({ username: null, clerkId: 'clerk_123' })).toBe('clerk_123')
+  })
+
+  it('classifies temporary profile availability errors', () => {
+    expect(isProfileUnavailableError(new ProfileUnavailableError())).toBe(true)
+    expect(isProfileUnavailableError(new Error('missing'))).toBe(false)
   })
 })

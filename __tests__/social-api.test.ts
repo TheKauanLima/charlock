@@ -37,6 +37,17 @@ import { GET as GET_FEED } from '@/app/api/feed/route'
 import { GET as GET_NOTIFICATIONS } from '@/app/api/notifications/route'
 import { POST as POST_FOLLOW } from '@/app/api/users/[id]/follow/route'
 
+function buildMutationRequest(url: string, init: RequestInit = {}) {
+  return new Request(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'http://localhost',
+      ...init.headers,
+    },
+  })
+}
+
 describe('social engagement API routes', () => {
   it('lists, creates, and deletes comments', async () => {
     serviceMocks.listHeroComments.mockResolvedValueOnce([{ id: 'comment_1', content: 'Filed.' }])
@@ -45,11 +56,11 @@ describe('social engagement API routes', () => {
 
     const context = { params: Promise.resolve({ slug: 'hero_1' }) }
     const listResponse = await GET_COMMENTS(new Request('http://localhost/api/heroes/hero_1/comments'), context)
-    const postResponse = await POST_COMMENT(new Request('http://localhost/api/heroes/hero_1/comments', {
+    const postResponse = await POST_COMMENT(buildMutationRequest('http://localhost/api/heroes/hero_1/comments', {
       method: 'POST',
       body: JSON.stringify({ content: 'New note.' }),
     }), context)
-    const deleteResponse = await DELETE(new Request('http://localhost/api/heroes/hero_1/comments?commentId=comment_1', {
+    const deleteResponse = await DELETE(buildMutationRequest('http://localhost/api/heroes/hero_1/comments?commentId=comment_1', {
       method: 'DELETE',
     }), context)
 
@@ -66,10 +77,10 @@ describe('social engagement API routes', () => {
     serviceMocks.toggleHeroBookmark.mockResolvedValueOnce({ heroId: 'hero_1', bookmarked: true })
     serviceMocks.toggleFollow.mockResolvedValueOnce({ userId: 'user_2', following: true, followerCount: 4 })
 
-    const bookmarkResponse = await POST_BOOKMARK(new Request('http://localhost/api/heroes/hero_1/bookmark', { method: 'POST' }), {
+    const bookmarkResponse = await POST_BOOKMARK(buildMutationRequest('http://localhost/api/heroes/hero_1/bookmark', { method: 'POST' }), {
       params: Promise.resolve({ slug: 'hero_1' }),
     })
-    const followResponse = await POST_FOLLOW(new Request('http://localhost/api/users/user_2/follow', { method: 'POST' }), {
+    const followResponse = await POST_FOLLOW(buildMutationRequest('http://localhost/api/users/user_2/follow', { method: 'POST' }), {
       params: Promise.resolve({ id: 'user_2' }),
     })
 

@@ -132,7 +132,11 @@ const NAME_FONT_OPTIONS = [
   { label: 'Mono', value: 'var(--font-geist-mono), "Roboto Mono", monospace' },
   { label: 'Serif', value: 'Georgia, serif' },
 ]
-const NAME_FONT_WEIGHTS = ['400', '600', '700', '800', '900']
+const NAME_FONT_WEIGHTS = [
+  { label: 'Light', value: '400' },
+  { label: 'Semi', value: '600' },
+  { label: 'Bold', value: '800' },
+]
 
 function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
   const uploadedAsset = uploadedAssets[0]
@@ -808,6 +812,7 @@ export default function HeroInfoEditor({
                   aria-label={`${tag.label} preview. Scroll or drag horizontally to rotate.`}
                   className={cn(styles.tagPreview, 'w-fit shrink-0')}
                   data-testid={`editor-tag-${index + 1}`}
+                  data-tag-text={tag.text.trim() || tag.label}
                   onWheel={event => handleTagWheel(event, tag)}
                   onPointerDown={event => handleTagPointerDown(event, tag)}
                   onPointerMove={handleTagPointerMove}
@@ -829,7 +834,6 @@ export default function HeroInfoEditor({
                     onClick={event => event.stopPropagation()}
                     onPointerDown={event => event.stopPropagation()}
                     onWheel={event => event.stopPropagation()}
-                    style={{ width: `${Math.max((tag.text || tag.label).length + 1, tag.label.length, 5)}ch` }}
                   />
                 </span>
               ))}
@@ -983,33 +987,32 @@ export default function HeroInfoEditor({
                     ))}
                   </select>
                 </label>
-                <div className={styles.twoColumnGrid}>
-                  <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
-                    Font Size
-                    <input
-                      id="editor-name-font-size"
-                      type="text"
-                      value={draft.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE}
-                      onChange={event => updateDraft({ nameFontSize: event.target.value })}
-                      className={styles.input}
-                    />
-                  </label>
-                  <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
-                    Weight
-                    <select
-                      id="editor-name-font-weight"
-                      value={draft.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT}
-                      onChange={event => updateDraft({ nameFontWeight: event.target.value })}
-                      className={styles.select}
-                    >
-                      {NAME_FONT_WEIGHTS.map(weight => (
-                        <option key={weight} value={weight}>
-                          {weight}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
+                <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
+                  Font Size
+                  <input
+                    id="editor-name-font-size"
+                    type="text"
+                    value={draft.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE}
+                    onChange={event => updateDraft({ nameFontSize: event.target.value })}
+                    className={styles.input}
+                  />
+                </label>
+                <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
+                  Weight
+                  <select
+                    id="editor-name-font-weight"
+                    value={draft.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT}
+                    onChange={event => updateDraft({ nameFontWeight: event.target.value })}
+                    className={styles.select}
+                  >
+                    {NAME_FONT_WEIGHTS.map(weight => (
+                      <option key={weight.value} value={weight.value}>
+                        {weight.label}
+                      </option>
+                    ))}
+                  </select>
+
+                </label>
               </>
             ) : (
               <CloudUploadButton

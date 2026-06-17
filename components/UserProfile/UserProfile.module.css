@@ -48,6 +48,34 @@
   padding: 96px 0 54px;
 }
 
+.unavailablePanel {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 14px;
+  width: min(560px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 140px 0 0;
+}
+
+.unavailablePanel h1 {
+  margin: 0;
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: clamp(2.8rem, 8vw, 5.6rem);
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.unavailablePanel p:not(.eyebrow) {
+  max-width: 48ch;
+  margin: 0;
+  color: rgba(255, 239, 214, 0.76);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
 .profileHeader,
 .reportPanel,
 .ledgerPanel,

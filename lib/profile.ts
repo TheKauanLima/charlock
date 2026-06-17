@@ -3,7 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { notFound } from 'next/navigation'
 import type { Types } from 'mongoose'
 
-import dbConnect from '@/lib/dbConnect'
+import dbConnect, { isDatabaseConnectionError } from '@/lib/dbConnect'
 import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import { HEROES, type HeroDefinition } from '@/lib/hero-data'
 import CustomHero from '@/lib/models/CustomHero'
@@ -82,6 +82,17 @@ interface HeroRecord {
 }
 
 const DEFAULT_PROFILE_BIO = 'No profile bio has been added yet.'
+
+export class ProfileUnavailableError extends Error {
+  constructor() {
+    super('Profile data is temporarily unavailable')
+    this.name = 'ProfileUnavailableError'
+  }
+}
+
+export function isProfileUnavailableError(error: unknown) {
+  return error instanceof ProfileUnavailableError
+}
 
 export function getUserLevel(contributionCount: number): UserLevel {
   if (contributionCount > 50) {
@@ -199,39 +210,57 @@ export async function getCurrentProfileUser() {
   const metadataUsername = clerkUser.unsafeMetadata?.username
   const username = clerkUser.username || (typeof metadataUsername === 'string' ? metadataUsername : null)
 
-  await dbConnect()
+  try {
+    await dbConnect()
 
-  return User.findOneAndUpdate(
-    { clerkId: clerkUser.id },
-    {
-      $set: {
-        clerkId: clerkUser.id,
-        email,
-        username,
-        emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
-        firstName: clerkUser.firstName,
-        lastName: clerkUser.lastName,
+    return User.findOneAndUpdate(
+      { clerkId: clerkUser.id },
+      {
+        $set: {
+          clerkId: clerkUser.id,
+          email,
+          username,
+          emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
+          firstName: clerkUser.firstName,
+          lastName: clerkUser.lastName,
+        },
       },
-    },
-    {
-      upsert: true,
-      returnDocument: 'after',
-      runValidators: true,
-      setDefaultsOnInsert: true,
-    },
-  ).lean<UserRecord | null>()
+      {
+        upsert: true,
+        returnDocument: 'after',
+        runValidators: true,
+        setDefaultsOnInsert: true,
+      },
+    ).lean<UserRecord | null>()
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      throw new ProfileUnavailableError()
+    }
+
+    throw error
+  }
 }
 
 export async function getUserProfile(username: string): Promise<UserProfileData> {
-  await dbConnect()
+  let user: UserRecord | null
 
-  const decodedUsername = decodeURIComponent(username)
-  const user = await User.findOne({
-    $or: [
-      { username: decodedUsername },
-      { clerkId: decodedUsername },
-    ],
-  }).lean<UserRecord | null>()
+  try {
+    await dbConnect()
+
+    const decodedUsername = decodeURIComponent(username)
+    user = await User.findOne({
+      $or: [
+        { username: decodedUsername },
+        { clerkId: decodedUsername },
+      ],
+    }).lean<UserRecord | null>()
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      throw new ProfileUnavailableError()
+    }
+
+    throw error
+  }
 
   if (!user) {
     notFound()

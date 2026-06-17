@@ -13,6 +13,7 @@ import WeaponStats from '@/lib/models/WeaponStats'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
 import type { PanelStat } from '@/components/panels/scaling-utils'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildFallbackHeroStatsBySlug } from '@/lib/hero-stats-shared'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { normalizeAbilityStats } from '@/lib/ability-editor-types'
@@ -217,7 +218,17 @@ function serializeStoredHeroInfo(heroInfo: HeroInfoRecord): HeroInfoDefinition {
 }
 
 export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbilityPayload | null> {
-  await dbConnect()
+  try {
+    await dbConnect()
+  } catch (error) {
+    const fallbackStats = buildFallbackHeroStatsBySlug(slug)
+
+    if (fallbackStats) {
+      return fallbackStats
+    }
+
+    throw error
+  }
 
   const customHeroById = Types.ObjectId.isValid(slug)
     ? await CustomHero.findById(slug).select('_id slug name portrait render').lean<HeroRecord | null>()
