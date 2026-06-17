@@ -2,12 +2,12 @@ import type { NextConfig } from "next";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz",
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz https://challenges.cloudflare.com",
   "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
   "font-src 'self' fonts.gstatic.com",
   "img-src 'self' data: blob: img.clerk.com images.clerk.dev https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz utfs.io",
-  "connect-src 'self' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz https://cursedconcepts.xyz *.uploadthing.com utfs.io",
-  "frame-src 'self' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz https://cursedconcepts.xyz",
+  "connect-src 'self' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz https://cursedconcepts.xyz https://challenges.cloudflare.com *.uploadthing.com utfs.io",
+  "frame-src 'self' *.clerk.com https://*.clerk.accounts.dev https://clerk.cursedconcepts.xyz https://cursedconcepts.xyz https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

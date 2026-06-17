@@ -14,16 +14,26 @@ describe('security hardening', () => {
     const headersConfig = await nextConfig.headers?.()
     const headers = new Map(headersConfig?.[0]?.headers.map(header => [header.key, header.value]))
     const csp = headers.get('Content-Security-Policy') ?? ''
+    const directives = new Map(csp.split('; ').map(directive => {
+      const [name, ...sources] = directive.split(' ')
+
+      return [name, sources]
+    }))
+    const scriptSrc = directives.get('script-src') ?? []
+    const connectSrc = directives.get('connect-src') ?? []
+    const imgSrc = directives.get('img-src') ?? []
+    const frameSrc = directives.get('frame-src') ?? []
 
     expect(headers.get('Strict-Transport-Security')).toBe('max-age=63072000; includeSubDomains; preload')
     expect(headers.get('X-Frame-Options')).toBe('SAMEORIGIN')
     expect(headers.get('X-Content-Type-Options')).toBe('nosniff')
     expect(headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
     expect(csp).toContain("default-src 'self'")
-    expect(csp).toContain('*.clerk.com')
+    expect(scriptSrc).toEqual(expect.arrayContaining(['*.clerk.com', 'https://clerk.cursedconcepts.xyz', 'https://challenges.cloudflare.com']))
+    expect(connectSrc).toEqual(expect.arrayContaining(['*.clerk.com', 'https://clerk.cursedconcepts.xyz', 'https://cursedconcepts.xyz', 'https://challenges.cloudflare.com']))
+    expect(imgSrc).toEqual(expect.arrayContaining(['https://clerk.cursedconcepts.xyz']))
+    expect(frameSrc).toEqual(expect.arrayContaining(['*.clerk.com', 'https://clerk.cursedconcepts.xyz', 'https://cursedconcepts.xyz', 'https://challenges.cloudflare.com']))
     expect(csp).toContain('https://*.clerk.accounts.dev')
-    expect(csp).toContain('https://clerk.cursedconcepts.xyz')
-    expect(csp).toContain('https://cursedconcepts.xyz')
     expect(csp).toContain('*.uploadthing.com')
     expect(csp).toContain('fonts.googleapis.com')
     expect(csp).toContain('utfs.io')
