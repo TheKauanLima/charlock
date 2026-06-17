@@ -22,9 +22,22 @@ describe('security hardening', () => {
     expect(csp).toContain("default-src 'self'")
     expect(csp).toContain('*.clerk.com')
     expect(csp).toContain('https://*.clerk.accounts.dev')
+    expect(csp).toContain('https://clerk.cursedconcepts.xyz')
+    expect(csp).toContain('https://cursedconcepts.xyz')
     expect(csp).toContain('*.uploadthing.com')
     expect(csp).toContain('fonts.googleapis.com')
     expect(csp).toContain('utfs.io')
+  })
+
+  it('allows production Clerk avatar images through Next image remote patterns', () => {
+    expect(nextConfig.images?.remotePatterns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          protocol: 'https',
+          hostname: 'clerk.cursedconcepts.xyz',
+        }),
+      ]),
+    )
   })
 
   it('rejects undocumented payload fields with strict Zod schemas', () => {
