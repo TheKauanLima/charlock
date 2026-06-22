@@ -5,9 +5,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
-import { getNextScaling } from '@/components/panels/scaling-utils'
+import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
-import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX } from '@/lib/ability-editor-types'
 import type {
   AbilityDefinition,
   AbilityGridCell,
@@ -76,6 +75,7 @@ interface AbilityEditorProps {
   heroInfo?: HeroInfoDefinition
   activeAbilityTarget?: AbilityEditorTarget
   secondaryAbilities?: AbilityDefinition[]
+  secondaryAbilitySlots?: number[]
   secondaryAbilityAnchorIndex?: number
   isSecondAbilitySetEnabled?: boolean
   abilityIconGroups?: AbilityIconGroup[]
@@ -187,13 +187,6 @@ function createStat(id: string, label = 'New Stat'): AbilityGridCell {
     icon: '/panorama/images/icons/properties/spirit.svg',
     scaling: 'none',
     scalingValue: '0',
-  }
-}
-
-function updateStatScaling(stat: AbilityStat): AbilityStat {
-  return {
-    ...stat,
-    scaling: getNextScaling(stat.scaling),
   }
 }
 
@@ -479,8 +472,21 @@ function removeAdjacentDuplicateInlineIcons(wrapper: HTMLElement) {
   }
 }
 
+function syncAbilityNames(ability: AbilityDefinition): AbilityDefinition {
+  return {
+    ...ability,
+    tiers: ability.tiers.map(tier => ({
+      ...tier,
+      variant: {
+        ...tier.variant,
+        name: ability.name,
+      },
+    })),
+  }
+}
+
 function cloneAbility(ability: AbilityDefinition): AbilityDefinition {
-  return structuredClone(ability)
+  return syncAbilityNames(structuredClone(ability))
 }
 
 function getAbilityIconGroupsAsAssets(groups: AbilityIconGroup[]): EditorAssetGroup[] {
@@ -541,7 +547,23 @@ function updateActiveAndHigherVariants(ability: AbilityDefinition, activeTier: A
   }
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilityAnchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onSave, onCancel }: AbilityEditorProps) {
+function hasCooldownEnabled(variant: AbilityVariant) {
+  return variant.hasCooldown !== false
+}
+
+function getSectionActionLabel(section: AbilitySection) {
+  return section.title.trim() || (section.type === 'richText' ? 'Text' : 'Grid')
+}
+
+function getRichTextAriaLabel(section: AbilityRichTextSection) {
+  return section.title.trim() || 'Ability text'
+}
+
+function getMainCellTitleInputValue(cell: AbilityGridCell) {
+  return cell.label === 'Damage' || cell.label === 'Value' ? '' : cell.label
+}
+
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onSave, onCancel }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
   const [draftAbility, setDraftAbility] = useState(() => cloneAbility(ability))
@@ -552,6 +574,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   const tierSystemRef = useRef<HTMLElement | null>(null)
   const [iconTarget, setIconTarget] = useState<IconTarget | null>(null)
   const [abilityIconTarget, setAbilityIconTarget] = useState<AbilityEditorTarget | null>(null)
+  const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
   const [iconSearch, setIconSearch] = useState('')
   const [selectedIconColor, setSelectedIconColor] = useState('')
   const [baseTierButtonStyle, setBaseTierButtonStyle] = useState<CSSProperties>({ visibility: 'hidden' })
@@ -569,6 +592,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     })).filter(group => group.assets.length)
   }, [iconSearch, propertyIconGroups])
   const activeAbility = getActiveVariant(draftAbility, activeTier)
+  const abilityName = draftAbility.name
   const abilityIconPickerGroups = useMemo(() => {
     const query = iconSearch.trim().toLowerCase()
 
@@ -656,6 +680,17 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     setDraftAbility(current => ({
       ...current,
       tiers: current.tiers.map(tier => tier.tier === tierToUpdate ? { ...tier, upgradeText } : tier),
+    }))
+  }
+
+  function updateAbilityName(name: string) {
+    if (!capabilities.canEditText) {
+      return
+    }
+
+    setDraftAbility(current => syncAbilityNames({
+      ...current,
+      name,
     }))
   }
 
@@ -834,32 +869,22 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     setIconSearch('')
   }
 
-  function shouldIgnoreStatBoxClick(target: EventTarget) {
-    return target instanceof HTMLElement && Boolean(target.closest('input, button, textarea, select'))
-  }
-
-  function handleStatBoxKeyDown(event: KeyboardEvent<HTMLDivElement>, stat: AbilityStat, onChange: (stat: AbilityStat) => void) {
-    if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) {
-      return
-    }
-
-    event.preventDefault()
-    onChange(updateStatScaling(stat))
-  }
-
   function renderInlineStat(stat: AbilityStat, label: string, onChange: (stat: AbilityStat) => void, onIconClick: () => void, variant: 'timing' | 'sub' | 'main' | 'lower' = 'sub') {
     const showAppend = (variant === 'main' || variant === 'lower') && (capabilities.canEditStats || Boolean(stat.append))
     const showDetail = variant !== 'lower'
+    const valueInputStyle = { width: `${Math.max(2, String(stat.value).length + 1)}ch` }
     const unitInputStyle = variant === 'main'
       ? { width: `${Math.max(4, (stat.unit ?? '').length + 1)}ch`, visibility: 'visible' as const }
-      : variant === 'timing' || variant === 'sub'
+      : variant === 'sub'
+        ? { width: stat.unit ? `${Math.max(2, stat.unit.length + 1)}ch` : '2ch', visibility: (capabilities.canEditStats || stat.unit) ? 'visible' as const : 'hidden' as const }
+        : variant === 'timing'
         ? { width: stat.unit ? `${Math.max(2, stat.unit.length + 1)}ch` : '0px', visibility: stat.unit ? 'visible' as const : 'hidden' as const }
         : undefined
     const appendInputStyle = showAppend
       ? { width: stat.append ? `${Math.max(3, stat.append.length + 1)}ch` : '2ch' }
       : undefined
-    const nextValue = (value: string) => variant === 'main' ? value : value.replace(/[^\d.-]/g, '')
-    const statLabel = capabilities.canEditStats ? `${label} stat. Scaling ${stat.scaling}. Click box to change scaling.` : `${label} stat`
+    const nextValue = (value: string) => variant === 'main' ? value.replace(/\s+/g, '') : value.replace(/[^\d.-]/g, '')
+    const statLabel = capabilities.canEditStats ? `${label} stat. Scaling ${stat.scaling}. Use the scaling button to edit scaling.` : `${label} stat`
     const iconContent = (
       <span
         className={cn(styles.propertyIcon, isIntrinsicColorPropertyIcon(stat.icon) && styles.propertyIconOriginalColor)}
@@ -881,14 +906,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
         data-scaling={stat.scaling}
         data-testid={`ability-stat-${variant}-${label.toLowerCase().replaceAll(' ', '-')}`}
         role="group"
-        tabIndex={capabilities.canEditStats ? 0 : undefined}
         aria-label={statLabel}
-        onClick={!capabilities.canEditStats ? undefined : event => {
-          if (!shouldIgnoreStatBoxClick(event.target)) {
-            onChange(updateStatScaling(stat))
-          }
-        }}
-        onKeyDown={!capabilities.canEditStats ? undefined : event => handleStatBoxKeyDown(event, stat, onChange)}
       >
         {variant === 'main' ? (
           <div className={styles.mainRow}>
@@ -897,8 +915,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               <span className={styles.srOnly}>Value</span>
               <input
                 className={styles.valueInput}
-                style={{ width: `${Math.max(1, String(stat.value).length)}ch` }}
+                style={valueInputStyle}
                 value={stat.value}
+                placeholder="0"
                 readOnly={!capabilities.canEditStats}
                 tabIndex={capabilities.canEditStats ? undefined : -1}
                 onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
@@ -911,6 +930,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                   className={styles.appendInput}
                   style={appendInputStyle}
                   value={stat.append ?? ''}
+                  placeholder="+"
                   readOnly={!capabilities.canEditStats}
                   tabIndex={capabilities.canEditStats ? undefined : -1}
                   onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { append: event.target.value }))}
@@ -925,8 +945,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               <span className={styles.srOnly}>Value</span>
               <input
                 className={styles.valueInput}
-                style={variant === 'timing' || variant === 'sub' || variant === 'lower' ? { width: `${Math.max(1, String(stat.value).length)}ch` } : undefined}
+                style={variant === 'timing' || variant === 'sub' || variant === 'lower' ? valueInputStyle : undefined}
                 value={stat.value}
+                placeholder="0"
                 readOnly={!capabilities.canEditStats}
                 tabIndex={capabilities.canEditStats ? undefined : -1}
                 onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
@@ -939,6 +960,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                   className={styles.appendInput}
                   style={appendInputStyle}
                   value={stat.append ?? ''}
+                  placeholder="+"
                   readOnly={!capabilities.canEditStats}
                   tabIndex={capabilities.canEditStats ? undefined : -1}
                   onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { append: event.target.value }))}
@@ -953,7 +975,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           <input
             className={styles.unitInput}
             style={unitInputStyle}
-            placeholder={variant === 'main' ? 'Detail' : undefined}
+            placeholder={variant === 'main' ? 'Detail' : 'Unit'}
             value={stat.unit ?? ''}
             readOnly={!capabilities.canEditStats}
             tabIndex={capabilities.canEditStats ? undefined : -1}
@@ -968,6 +990,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               className={styles.statLabelInput}
               value={stat.label}
               aria-label="Detail"
+              placeholder="Detail"
               readOnly={!capabilities.canEditStats}
               tabIndex={capabilities.canEditStats ? undefined : -1}
               onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { label: event.target.value }))}
@@ -975,14 +998,26 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           </label>
         ) : null}
         <span className={styles.scalingValueWrap}>
-          <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} isEditable={capabilities.canEditStats} onChange={scalingValue => onChange(updateStat(stat, { scalingValue }))} />
+          {capabilities.canEditStats ? (
+            <ScalingPicker
+              label={label}
+              scaling={stat.scaling}
+              scalingValue={stat.scalingValue}
+              boundaryRef={mainEditorColumnRef}
+              openPickerId={openScalingPickerId}
+              onChange={updates => onChange(updateStat(stat, updates))}
+              onOpenPickerChange={setOpenScalingPickerId}
+            />
+          ) : (
+            <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} />
+          )}
         </span>
       </div>
     )
   }
 
   return (
-    <section className={cn(styles.focusShell, isPreviewMode && styles.focusShellPreview, className)} data-testid="ability-editor" aria-label={`${isPreviewMode ? 'Ability preview' : 'Ability editor'} for ${activeAbility.name}`}>
+    <section className={cn(styles.focusShell, isPreviewMode && styles.focusShellPreview, className)} data-testid="ability-editor" aria-label={`${isPreviewMode ? 'Ability preview' : 'Ability editor'} for ${abilityName}`}>
       <div className={styles.focusBackdrop} />
       {hero && heroInfo && capabilities.showHeroInfoCluster ? (
         <>
@@ -990,12 +1025,12 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             <button
             type="button"
             className={cn(styles.secondAbilityToggle, isSecondAbilitySetEnabled && styles.secondAbilityToggleActive)}
-            aria-label="Second Ability Set"
+            aria-label="Secondary Abilities"
             aria-pressed={isSecondAbilitySetEnabled}
-            onClick={() => onSecondAbilitySetToggle?.(!isSecondAbilitySetEnabled, draftAbility)}
+            onClick={() => onSecondAbilitySetToggle?.(true, syncAbilityNames(draftAbility))}
             >
               <span>2nd</span>
-              <strong>Set</strong>
+              <strong>Slots</strong>
             </button>
           ) : null}
           <AbilityHeroInfoCluster
@@ -1003,6 +1038,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             heroInfo={heroInfo}
             activeTarget={activeAbilityTarget ?? { set: 'primary', index: draftAbility.slot - 1 }}
             secondaryAbilities={secondaryAbilities}
+            secondaryAbilitySlots={secondaryAbilitySlots}
             secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
             editable={capabilities.canChangeIcons}
             onAbilityClick={target => {
@@ -1010,7 +1046,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
               if (!capabilities.canChangeIcons) {
                 if (target.set !== currentTarget.set || target.index !== currentTarget.index) {
-                  onAbilitySelect?.(target, draftAbility)
+                  onAbilitySelect?.(target, syncAbilityNames(draftAbility))
                 }
 
                 return
@@ -1021,7 +1057,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 return
               }
 
-              onAbilitySelect?.(target, draftAbility)
+              onAbilitySelect?.(target, syncAbilityNames(draftAbility))
             }}
           />
         </>
@@ -1050,16 +1086,22 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 ) : null}
                 <label className={styles.nameInputWrap}>
                   <span className={styles.srOnly}>Ability Name</span>
-                  <input value={activeAbility.name} readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => setActiveAbility(current => ({ ...current, name: event.target.value }))} />
+                  <input value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
                 </label>
               </div>
 
               <div className={styles.timingPanel}>
                 {capabilities.canToggleCharges ? (
-                  <label className={styles.chargeToggle}>
-                    <input type="checkbox" checked={activeAbility.hasCharges} onChange={event => setActiveAbility(current => ({ ...current, hasCharges: event.target.checked }), { cascadeToHigher: true })} />
-                    Charges
-                  </label>
+                  <div className={styles.timingToggleRow}>
+                    <label className={styles.chargeToggle}>
+                      <input type="checkbox" checked={activeAbility.hasCharges} onChange={event => setActiveAbility(current => ({ ...current, hasCharges: event.target.checked }), { cascadeToHigher: true })} />
+                      Charges
+                    </label>
+                    <label className={styles.chargeToggle}>
+                      <input type="checkbox" checked={hasCooldownEnabled(activeAbility)} onChange={event => setActiveAbility(current => ({ ...current, hasCooldown: event.target.checked }), { cascadeToHigher: true })} />
+                      Cooldown
+                    </label>
+                  </div>
                 ) : null}
                 {activeAbility.hasCharges ? (
                   <div className={styles.chargeGrid}>
@@ -1067,7 +1109,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                     {renderInlineStat(activeAbility.rechargeTime, 'Recharge Time', rechargeTime => setActiveAbility(current => ({ ...current, rechargeTime }), { cascadeToHigher: true }), () => setIconTarget({ type: 'rechargeTime' }), 'timing')}
                   </div>
                 ) : null}
-                {renderInlineStat(activeAbility.cooldown, 'Cooldown', cooldown => setActiveAbility(current => ({ ...current, cooldown }), { cascadeToHigher: true }), () => setIconTarget({ type: 'cooldown' }), 'timing')}
+                {hasCooldownEnabled(activeAbility) ? renderInlineStat(activeAbility.cooldown, 'Cooldown', cooldown => setActiveAbility(current => ({ ...current, cooldown }), { cascadeToHigher: true }), () => setIconTarget({ type: 'cooldown' }), 'timing') : null}
               </div>
               </header>
 
@@ -1088,17 +1130,13 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               {activeAbility.sections.map(section => (
                 <article key={section.id} className={styles.section}>
                   {capabilities.canDeleteSections ? (
-                    <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${section.title} section`} onClick={() => removeSection(section.id)}>
+                    <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${getSectionActionLabel(section)} section`} onClick={() => removeSection(section.id)}>
                     <X aria-hidden="true" />
                     </button>
                   ) : null}
 
                   {section.type === 'richText' ? (
                     <>
-                      <label className={styles.sectionTitleLabel}>
-                        <span className={styles.srOnly}>Section Title</span>
-                        <input value={section.title} readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateSection(section.id, current => ({ ...current, title: event.target.value }))} />
-                      </label>
                       <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }))} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
                     </>
                   ) : (
@@ -1135,8 +1173,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
         <aside className={styles.returnPanel}>
           <p>{isPreviewMode ? 'Ability Preview' : 'Focused Ability Editor'}</p>
-          <h2>{activeAbility.name}</h2>
-          <button type="button" className={styles.saveReturnButton} onClick={() => isPreviewMode ? onCancel?.() : onSave?.(draftAbility)}>
+          <h2>{abilityName}</h2>
+          <button type="button" className={styles.saveReturnButton} onClick={() => isPreviewMode ? onCancel?.() : onSave?.(syncAbilityNames(draftAbility))}>
             Go Back
           </button>
         </aside>
@@ -1287,6 +1325,7 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
   const handledToolbarPointerRef = useRef(false)
   const visibleLineCount = text.split(/\r?\n/).length
   const isDense = visibleLineCount > 4 || text.length > 92
+  const isEmpty = text.trim().length === 0
 
   useEffect(() => {
     if (!editorRef.current || document.activeElement === editorRef.current || lastTextRef.current === text) {
@@ -1348,6 +1387,10 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
     }
 
     const nextText = editableHtmlToTokenText(editorRef.current)
+
+    if (!nextText.trim()) {
+      editorRef.current.innerHTML = ''
+    }
 
     lastTextRef.current = nextText
     onTextChange(nextText)
@@ -1433,6 +1476,8 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
         contentEditable={!readOnly}
         role="textbox"
         aria-label={`Tier ${tier} upgrade text`}
+        data-placeholder={`Tier ${tier} upgrade`}
+        data-empty={isEmpty ? 'true' : undefined}
         spellCheck
         onFocus={onFocus}
         onKeyDown={readOnly ? undefined : event => event.stopPropagation()}
@@ -1454,12 +1499,13 @@ interface AbilityHeroInfoClusterProps {
   heroInfo: HeroInfoDefinition
   activeTarget: AbilityEditorTarget
   secondaryAbilities: AbilityDefinition[]
-  secondaryAbilityAnchorIndex: number
+  secondaryAbilitySlots?: number[]
+  secondaryAbilityAnchorIndex?: number
   editable?: boolean
   onAbilityClick: (target: AbilityEditorTarget) => void
 }
 
-function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbilities, secondaryAbilityAnchorIndex, editable = true, onAbilityClick }: AbilityHeroInfoClusterProps) {
+function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbilities, secondaryAbilitySlots, secondaryAbilityAnchorIndex, editable = true, onAbilityClick }: AbilityHeroInfoClusterProps) {
   const tags = [
     { text: heroInfo.tag1Text, tilt: heroInfo.tag1Tilt, offsetY: heroInfo.tag1OffsetY },
     { text: heroInfo.tag2Text, tilt: heroInfo.tag2Tilt, offsetY: heroInfo.tag2OffsetY },
@@ -1506,6 +1552,7 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
       <HeroAbilityIconRow
         heroInfo={heroInfo}
         secondaryAbilities={secondaryAbilities}
+        secondaryAbilitySlots={secondaryAbilitySlots}
         secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
         activeTarget={activeTarget}
         onAbilityClick={onAbilityClick}
@@ -1928,7 +1975,8 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
         className={styles.richEditable}
         contentEditable={!readOnly}
         role="textbox"
-        aria-label={`${section.title} rich text`}
+        aria-label={`${getRichTextAriaLabel(section)} rich text`}
+        data-placeholder="Write ability text..."
         spellCheck
         onKeyDown={readOnly ? undefined : handleEditorKeyDown}
         onMouseDown={readOnly ? undefined : handleEditorMouseDown}
@@ -1976,8 +2024,9 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
             <label className={styles.mainCellTitleLabel}>
               <span className={styles.srOnly}>Main Cell Title</span>
               <input
-                value={cell.label}
+                value={getMainCellTitleInputValue(cell)}
                 aria-label={`Main cell ${index + 1} title`}
+                placeholder="Detail"
                 readOnly={readOnly}
                 tabIndex={readOnly ? -1 : undefined}
                 onChange={readOnly ? undefined : event => onMainCellChange(index, { ...cell, label: event.target.value })}
@@ -2043,7 +2092,7 @@ function IconSearchModal({ groups, search, selectedIconColor, title = 'Property 
             ? { backgroundImage: `url('${asset.path}')` }
             : isAbilityPicker
               ? getWhiteAbilityIconVisualStyle(asset.path)
-              : getPropertyIconVisualStyle(asset.path, selectedIconColor)
+              : getPropertyIconVisualStyle(asset.path, selectedIconColor || '#ffffff')
         }
       />
       {isAbilityPicker ? null : asset.label}

@@ -18,11 +18,12 @@ import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_I
 import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
 import {
-  DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
   buildDefaultAbility,
   buildDefaultAbilityStats,
   buildDefaultSecondaryAbilities,
   getPrimaryAbilityIndexForSecondary,
+  getSecondaryAbilitySlots,
+  normalizeSecondaryAbilitySlots,
   normalizeAbilityStats,
 } from '@/lib/ability-editor-types'
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
@@ -92,7 +93,7 @@ interface ActiveAbilityTarget {
   index: number
 }
 
-type SecondAbilitySetModal = 'selectAnchor' | 'confirmRemove'
+type SecondAbilitySetModal = 'selectSlots' | 'confirmRemove'
 
 interface TagRotationDrag {
   tag: TagControl
@@ -223,6 +224,7 @@ function ColorField({ label, value, onChange }: ColorFieldProps) {
           type="text"
           value={value}
           onChange={event => onChange(event.target.value)}
+          placeholder="#ffffff"
           className={cn(styles.input, 'min-w-0 flex-1 text-[0.74rem] tracking-[0.08em]')}
           aria-label={`${label} hex value`}
         />
@@ -294,7 +296,7 @@ export default function HeroInfoEditor({
   const normalizedInitialAbilityDraft = normalizeAbilityStats(initialAbilityDraft, hero)
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
   const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizedInitialAbilityDraft)
-  const [isSecondAbilitySetEnabled, setIsSecondAbilitySetEnabled] = useState(() => Boolean(normalizedInitialAbilityDraft.secondaryAbilities))
+  const [secondarySlotSelection, setSecondarySlotSelection] = useState<number[]>(() => normalizedInitialAbilityDraft.secondaryAbilitySlots ?? [])
   const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(initialStatsDraft.weapon.stats))
   const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
@@ -475,6 +477,31 @@ export default function HeroInfoEditor({
     return savedHeroName.trim()
   }
 
+  function getDraftSecondaryAbilitySlots(draftToRead: AbilityStatsPayload) {
+    return draftToRead.secondaryAbilities
+      ? getSecondaryAbilitySlots(draftToRead.secondaryAbilitySlots, draftToRead.secondaryAbilityAnchorIndex, [])
+      : []
+  }
+
+  function buildSecondaryAbilitiesForSlots(currentDraft: AbilityStatsPayload, nextSlots: number[]) {
+    const currentSlots = getDraftSecondaryAbilitySlots(currentDraft)
+    const currentSecondaryAbilities = currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, currentSlots)
+
+    return nextSlots.map(primaryIndex => {
+      const currentSecondaryIndex = currentSlots.indexOf(primaryIndex)
+
+      return currentSecondaryIndex >= 0
+        ? currentSecondaryAbilities[currentSecondaryIndex] ?? buildDefaultAbility(primaryIndex + 1, hero)
+        : buildDefaultAbility(primaryIndex + 1, hero)
+    })
+  }
+
+  const secondaryAbilitySlots = getDraftSecondaryAbilitySlots(abilityStatsDraft)
+  const isSecondAbilitySetEnabled = secondaryAbilitySlots.length > 0
+  const secondaryAbilities = isSecondAbilitySetEnabled
+    ? abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)
+    : []
+
   function handleGlobalSave(status: CustomHeroStatus) {
     const name = getDraftName()
 
@@ -501,19 +528,18 @@ export default function HeroInfoEditor({
       abilityStats: isSecondAbilitySetEnabled
         ? {
           ...abilityStatsDraft,
-          secondaryAbilities: abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
-          secondaryAbilityAnchorIndex: abilityStatsDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+          secondaryAbilities: abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots),
+          secondaryAbilitySlots,
+          secondaryAbilityAnchorIndex: undefined,
         }
         : {
           ...abilityStatsDraft,
           secondaryAbilities: undefined,
+          secondaryAbilitySlots: undefined,
           secondaryAbilityAnchorIndex: undefined,
         },
     })
   }
-
-  const secondaryAbilities = isSecondAbilitySetEnabled ? abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero) : []
-  const secondaryAbilityAnchorIndex = abilityStatsDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
 
   function commitAbilityDraft(nextAbility: AbilityDefinition, target: ActiveAbilityTarget | null = activeAbilityTarget) {
     if (!target) {
@@ -528,7 +554,7 @@ export default function HeroInfoEditor({
         ? currentDraft.abilities.map((ability, index) => (index === target.index ? nextAbility : ability))
         : currentDraft.abilities,
       secondaryAbilities: target.set === 'secondary'
-        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero)).map((ability, index) => (index === target.index ? nextAbility : ability))
+        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, getDraftSecondaryAbilitySlots(currentDraft))).map((ability, index) => (index === target.index ? nextAbility : ability))
         : currentDraft.secondaryAbilities,
     }))
 
@@ -564,58 +590,105 @@ export default function HeroInfoEditor({
         ? currentDraft.abilities.map((ability, index) => (index === target.index ? { ...ability, icon: iconPath } : ability))
         : currentDraft.abilities,
       secondaryAbilities: target.set === 'secondary'
-        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero)).map((ability, index) => (index === target.index ? { ...ability, icon: iconPath } : ability))
+        ? (currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, getDraftSecondaryAbilitySlots(currentDraft))).map((ability, index) => (index === target.index ? { ...ability, icon: iconPath } : ability))
         : currentDraft.secondaryAbilities,
     }))
   }
 
+  function getPreferredSecondarySlot() {
+    if (activeAbilityTarget?.set === 'primary') {
+      return activeAbilityTarget.index
+    }
+
+    if (activeAbilityTarget?.set === 'secondary') {
+      return secondaryAbilitySlots[activeAbilityTarget.index] ?? null
+    }
+
+    return null
+  }
+
+  function openSecondAbilitySlotModal(preferredSlot: number | null = getPreferredSecondarySlot()) {
+    const nextSelection = secondaryAbilitySlots.length
+      ? secondaryAbilitySlots
+      : preferredSlot !== null
+        ? [preferredSlot]
+        : []
+
+    setSecondarySlotSelection(nextSelection)
+    setSecondAbilitySetModal('selectSlots')
+  }
+
   function handleSecondAbilitySetToggleRequest(enabled: boolean) {
     if (enabled) {
-      setIsSecondAbilitySetEnabled(true)
-      setAbilityStatsDraft(currentDraft => ({
-        ...currentDraft,
-        secondaryAbilities: currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
-        secondaryAbilityAnchorIndex: currentDraft.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
-      }))
-      setSecondAbilitySetModal('selectAnchor')
+      openSecondAbilitySlotModal()
       return
     }
 
     setSecondAbilitySetModal('confirmRemove')
   }
 
-  function enableSecondAbilitySet(anchorIndex: number) {
-    setIsSecondAbilitySetEnabled(true)
+  function toggleSecondarySlotSelection(slot: number) {
+    setSecondarySlotSelection(currentSelection => normalizeSecondaryAbilitySlots(
+      currentSelection.includes(slot)
+        ? currentSelection.filter(currentSlot => currentSlot !== slot)
+        : [...currentSelection, slot],
+    ))
+  }
+
+  function applySecondaryAbilitySlots() {
+    const nextSlots = normalizeSecondaryAbilitySlots(secondarySlotSelection)
+
+    if (!nextSlots.length) {
+      setSecondAbilitySetModal(null)
+      return
+    }
+
+    const currentSecondaryPrimaryIndex = activeAbilityTarget?.set === 'secondary'
+      ? secondaryAbilitySlots[activeAbilityTarget.index] ?? null
+      : null
+
     setAbilityStatsDraft(currentDraft => ({
       ...currentDraft,
-      secondaryAbilities: currentDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero),
-      secondaryAbilityAnchorIndex: anchorIndex,
+      secondaryAbilities: buildSecondaryAbilitiesForSlots(currentDraft, nextSlots),
+      secondaryAbilitySlots: nextSlots,
+      secondaryAbilityAnchorIndex: undefined,
     }))
     setSecondAbilitySetModal(null)
+
+    if (currentSecondaryPrimaryIndex === null) {
+      return
+    }
+
+    const nextSecondaryIndex = nextSlots.indexOf(currentSecondaryPrimaryIndex)
+
+    setActiveAbilityTarget(nextSecondaryIndex >= 0
+      ? { set: 'secondary', index: nextSecondaryIndex }
+      : { set: 'primary', index: currentSecondaryPrimaryIndex })
   }
 
   function removeSecondAbilitySet() {
     const nextPrimaryTarget = activeAbilityTarget?.set === 'secondary'
-      ? getPrimaryAbilityIndexForSecondary(activeAbilityTarget.index, secondaryAbilityAnchorIndex)
+      ? getPrimaryAbilityIndexForSecondary(activeAbilityTarget.index, secondaryAbilitySlots)
       : null
 
     setAbilityStatsDraft(currentDraft => ({
       ...currentDraft,
       secondaryAbilities: undefined,
+      secondaryAbilitySlots: undefined,
       secondaryAbilityAnchorIndex: undefined,
     }))
 
-    setIsSecondAbilitySetEnabled(false)
     setSecondAbilitySetModal(null)
+    setSecondarySlotSelection([])
 
     if (nextPrimaryTarget !== null) {
       setActiveAbilityTarget({ set: 'primary', index: nextPrimaryTarget })
     }
   }
 
-  function handleFocusedSecondAbilitySetToggle(enabled: boolean, currentAbility: AbilityDefinition) {
+  function handleFocusedSecondAbilitySetToggle(_enabled: boolean, currentAbility: AbilityDefinition) {
     commitAbilityDraft(currentAbility, activeAbilityTarget)
-    handleSecondAbilitySetToggleRequest(enabled)
+    openSecondAbilitySlotModal(currentAbility.slot - 1)
   }
 
   function updateTagTilt(tag: TagControl, tilt: number) {
@@ -677,25 +750,26 @@ export default function HeroInfoEditor({
           aria-labelledby="second-set-modal-title"
           data-testid="second-ability-set-modal"
         >
-          {secondAbilitySetModal === 'selectAnchor' ? (
+          {secondAbilitySetModal === 'selectSlots' ? (
             <>
               <div className={styles.secondSetModalHeader}>
-                <h2 id="second-set-modal-title">SELECT AN ANCHOR POINT</h2>
+                <h2 id="second-set-modal-title">SELECT SECONDARY ABILITIES</h2>
                 <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
                   X
                 </button>
               </div>
               <p className={styles.secondSetModalCopy}>
-                The anchored ability stays clean. The other three abilities receive a second ability icon.
+                Choose exactly which abilities receive a second ability icon.
               </p>
-              <div className={styles.anchorAbilityGrid} aria-label="Second ability set anchor choices">
+              <div className={styles.anchorAbilityGrid} aria-label="Secondary ability choices">
                 {ABILITY_CONTROLS.map((ability, index) => (
                   <button
                     key={ability.iconKey}
                     type="button"
-                    className={styles.anchorAbilityButton}
-                    aria-label={`Anchor ${ability.label}`}
-                    onClick={() => enableSecondAbilitySet(index)}
+                    className={cn(styles.anchorAbilityButton, secondarySlotSelection.includes(index) && styles.anchorAbilityButtonSelected)}
+                    aria-label={`Toggle secondary ${ability.label}`}
+                    aria-pressed={secondarySlotSelection.includes(index)}
+                    onClick={() => toggleSecondarySlotSelection(index)}
                   >
                     <span
                       className={styles.anchorAbilityIcon}
@@ -709,6 +783,14 @@ export default function HeroInfoEditor({
                     <strong>{ability.label}</strong>
                   </button>
                 ))}
+              </div>
+              <div className={styles.secondSetConfirmActions}>
+                <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
+                  Cancel
+                </button>
+                <button type="button" className={styles.secondSetDeleteButton} disabled={!secondarySlotSelection.length} onClick={applySecondaryAbilitySlots}>
+                  Apply Selection
+                </button>
               </div>
             </>
           ) : (
@@ -740,7 +822,7 @@ export default function HeroInfoEditor({
   if (activeAbilityTarget !== null) {
     const activeAbilityDraft = activeAbilityTarget.set === 'primary'
       ? abilityStatsDraft.abilities[activeAbilityTarget.index] ?? buildDefaultAbility(activeAbilityTarget.index + 1, hero)
-      : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero)[activeAbilityTarget.index]
+      : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)[activeAbilityTarget.index]
 
     return (
       <>
@@ -752,7 +834,7 @@ export default function HeroInfoEditor({
           heroInfo={draft}
           activeAbilityTarget={activeAbilityTarget}
           secondaryAbilities={secondaryAbilities}
-          secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+          secondaryAbilitySlots={secondaryAbilitySlots}
           isSecondAbilitySetEnabled={isSecondAbilitySetEnabled}
           abilityIconGroups={ABILITY_ICON_GROUPS}
           onHeroInfoChange={onDraftChange}
@@ -842,7 +924,7 @@ export default function HeroInfoEditor({
             <HeroAbilityIconRow
               heroInfo={draft}
               secondaryAbilities={secondaryAbilities}
-              secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+              secondaryAbilitySlots={secondaryAbilitySlots}
               onAbilityClick={setActiveAbilityTarget}
               className={styles.abilitiesRow}
               primaryTestIdPrefix="editor-ability"
@@ -993,6 +1075,7 @@ export default function HeroInfoEditor({
                     id="editor-name-font-size"
                     type="text"
                     value={draft.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE}
+                    placeholder={DEFAULT_HERO_NAME_FONT_SIZE}
                     onChange={event => updateDraft({ nameFontSize: event.target.value })}
                     className={styles.input}
                   />
@@ -1039,6 +1122,7 @@ export default function HeroInfoEditor({
                       max={TAG_TILT_MAX}
                       step="0.5"
                       value={draft[tag.tiltKey]}
+                      placeholder="0"
                       aria-label={`${tag.label} tilt`}
                       onChange={event => updateTagTilt(tag, parseTagControlNumber(event.target.value, draft[tag.tiltKey]))}
                       className={cn(styles.input, styles.compactInput)}
@@ -1053,6 +1137,7 @@ export default function HeroInfoEditor({
                       max="28"
                       step="1"
                       value={draft[tag.offsetKey]}
+                      placeholder="0"
                       aria-label={`${tag.label} vertical position`}
                       onChange={event => updateDraft({ [tag.offsetKey]: parseTagControlNumber(event.target.value, draft[tag.offsetKey]) })}
                       className={cn(styles.input, styles.compactInput)}
@@ -1138,25 +1223,26 @@ export default function HeroInfoEditor({
             aria-labelledby="second-set-modal-title"
             data-testid="second-ability-set-modal"
           >
-            {secondAbilitySetModal === 'selectAnchor' ? (
+            {secondAbilitySetModal === 'selectSlots' ? (
               <>
                 <div className={styles.secondSetModalHeader}>
-                  <h2 id="second-set-modal-title">SELECT AN ANCHOR POINT</h2>
+                  <h2 id="second-set-modal-title">SELECT SECONDARY ABILITIES</h2>
                   <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
                     ×
                   </button>
                 </div>
                 <p className={styles.secondSetModalCopy}>
-                  The anchored ability stays clean. The other three abilities receive a second ability icon.
+                  Choose exactly which abilities receive a second ability icon.
                 </p>
-                <div className={styles.anchorAbilityGrid} aria-label="Second ability set anchor choices">
+                <div className={styles.anchorAbilityGrid} aria-label="Secondary ability choices">
                   {ABILITY_CONTROLS.map((ability, index) => (
                     <button
                       key={ability.iconKey}
                       type="button"
-                      className={styles.anchorAbilityButton}
-                      aria-label={`Anchor ${ability.label}`}
-                      onClick={() => enableSecondAbilitySet(index)}
+                      className={cn(styles.anchorAbilityButton, secondarySlotSelection.includes(index) && styles.anchorAbilityButtonSelected)}
+                      aria-label={`Toggle secondary ${ability.label}`}
+                      aria-pressed={secondarySlotSelection.includes(index)}
+                      onClick={() => toggleSecondarySlotSelection(index)}
                     >
                       <span
                         className={styles.anchorAbilityIcon}
@@ -1170,6 +1256,14 @@ export default function HeroInfoEditor({
                       <strong>{ability.label}</strong>
                     </button>
                   ))}
+                </div>
+                <div className={styles.secondSetConfirmActions}>
+                  <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
+                    Cancel
+                  </button>
+                  <button type="button" className={styles.secondSetDeleteButton} disabled={!secondarySlotSelection.length} onClick={applySecondaryAbilitySlots}>
+                    Apply Selection
+                  </button>
                 </div>
               </>
             ) : (

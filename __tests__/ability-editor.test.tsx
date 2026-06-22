@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readdirSync } from 'node:fs'
+
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +16,19 @@ afterEach(() => {
 })
 
 describe('AbilityEditor', () => {
+  it('exposes every property icon asset in the icon picker groups', () => {
+    const exportedPaths = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.path)).sort()
+    const exportedLabels = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.label))
+    const directoryPaths = readdirSync('public/panorama/images/icons/properties')
+      .filter(fileName => fileName.endsWith('.svg'))
+      .map(fileName => `/panorama/images/icons/properties/${fileName}`)
+      .sort()
+
+    expect(exportedPaths).toEqual(directoryPaths)
+    expect(exportedLabels).toContain('Ammo Reload Auto')
+    expect(exportedLabels).toContain('Damage Bullet Color')
+  })
+
   it('shows the hero info cluster and changes ability circle icons from the focused editor', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
@@ -104,7 +119,7 @@ describe('AbilityEditor', () => {
 
     await user.clear(screen.getByLabelText('Ability Name'))
     await user.type(screen.getByLabelText('Ability Name'), 'Toggle Commit Check')
-    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
 
     expect(onSecondAbilitySetToggle).toHaveBeenCalledWith(true, expect.objectContaining({
       name: 'Toggle Commit Check',
@@ -112,10 +127,48 @@ describe('AbilityEditor', () => {
     }))
   })
 
+  it('exposes placeholders on editable ability text fields', () => {
+    const hero = HEROES[0]
+    const ability = structuredClone(buildDefaultAbilityStats(hero).abilities[0])
+
+    ability.tiers = ability.tiers.map(tier => ({
+      ...tier,
+      upgradeText: '',
+    }))
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ability Name')).toHaveAttribute('placeholder', 'Ability name')
+    expect(screen.getByLabelText('Description rich text')).toHaveAttribute('data-placeholder', 'Write ability text...')
+    expect(screen.getByLabelText('Tier 1 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 1 upgrade')
+    expect(screen.getByLabelText('Tier 1 upgrade text')).toHaveAttribute('data-empty', 'true')
+    expect(screen.getByLabelText('Tier 2 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 2 upgrade')
+    expect(screen.getByLabelText('Tier 3 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 3 upgrade')
+    expect(screen.getByLabelText('Main cell 1 title')).toHaveAttribute('placeholder', 'Detail')
+  })
+
   it('manages focused ability state and saves a scaled rich-text payload', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
-    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.tiers = ability.tiers.map(tier => ({
+      ...tier,
+      variant: {
+        ...tier.variant,
+        name: `Stale Tier ${tier.tier} Name`,
+      },
+    }))
 
     render(
       <AbilityEditor
@@ -127,6 +180,11 @@ describe('AbilityEditor', () => {
     )
 
     expect(screen.getByTestId('ability-editor')).toBeInTheDocument()
+    expect(screen.getByLabelText('Cooldown')).toBeChecked()
+    expect(screen.getByTestId('ability-stat-timing-cooldown')).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText('Cooldown'))
+    expect(screen.queryByTestId('ability-stat-timing-cooldown')).not.toBeInTheDocument()
 
     await user.clear(screen.getByLabelText('Ability Name'))
     await user.type(screen.getByLabelText('Ability Name'), 'Kinetic Fault')
@@ -134,19 +192,27 @@ describe('AbilityEditor', () => {
     const rangeStatBox = screen.getByTestId('ability-stat-sub-range')
 
     expect(rangeStatBox).toHaveAttribute('data-scaling', 'none')
-    await user.click(rangeStatBox)
+    await user.click(within(rangeStatBox).getByRole('button', { name: 'Edit Range scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Range scaling controls' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Range scaling to spirit' }))
     expect(rangeStatBox).toHaveAttribute('data-scaling', 'spirit')
-    await user.clear(within(rangeStatBox).getByLabelText('spirit scaling value'))
-    await user.type(within(rangeStatBox).getByLabelText('spirit scaling value'), '1.25')
+    await user.clear(within(rangeStatBox).getByLabelText('Range scaling value'))
+    await user.type(within(rangeStatBox).getByLabelText('Range scaling value'), '1.25')
 
     await user.click(screen.getByLabelText('Charges'))
     expect(screen.getByLabelText('Choose Recharge Time icon')).toBeInTheDocument()
+    await user.click(within(screen.getByTestId('ability-stat-timing-charges')).getByRole('button', { name: 'Edit Charges scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Charges scaling controls' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Range scaling controls' })).not.toBeInTheDocument()
+    await user.click(screen.getByLabelText('Ability Name'))
+    expect(screen.queryByRole('dialog', { name: 'Charges scaling controls' })).not.toBeInTheDocument()
 
     await user.click(screen.getByLabelText('Add sub-header stat'))
     expect(screen.getByRole('button', { name: 'Remove Stat' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Remove Stat' }))
     expect(screen.queryByRole('button', { name: 'Remove Stat' })).not.toBeInTheDocument()
     await user.click(screen.getByLabelText('Add sub-header stat'))
+    expect(within(screen.getByTestId('ability-stat-sub-stat')).getByLabelText('Unit')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Grid' }))
     expect(screen.getByRole('button', { name: 'Remove Stats section' })).toBeInTheDocument()
@@ -155,6 +221,7 @@ describe('AbilityEditor', () => {
 
     const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
 
+    expect(screen.queryByDisplayValue('Description')).not.toBeInTheDocument()
     expect(richTextEditor).toHaveTextContent('Abrams channels custom ability 1.')
     expect(richTextEditor).not.toHaveTextContent('[b]')
 
@@ -182,6 +249,7 @@ describe('AbilityEditor', () => {
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Kinetic Fault',
+      hasCooldown: false,
       hasCharges: true,
       subStats: expect.arrayContaining([
         expect.objectContaining({
@@ -204,7 +272,7 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text.indexOf('[i:heal]')).toBeLessThan(savedRichText?.text.indexOf(' channels') ?? 0)
   })
 
-  it('switches between tier variants without leaking edits into the base ability', async () => {
+  it('keeps ability names unified while tier-specific upgrade text stays isolated', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
@@ -229,9 +297,10 @@ describe('AbilityEditor', () => {
     expect(tierOneButton.className).toContain('tierBoxActive')
     expect(tierTwoButton.className).toContain('tierBoxFlashing')
     await user.click(tierOneButton)
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Abrams Ability 1')
 
     await user.clear(screen.getByLabelText('Ability Name'))
-    await user.type(screen.getByLabelText('Ability Name'), 'Tier One Variant')
+    await user.type(screen.getByLabelText('Ability Name'), 'Unified Ability Name')
 
     const tierOneText = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
 
@@ -271,20 +340,25 @@ describe('AbilityEditor', () => {
     expect(tierOneText.querySelector('strong')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: '0' }))
-    expect(screen.getByLabelText('Ability Name')).toHaveValue('Abrams Ability 1')
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Unified Ability Name')
 
     await user.click(tierOneButton)
-    expect(screen.getByLabelText('Ability Name')).toHaveValue('Tier One Variant')
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Unified Ability Name')
+
+    await user.click(tierTwoButton)
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Unified Ability Name')
 
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
+    const savedTierTwo = savedAbility?.tiers.find(tier => tier.tier === 2)
 
-    expect(savedAbility?.name).toBe('Abrams Ability 1')
+    expect(savedAbility?.name).toBe('Unified Ability Name')
     expect(savedAbility?.tiers).toHaveLength(3)
     expect(savedTierOne?.upgradeText).toBe('Tier one upgrade')
-    expect(savedTierOne?.variant.name).toBe('Tier One Variant')
+    expect(savedTierOne?.variant.name).toBe('Unified Ability Name')
+    expect(savedTierTwo?.variant.name).toBe('Unified Ability Name')
   })
 
   it('cascades stat edits from lower tiers into higher tiers', async () => {
@@ -496,12 +570,14 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Grid' }))
 
     expect(screen.queryByLabelText('Grid Section Title')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Main cell 1 title')).toHaveValue('Damage')
+    expect(screen.getByLabelText('Main cell 1 title')).toHaveValue('')
+    expect(screen.queryByDisplayValue('Damage')).not.toBeInTheDocument()
     const firstMainStat = screen.getByTestId('ability-stat-main-damage')
 
     expect(within(firstMainStat).getByPlaceholderText('Detail')).toBeVisible()
     await user.clear(within(firstMainStat).getByLabelText('Value'))
     await user.type(within(firstMainStat).getByLabelText('Value'), 'Impact Text')
+    expect(within(firstMainStat).getByLabelText('Value')).toHaveValue('ImpactText')
     await user.type(within(firstMainStat).getByLabelText('Append'), 'm')
     await user.type(within(firstMainStat).getByPlaceholderText('Detail'), 'Radius')
 
@@ -531,7 +607,7 @@ describe('AbilityEditor', () => {
       mainCells: expect.arrayContaining([
         expect.objectContaining({
           label: 'Impact Damage',
-          value: 'Impact Text',
+          value: 'ImpactText',
           append: 'm',
           unit: 'Radius',
         }),
@@ -574,7 +650,8 @@ describe('AbilityEditor', () => {
     await user.type(within(firstLowerStat).getByLabelText('Append'), '%')
     await user.clear(within(firstLowerStat).getByLabelText('Detail'))
     await user.type(within(firstLowerStat).getByLabelText('Detail'), 'Bonus')
-    await user.click(firstLowerStat)
+    await user.click(within(firstLowerStat).getByRole('button', { name: 'Edit Bonus scaling' }))
+    await user.click(screen.getByRole('button', { name: 'Set Bonus scaling to spirit' }))
     expect(firstLowerStat).toHaveAttribute('data-scaling', 'spirit')
     expect(lowerCellGrid.querySelectorAll('[class*="inlineStatEditorScaled"]')).toHaveLength(1)
     await user.click(screen.getByRole('button', { name: 'Remove lower cell 3' }))
@@ -646,7 +723,7 @@ describe('AbilityEditor', () => {
 
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'damage bullet')
 
-    const coloredIconOption = within(iconModal).getByRole('button', { name: 'Use Damage Bullet' })
+    const coloredIconOption = within(iconModal).getByRole('button', { name: 'Use Damage Bullet Color' })
     const coloredIconPreview = coloredIconOption.querySelector<HTMLElement>('span')
 
     expect(coloredIconPreview?.style.backgroundImage).toContain('damage_bullet_color.svg')
@@ -682,11 +759,14 @@ describe('AbilityEditor', () => {
 
     const iconModal = screen.getByTestId('property-icon-modal')
 
-    await user.click(within(iconModal).getByRole('button', { name: 'Green icon color' }))
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
 
     const healOption = within(iconModal).getByRole('button', { name: 'Use Heal' })
     const healPreview = healOption.querySelector<HTMLElement>('span')
+
+    expect(healPreview?.style.backgroundColor).toBe('rgb(255, 255, 255)')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Green icon color' }))
 
     expect(healPreview?.style.backgroundColor).toBe('rgb(46, 152, 96)')
 

@@ -43,6 +43,7 @@ const abilityVariantSchema = z.object({
   name: z.string().max(120).optional(),
   icon: z.string().max(500).optional(),
   cooldown: panelStatSchema.optional(),
+  hasCooldown: z.boolean().optional(),
   hasCharges: z.boolean().optional(),
   charges: panelStatSchema.optional(),
   rechargeTime: panelStatSchema.optional(),
@@ -118,7 +119,8 @@ export const customHeroSaveSchema = z.object({
   }).strict().default({}),
   abilityStats: z.object({
     abilities: z.array(abilityDefinitionSchema).max(4).optional(),
-    secondaryAbilities: z.array(abilityDefinitionSchema).max(3).optional(),
+    secondaryAbilities: z.array(abilityDefinitionSchema).max(4).optional(),
+    secondaryAbilitySlots: z.array(z.number().int().min(0).max(3)).max(4).optional(),
     secondaryAbilityAnchorIndex: z.number().int().min(0).max(3).optional(),
   }).strict().default({}),
 }).strict()

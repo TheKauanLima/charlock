@@ -36,6 +36,7 @@ export interface AbilityVariant {
   name: string
   icon: string
   cooldown: AbilityStat
+  hasCooldown: boolean
   hasCharges: boolean
   charges: AbilityStat
   rechargeTime: AbilityStat
@@ -59,6 +60,7 @@ export interface AbilityDefinition extends AbilityVariant {
 export interface AbilityStatsPayload {
   abilities: AbilityDefinition[]
   secondaryAbilities?: AbilityDefinition[]
+  secondaryAbilitySlots?: number[]
   secondaryAbilityAnchorIndex?: number
 }
 
@@ -71,6 +73,9 @@ const DEFAULT_PROPERTY_ICON = '/panorama/images/icons/properties/cooldown.svg'
 const DEFAULT_GRID_ICON = '/panorama/images/icons/properties/damage_magic_color.svg'
 const DEFAULT_HEAL_ICON = '/panorama/images/icons/properties/heal.svg'
 export const DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX = 3
+export const DEFAULT_SECONDARY_ABILITY_SLOTS = [0, 1, 2]
+const ALL_SECONDARY_ABILITY_SLOTS = [0, 1, 2, 3]
+type SecondaryAbilitySlotConfig = number[] | number
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -90,6 +95,42 @@ function getSecondaryAnchorIndex(value: unknown) {
   return Number.isInteger(numericValue) && numericValue >= 0 && numericValue <= 3
     ? numericValue
     : DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
+}
+
+export function normalizeSecondaryAbilitySlots(value: unknown, fallback: number[] = []) {
+  if (!Array.isArray(value)) {
+    return fallback
+  }
+
+  const slots = value
+    .map(slot => (typeof slot === 'number' ? slot : Number(slot)))
+    .filter(slot => Number.isInteger(slot) && slot >= 0 && slot <= 3)
+
+  return ALL_SECONDARY_ABILITY_SLOTS.filter(slot => slots.includes(slot))
+}
+
+export function getSecondaryAbilitySlotsForAnchor(anchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX) {
+  return ALL_SECONDARY_ABILITY_SLOTS.filter(primaryIndex => primaryIndex !== anchorIndex)
+}
+
+export function getSecondaryAbilitySlots(value?: unknown, legacyAnchorIndex?: unknown, fallback = DEFAULT_SECONDARY_ABILITY_SLOTS) {
+  const slots = normalizeSecondaryAbilitySlots(value)
+
+  if (slots.length) {
+    return slots
+  }
+
+  if (legacyAnchorIndex !== undefined && legacyAnchorIndex !== null) {
+    return getSecondaryAbilitySlotsForAnchor(getSecondaryAnchorIndex(legacyAnchorIndex))
+  }
+
+  return fallback
+}
+
+function getSecondaryAbilitySlotsFromConfig(config: SecondaryAbilitySlotConfig = DEFAULT_SECONDARY_ABILITY_SLOTS) {
+  return typeof config === 'number'
+    ? getSecondaryAbilitySlotsForAnchor(config)
+    : normalizeSecondaryAbilitySlots(config, DEFAULT_SECONDARY_ABILITY_SLOTS)
 }
 
 function getScaling(value: unknown): ScalingType {
@@ -162,6 +203,7 @@ function buildDefaultAbilityVariant(slot: number, hero: AbilityHeroLike, idPrefi
       unit: 's',
       icon: DEFAULT_PROPERTY_ICON,
     }),
+    hasCooldown: true,
     hasCharges: false,
     charges: buildAbilityStat({
       label: 'Charges',
@@ -296,6 +338,7 @@ export function normalizeAbilityDefinition(value: unknown, fallback: AbilityDefi
       name: getString(variantRecord.name, fallbackVariant.name),
       icon: getString(variantRecord.icon, fallbackVariant.icon),
       cooldown: normalizeAbilityStat(variantRecord.cooldown, fallbackVariant.cooldown),
+      hasCooldown: getBoolean(variantRecord.hasCooldown, fallbackVariant.hasCooldown),
       hasCharges: getBoolean(variantRecord.hasCharges, fallbackVariant.hasCharges),
       charges: normalizeAbilityStat(variantRecord.charges, fallbackVariant.charges),
       rechargeTime: normalizeAbilityStat(variantRecord.rechargeTime, fallbackVariant.rechargeTime),
@@ -334,20 +377,19 @@ export function buildDefaultAbilityStats(hero: HeroDefinition | AbilityHeroLike)
   }
 }
 
-export function buildDefaultSecondaryAbilities(hero: HeroDefinition | AbilityHeroLike): AbilityDefinition[] {
-  return [1, 2, 3].map(slot => buildDefaultAbility(slot, hero))
+export function buildDefaultSecondaryAbilities(hero: HeroDefinition | AbilityHeroLike, secondaryAbilitySlots = DEFAULT_SECONDARY_ABILITY_SLOTS): AbilityDefinition[] {
+  return secondaryAbilitySlots.map(primaryIndex => buildDefaultAbility(primaryIndex + 1, hero))
 }
 
-export function getSecondaryAbilityIndexForPrimary(primaryIndex: number, anchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX) {
-  if (primaryIndex === anchorIndex || primaryIndex < 0 || primaryIndex > 3) {
-    return null
-  }
+export function getSecondaryAbilityIndexForPrimary(primaryIndex: number, slotConfig: SecondaryAbilitySlotConfig = DEFAULT_SECONDARY_ABILITY_SLOTS) {
+  const secondaryAbilitySlots = getSecondaryAbilitySlotsFromConfig(slotConfig)
+  const secondaryIndex = secondaryAbilitySlots.indexOf(primaryIndex)
 
-  return primaryIndex < anchorIndex ? primaryIndex : primaryIndex - 1
+  return secondaryIndex >= 0 ? secondaryIndex : null
 }
 
-export function getPrimaryAbilityIndexForSecondary(secondaryIndex: number, anchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX) {
-  const primaryIndexes = [0, 1, 2, 3].filter(primaryIndex => primaryIndex !== anchorIndex)
+export function getPrimaryAbilityIndexForSecondary(secondaryIndex: number, slotConfig: SecondaryAbilitySlotConfig = DEFAULT_SECONDARY_ABILITY_SLOTS) {
+  const primaryIndexes = getSecondaryAbilitySlotsFromConfig(slotConfig)
 
   return primaryIndexes[secondaryIndex] ?? 0
 }
@@ -357,9 +399,12 @@ export function normalizeAbilityStats(value: unknown, hero: HeroDefinition | Abi
   const record = isRecord(value) ? value : {}
   const sourceAbilities = Array.isArray(record.abilities) ? record.abilities : []
   const abilities = defaults.abilities.map((fallback, index) => normalizeAbilityDefinition(sourceAbilities[index], fallback))
-  const secondaryFallbacks = buildDefaultSecondaryAbilities(hero)
   const sourceSecondaryAbilities = Array.isArray(record.secondaryAbilities) ? record.secondaryAbilities : null
-  const secondaryAbilities = sourceSecondaryAbilities
+  const secondaryAbilitySlots = sourceSecondaryAbilities
+    ? getSecondaryAbilitySlots(record.secondaryAbilitySlots, record.secondaryAbilityAnchorIndex).slice(0, 4)
+    : undefined
+  const secondaryFallbacks = secondaryAbilitySlots ? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots) : []
+  const secondaryAbilities = sourceSecondaryAbilities && secondaryAbilitySlots
     ? secondaryFallbacks.map((fallback, index) => normalizeAbilityDefinition(sourceSecondaryAbilities[index], fallback))
     : undefined
 
@@ -367,7 +412,7 @@ export function normalizeAbilityStats(value: unknown, hero: HeroDefinition | Abi
     abilities,
     ...(secondaryAbilities ? {
       secondaryAbilities,
-      secondaryAbilityAnchorIndex: getSecondaryAnchorIndex(record.secondaryAbilityAnchorIndex),
+      secondaryAbilitySlots,
     } : {}),
   }
 }

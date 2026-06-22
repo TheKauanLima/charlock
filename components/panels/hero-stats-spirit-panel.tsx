@@ -1,9 +1,11 @@
 'use client'
 
-import type { ChangeEvent, CSSProperties } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent, CSSProperties, RefObject } from 'react'
 
 import { buildSpiritPowerStat, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'
-import { formatPanelValue, getNextScaling } from '@/components/panels/scaling-utils'
+import { formatPanelValue } from '@/components/panels/scaling-utils'
+import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 import cn from '@/lib/utilsd'
@@ -26,7 +28,10 @@ interface SpiritStatCellProps extends PanelStat {
   isPower?: boolean
   isEditable?: boolean
   showDetails?: boolean
+  boundaryRef?: RefObject<HTMLElement | null>
+  openScalingPickerId?: string | null
   onChange?: (updates: Partial<PanelStat>) => void
+  onOpenScalingPickerChange?: (pickerId: string | null) => void
 }
 
 interface IconAsset {
@@ -68,31 +73,13 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, showDetails = false, onChange }: SpiritStatCellProps) {
-  function handleClick() {
-    const nextScaling = getNextScaling(scaling)
-
-    onChange?.({
-      scaling: nextScaling,
-      scalingValue: nextScaling === 'none' ? '0' : scalingValue,
-    })
-  }
-
+function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: SpiritStatCellProps) {
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
   }
 
-  return (
-    <button
-      type="button"
-      className={cn(
-        styles.cell,
-        isPower && styles.powerCell,
-      )}
-      data-scaling={scaling}
-      onClick={handleClick}
-      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
-    >
+  const content = (
+    <>
       <span
         className={cn(styles.icon, isPower && styles.powerIcon)}
         style={getIconStyle(icon)}
@@ -105,7 +92,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
             className={styles.input}
             value={value}
             onChange={handleValueChange}
-            onClick={event => event.stopPropagation()}
+            placeholder="0"
             aria-label={`${label} value`}
           />
         ) : (
@@ -114,30 +101,88 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
         {unit ? <span className={styles.unit}>{unit}</span> : null}
         <span className={styles.label}>{label}</span>
       </span>
-      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+      {isEditable && onOpenScalingPickerChange ? (
+        <ScalingPicker
+          label={label}
+          scaling={scaling}
+          scalingValue={scalingValue}
+          boundaryRef={boundaryRef}
+          openPickerId={openScalingPickerId}
+          onChange={updates => onChange?.(updates)}
+          onOpenPickerChange={onOpenScalingPickerChange}
+        />
+      ) : (
+        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+      )}
+    </>
+  )
+
+  if (isEditable) {
+    return (
+      <div
+        className={cn(styles.cell, styles.editableCell, isPower && styles.powerCell)}
+        data-scaling={scaling}
+        role="group"
+        aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+      >
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        styles.cell,
+        isPower && styles.powerCell,
+      )}
+      data-scaling={scaling}
+      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+    >
+      {content}
     </button>
   )
 }
 
 export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerStat: spiritPowerStatProp, isEditable = false, showDetails = false, onStatsChange, onSpiritPowerStatChange }: HeroStatsSpiritPanelProps) {
-  const topStats = stats ?? buildTopSpiritStatsArray(statsSource)
-  const spiritPowerStat = spiritPowerStatProp ?? buildSpiritPowerStat(statsSource)
+  const panelRef = useRef<HTMLElement | null>(null)
+  const sourceTopStats = stats ?? buildTopSpiritStatsArray(statsSource)
+  const sourceSpiritPowerStat = spiritPowerStatProp ?? buildSpiritPowerStat(statsSource)
+  const [editedTopStats, setEditedTopStats] = useState<PanelStat[]>(() => sourceTopStats)
+  const [editedSpiritPowerStat, setEditedSpiritPowerStat] = useState<PanelStat>(() => sourceSpiritPowerStat)
+  const topStats = isEditable && !onStatsChange ? editedTopStats : sourceTopStats
+  const spiritPowerStat = isEditable && !onSpiritPowerStatChange ? editedSpiritPowerStat : sourceSpiritPowerStat
+  const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
 
   function handleTopStatChange(index: number, updates: Partial<PanelStat>) {
     const nextStats = topStats.map((stat, statIndex) => (statIndex === index ? { ...stat, ...updates } : stat))
 
-    onStatsChange?.(nextStats, nextStats[index])
+    if (onStatsChange) {
+      onStatsChange(nextStats, nextStats[index])
+      return
+    }
+
+    setEditedTopStats(nextStats)
   }
 
   function handleSpiritPowerStatChange(updates: Partial<PanelStat>) {
-    onSpiritPowerStatChange?.({
+    const nextStat = {
       ...spiritPowerStat,
       ...updates,
-    })
+    }
+
+    if (onSpiritPowerStatChange) {
+      onSpiritPowerStatChange(nextStat)
+      return
+    }
+
+    setEditedSpiritPowerStat(nextStat)
   }
 
   return (
     <section
+      ref={panelRef}
       className={styles.panel}
       aria-label="Spirit stats"
       data-testid="hero-stats-spirit-panel"
@@ -151,7 +196,7 @@ export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerSt
       <div className={styles.topStats}>
         <div className={styles.row}>
           {topStats.map((stat, index) => (
-            <SpiritStatCell key={`spirit-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} onChange={updates => handleTopStatChange(index, updates)} />
+            <SpiritStatCell key={`spirit-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={updates => handleTopStatChange(index, updates)} />
           ))}
         </div>
       </div>
@@ -161,7 +206,7 @@ export default function HeroStatsSpiritPanel({ statsSource, stats, spiritPowerSt
           <h3 className={styles.powerTitle}>Spirit Power Impact</h3>
         </div>
         <div className={styles.powerContent}>
-          <SpiritStatCell {...spiritPowerStat} isPower isEditable={isEditable} showDetails={showDetails} onChange={handleSpiritPowerStatChange} />
+          <SpiritStatCell {...spiritPowerStat} isPower isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={handleSpiritPowerStatChange} />
           {spiritPowerStat.description ? <p className={styles.description}>{spiritPowerStat.description}</p> : null}
         </div>
       </section>

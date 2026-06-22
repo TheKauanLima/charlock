@@ -2,7 +2,7 @@
 
 import type { CSSProperties, MouseEventHandler } from 'react'
 
-import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, getSecondaryAbilityIndexForPrimary } from '@/lib/ability-editor-types'
+import { DEFAULT_SECONDARY_ABILITY_SLOTS, getSecondaryAbilityIndexForPrimary, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityDefinition } from '@/lib/ability-editor-types'
 import type { HeroInfoDefinition } from '@/lib/hero-data'
 import cn from '@/lib/utilsd'
@@ -19,6 +19,7 @@ type AbilityIconKey = 'ability1Icon' | 'ability2Icon' | 'ability3Icon' | 'abilit
 interface HeroAbilityIconRowProps {
   heroInfo: HeroInfoDefinition
   secondaryAbilities?: AbilityDefinition[]
+  secondaryAbilitySlots?: number[]
   secondaryAbilityAnchorIndex?: number
   activeTarget?: AbilityIconTarget | null
   onAbilityClick?: (target: AbilityIconTarget) => void
@@ -35,7 +36,8 @@ const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ab
 export default function HeroAbilityIconRow({
   heroInfo,
   secondaryAbilities = [],
-  secondaryAbilityAnchorIndex = DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+  secondaryAbilitySlots,
+  secondaryAbilityAnchorIndex,
   activeTarget = null,
   onAbilityClick,
   className,
@@ -45,6 +47,10 @@ export default function HeroAbilityIconRow({
   secondaryLabel = slot => `Secondary Ability ${slot}`,
   editable = false,
 }: HeroAbilityIconRowProps) {
+  const visibleSecondaryAbilitySlots = secondaryAbilities.length
+    ? getSecondaryAbilitySlots(secondaryAbilitySlots, secondaryAbilityAnchorIndex, DEFAULT_SECONDARY_ABILITY_SLOTS)
+    : []
+
   return (
     <div className={cn(styles.row, className)} aria-label={editable ? 'Editable hero ability icons' : 'Hero abilities'}>
       {ABILITY_ICON_KEYS.map((iconKey, index) => {
@@ -52,7 +58,7 @@ export default function HeroAbilityIconRow({
         const primaryTarget: AbilityIconTarget = { set: 'primary', index }
         const isPrimaryActive = activeTarget?.set === 'primary' && activeTarget.index === index
         const secondaryIndex = secondaryAbilities.length
-          ? getSecondaryAbilityIndexForPrimary(index, secondaryAbilityAnchorIndex)
+          ? getSecondaryAbilityIndexForPrimary(index, visibleSecondaryAbilitySlots)
           : null
         const secondaryAbility = secondaryIndex !== null ? secondaryAbilities[secondaryIndex] : undefined
         const isSecondaryActive = secondaryIndex !== null && activeTarget?.set === 'secondary' && activeTarget.index === secondaryIndex

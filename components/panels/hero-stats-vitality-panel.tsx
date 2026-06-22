@@ -1,8 +1,10 @@
 'use client'
 
-import type { ChangeEvent, CSSProperties } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent, CSSProperties, RefObject } from 'react'
 
-import { formatPanelValue, getNextScaling } from '@/components/panels/scaling-utils'
+import { formatPanelValue } from '@/components/panels/scaling-utils'
+import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
@@ -24,7 +26,10 @@ interface VitalityStatCellProps extends PanelStat {
   isBottom?: boolean
   isEditable?: boolean
   showDetails?: boolean
+  boundaryRef?: RefObject<HTMLElement | null>
+  openScalingPickerId?: string | null
   onChange?: (updates: Partial<PanelStat>) => void
+  onOpenScalingPickerChange?: (pickerId: string | null) => void
 }
 
 interface IconAsset {
@@ -79,31 +84,13 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, showDetails = false, onChange }: VitalityStatCellProps) {
-  function handleClick() {
-    const nextScaling = getNextScaling(scaling)
-
-    onChange?.({
-      scaling: nextScaling,
-      scalingValue: nextScaling === 'none' ? '0' : scalingValue,
-    })
-  }
-
+function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: VitalityStatCellProps) {
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
   }
 
-  return (
-    <button
-      type="button"
-      className={cn(
-        styles.cell,
-        isBottom && styles.bottomCell,
-      )}
-      data-scaling={scaling}
-      onClick={handleClick}
-      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
-    >
+  const content = (
+    <>
       <span
         className={styles.icon}
         style={getIconStyle(icon)}
@@ -116,7 +103,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
             className={styles.input}
             value={value}
             onChange={handleValueChange}
-            onClick={event => event.stopPropagation()}
+            placeholder="0"
             aria-label={`${label} value`}
           />
         ) : (
@@ -126,25 +113,74 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
         <span className={styles.label}>{label}</span>
       </span>
       <span className={styles.scalingWrap}>
-        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+        {isEditable && onOpenScalingPickerChange ? (
+          <ScalingPicker
+            label={label}
+            scaling={scaling}
+            scalingValue={scalingValue}
+            boundaryRef={boundaryRef}
+            openPickerId={openScalingPickerId}
+            onChange={updates => onChange?.(updates)}
+            onOpenPickerChange={onOpenScalingPickerChange}
+          />
+        ) : (
+          <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+        )}
       </span>
+    </>
+  )
+
+  if (isEditable) {
+    return (
+      <div
+        className={cn(styles.cell, styles.editableCell, isBottom && styles.bottomCell)}
+        data-scaling={scaling}
+        role="group"
+        aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+      >
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        styles.cell,
+        isBottom && styles.bottomCell,
+      )}
+      data-scaling={scaling}
+      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+    >
+      {content}
     </button>
   )
 }
 
 export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable = false, showDetails = false, onStatsChange }: HeroStatsVitalityPanelProps) {
-  const vitalityStats = stats ?? buildVitalityStatsArray(statsSource)
+  const panelRef = useRef<HTMLElement | null>(null)
+  const sourceVitalityStats = stats ?? buildVitalityStatsArray(statsSource)
+  const [editedStats, setEditedStats] = useState<PanelStat[]>(() => sourceVitalityStats)
+  const vitalityStats = isEditable && !onStatsChange ? editedStats : sourceVitalityStats
   const topRows = splitRows(vitalityStats.slice(0, 9))
   const bottomRows = splitRows(vitalityStats.slice(9))
+  const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
 
   function handleStatChange(index: number, updates: Partial<PanelStat>) {
     const nextStats = vitalityStats.map((stat, statIndex) => (statIndex === index ? { ...stat, ...updates } : stat))
 
-    onStatsChange?.(nextStats, nextStats[index])
+    if (onStatsChange) {
+      onStatsChange(nextStats, nextStats[index])
+      return
+    }
+
+    setEditedStats(nextStats)
   }
 
   return (
     <section
+      ref={panelRef}
       className={styles.panel}
       aria-label="Vitality stats"
       data-testid="hero-stats-vitality-panel"
@@ -159,7 +195,7 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         {topRows.map((row, rowIndex) => (
           <div key={`vitality-top-${rowIndex}`} className={styles.row}>
             {row.map((stat, statIndex) => (
-              <VitalityStatCell key={`vitality-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} onChange={updates => handleStatChange(rowIndex * 2 + statIndex, updates)} />
+              <VitalityStatCell key={`vitality-top-${stat.label}`} {...stat} isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={updates => handleStatChange(rowIndex * 2 + statIndex, updates)} />
             ))}
           </div>
         ))}
@@ -169,7 +205,7 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         {bottomRows.map((row, rowIndex) => (
           <div key={`vitality-bottom-${rowIndex}`} className={styles.bottomRow}>
             {row.map((stat, statIndex) => (
-              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} showDetails={showDetails} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
+              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
             ))}
           </div>
         ))}

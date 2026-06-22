@@ -87,6 +87,7 @@ interface SpiritStatsRecord {
 interface AbilityStatsRecord {
   abilities: AbilityStatsPayload['abilities']
   secondaryAbilities?: AbilityStatsPayload['secondaryAbilities']
+  secondaryAbilitySlots?: AbilityStatsPayload['secondaryAbilitySlots']
   secondaryAbilityAnchorIndex?: AbilityStatsPayload['secondaryAbilityAnchorIndex']
 }
 

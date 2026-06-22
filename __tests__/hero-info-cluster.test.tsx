@@ -102,11 +102,12 @@ describe('HeroInfoCluster', () => {
     } satisfies HeroDefinition
     const abilityStats = buildDefaultAbilityStats(hero)
 
-    abilityStats.secondaryAbilities = abilityStats.abilities.slice(0, 3).map((ability, index) => ({
-      ...ability,
+    abilityStats.secondaryAbilities = [0, 2, 3].map((primaryIndex, index) => ({
+      ...abilityStats.abilities[primaryIndex],
+      slot: primaryIndex + 1,
       icon: `/secondary-${index + 1}.svg`,
     }))
-    abilityStats.secondaryAbilityAnchorIndex = 1
+    abilityStats.secondaryAbilitySlots = [0, 2, 3]
     abilityStats.abilities[0] = {
       ...abilityStats.abilities[0],
       name: 'Base Snare',
@@ -147,7 +148,8 @@ describe('HeroInfoCluster', () => {
 
     await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
 
-    expect(screen.getByTestId('ability-editor')).toHaveTextContent('Tier Snare')
+    expect(screen.getByTestId('ability-editor')).toHaveTextContent('Base Snare')
+    expect(screen.getByTestId('ability-editor')).not.toHaveTextContent('Tier Snare')
     expect(screen.getByTestId('ability-editor')).toHaveTextContent('+150')
   })
 
@@ -340,7 +342,7 @@ describe('HeroInfoCluster', () => {
       ...ability,
       icon: `/fetched-secondary-${index + 1}.svg`,
     }))
-    fetchedAbilityStats.secondaryAbilityAnchorIndex = 3
+    fetchedAbilityStats.secondaryAbilitySlots = [0, 1, 2]
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({
@@ -399,7 +401,7 @@ describe('HeroInfoCluster', () => {
       ...ability,
       icon: `/browse-secondary-${index + 1}.svg`,
     }))
-    fetchedAbilityStats.secondaryAbilityAnchorIndex = 3
+    fetchedAbilityStats.secondaryAbilitySlots = [0, 1, 2]
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
       new Response(JSON.stringify({

@@ -71,6 +71,7 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
             onClick={stopStatCellClick}
             onMouseDown={stopStatCellClick}
             aria-label={`${scaling} scaling value`}
+            placeholder="0"
             className={`${styles.input} border-0 bg-transparent`}
             style={getScalingValueStyle(scaling)}
           />

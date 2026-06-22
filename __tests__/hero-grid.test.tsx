@@ -307,6 +307,10 @@ describe('HeroGrid', () => {
     expect(screen.getByTestId('editor-tag-1')).toHaveStyle({ transform: 'rotate(17.5deg) translateY(-6px)' })
 
     await user.clear(screen.getByLabelText('Hero Name hex value'))
+    expect(screen.getByLabelText('Hero Name hex value')).toHaveAttribute('placeholder', '#ffffff')
+    expect(screen.getByLabelText('Tag 1 tilt')).toHaveAttribute('placeholder', '0')
+    expect(screen.getByLabelText('Tag 1 vertical position')).toHaveAttribute('placeholder', '0')
+    expect(screen.getByLabelText('Font Size')).toHaveAttribute('placeholder')
     await user.type(screen.getByLabelText('Hero Name hex value'), '#123456')
     expect(screen.getByTestId('editor-name-text')).toHaveStyle({ color: '#123456' })
 
@@ -349,17 +353,18 @@ describe('HeroGrid', () => {
     expect(screen.queryByTestId('property-icon-modal')).not.toBeInTheDocument()
   })
 
-  it('opens the second ability set anchor modal from the focused ability editor toggle', async () => {
+  it('opens the second ability slot modal from the focused ability editor toggle', async () => {
     const user = userEvent.setup()
 
     render(<HeroGrid />)
 
     await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
-    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
 
-    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+    expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Toggle secondary Ability 1' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
 
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
   })
@@ -415,8 +420,8 @@ describe('HeroGrid', () => {
     await openEmptyCreateEditor(user)
     await user.type(screen.getByPlaceholderText('Name this save'), 'Published Secondary')
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
-    await user.click(screen.getByRole('button', { name: 'Second Ability Set' }))
-    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
     await user.click(screen.getByRole('button', { name: 'Publish' }))
@@ -424,14 +429,15 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody.status).toBe('published')
-    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
-    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(1)
+    expect(requestBody.abilityStats.secondaryAbilitySlots).toEqual([0])
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBeUndefined()
   })
 
-  it('publishes default secondary abilities as soon as the second set is toggled on', async () => {
+  it('does not publish secondary abilities when the selector closes without applying', async () => {
     const user = userEvent.setup()
     const abrams = HEROES[0]
     const savedStats = buildHeroStatsSeed(abrams)
@@ -481,18 +487,19 @@ describe('HeroGrid', () => {
     await openEmptyCreateEditor(user)
     await user.type(screen.getByPlaceholderText('Name this save'), 'Published Default Secondary')
     await user.click(screen.getByLabelText('Second Ability Set'))
-    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close second ability set modal' }))
     await user.click(screen.getByRole('button', { name: 'Publish' }))
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { status: string; abilityStats: { secondaryAbilities?: unknown[]; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody.status).toBe('published')
-    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
-    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+    expect(requestBody.abilityStats.secondaryAbilities).toBeUndefined()
+    expect(requestBody.abilityStats.secondaryAbilitySlots).toBeUndefined()
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBeUndefined()
   })
 
   it('stores Uploadthing asset URLs in the create draft', async () => {
@@ -584,8 +591,9 @@ describe('HeroGrid', () => {
     await user.clear(screen.getByPlaceholderText('Name this save'))
     await user.type(screen.getByPlaceholderText('Name this save'), 'Arc Light')
     await user.click(screen.getByLabelText('Second Ability Set'))
-    expect(screen.getByRole('dialog', { name: 'SELECT AN ANCHOR POINT' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Anchor Ability 4' }))
+    expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Toggle secondary Ability 1' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
@@ -602,7 +610,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
@@ -618,8 +626,9 @@ describe('HeroGrid', () => {
     expect(requestBody.weapon.stats.length).toBeGreaterThan(0)
     expect(requestBody.abilityStats.abilities).toHaveLength(4)
     expect(requestBody.abilityStats.abilities[0].name).toBe('Arc Pulse')
-    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(3)
-    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBe(3)
+    expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(1)
+    expect(requestBody.abilityStats.secondaryAbilitySlots).toEqual([0])
+    expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBeUndefined()
     expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
     expect(await screen.findByRole('status')).toHaveTextContent('Private hero saved')
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
@@ -667,7 +676,7 @@ describe('HeroGrid', () => {
       ...ability,
       icon: `/published-secondary-${index + 1}.svg`,
     }))
-    publishedAbilityStats.secondaryAbilityAnchorIndex = 3
+    publishedAbilityStats.secondaryAbilitySlots = [0, 1, 2]
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = String(input)
 
@@ -810,7 +819,7 @@ describe('HeroGrid', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=trending&limit=24&offset=1')
   })
 
-  it('cycles scaling and edits weapon header assets in create mode', async () => {
+  it('edits weapon scaling from the dropdown and edits weapon header assets in create mode', async () => {
     const user = userEvent.setup()
 
     render(<HeroGrid />)
@@ -818,10 +827,11 @@ describe('HeroGrid', () => {
     await openEmptyCreateEditor(user)
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
 
-    const weaponDamageCell = screen.getByRole('button', { name: /Weapon Damage:/ })
+    const weaponDamageCell = screen.getByRole('group', { name: /Weapon Damage:/ })
     expect(weaponDamageCell).toHaveAttribute('data-scaling', 'none')
 
-    await user.click(weaponDamageCell)
+    await user.click(within(weaponDamageCell).getByRole('button', { name: 'Edit Weapon Damage scaling' }))
+    await user.click(screen.getByRole('button', { name: 'Set Weapon Damage scaling to spirit' }))
     expect(weaponDamageCell).toHaveAttribute('data-scaling', 'spirit')
 
     const weaponPanel = screen.getByTestId('weapon-panel')

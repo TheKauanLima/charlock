@@ -24,6 +24,7 @@ const FALLBACK_BACKSTORY = 'No character backstory has been added yet.'
 
 export default function BackstoryModule({ hero, isEditable = false, onCreateFromHero, onBackstoryChange }: BackstoryModuleProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const modalRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const titleId = `backstory-title-${hero.slug}`
@@ -40,6 +41,10 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
       return undefined
     }
 
+    const previousBodyOverflow = document.body.style.overflow
+
+    document.body.style.overflow = 'hidden'
+
     if (isEditable) {
       textareaRef.current?.focus()
     } else {
@@ -49,12 +54,50 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setIsOpen(false)
+        return
+      }
+
+      if (event.key !== 'Tab') {
+        return
+      }
+
+      const modal = modalRef.current
+
+      if (!modal) {
+        return
+      }
+
+      const focusableElements = Array.from(modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), textarea:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter(element => !element.hasAttribute('aria-hidden'))
+
+      if (!focusableElements.length) {
+        event.preventDefault()
+        return
+      }
+
+      const firstElement = focusableElements[0]
+      const lastElement = focusableElements.at(-1)
+      const activeElement = document.activeElement
+
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault()
+        lastElement?.focus()
+        return
+      }
+
+      if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault()
+        firstElement.focus()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
 
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [isEditable, isOpen])
 
   function handleBackdropMouseDown(event: MouseEvent<HTMLDivElement>) {
@@ -113,6 +156,7 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
       {isOpen ? (
         <div className={styles.backdrop} onMouseDown={handleBackdropMouseDown}>
           <section
+            ref={modalRef}
             className={styles.modal}
             role="dialog"
             aria-modal="true"

@@ -1,5 +1,6 @@
 export { default as HeroStatsSpiritPanel } from '@/components/panels/hero-stats-spirit-panel'
 export { default as HeroStatsVitalityPanel } from '@/components/panels/hero-stats-vitality-panel'
+export { default as ScalingPicker } from '@/components/panels/scaling-picker'
 export { default as WeaponPanel } from '@/components/panels/weapon-panel'
 
 export { buildSpiritPowerStat, buildSpiritStatsArray, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'

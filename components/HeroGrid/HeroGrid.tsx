@@ -125,6 +125,7 @@ function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload
   return {
     ...savedAbilityStats,
     secondaryAbilities: submittedAbilityStats.secondaryAbilities,
+    secondaryAbilitySlots: submittedAbilityStats.secondaryAbilitySlots,
     secondaryAbilityAnchorIndex: submittedAbilityStats.secondaryAbilityAnchorIndex,
   }
 }

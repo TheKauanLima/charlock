@@ -19,6 +19,7 @@ export interface IAbilityVariant {
   name: string
   icon: string
   cooldown: IPanelStat
+  hasCooldown: boolean
   hasCharges: boolean
   charges: IPanelStat
   rechargeTime: IPanelStat
@@ -41,6 +42,7 @@ export interface IAbilityStats {
   heroId: Types.ObjectId
   abilities: IAbilityDefinition[]
   secondaryAbilities?: IAbilityDefinition[]
+  secondaryAbilitySlots?: number[]
   secondaryAbilityAnchorIndex?: number
   createdAt: Date
   updatedAt: Date
@@ -91,6 +93,7 @@ const abilityVariantSchema = new Schema<IAbilityVariant>({
     type: statSchema,
     required: true,
   },
+  hasCooldown: { type: Boolean, default: true },
   hasCharges: { type: Boolean, default: false },
   charges: {
     type: statSchema,
@@ -125,6 +128,7 @@ const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
     type: statSchema,
     required: true,
   },
+  hasCooldown: { type: Boolean, default: true },
   hasCharges: { type: Boolean, default: false },
   charges: {
     type: statSchema,
@@ -171,9 +175,19 @@ const abilityStatsSchema = new Schema<IAbilityStats>(
       default: undefined,
       validate: {
         validator(abilities: IAbilityDefinition[]) {
-          return !abilities || abilities.length === 3
+          return !abilities || abilities.length <= 4
         },
-        message: 'Secondary ability sets must include exactly 3 abilities.',
+        message: 'Secondary ability sets support up to 4 abilities.',
+      },
+    },
+    secondaryAbilitySlots: {
+      type: [Number],
+      default: undefined,
+      validate: {
+        validator(slots: number[]) {
+          return !slots || (slots.length <= 4 && slots.every(slot => Number.isInteger(slot) && slot >= 0 && slot <= 3) && new Set(slots).size === slots.length)
+        },
+        message: 'Secondary ability slots must be unique ability indexes from 0 to 3.',
       },
     },
     secondaryAbilityAnchorIndex: {

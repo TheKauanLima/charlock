@@ -392,9 +392,14 @@
   z-index: 30;
 }
 
+.statCell:has([data-scaling-picker-menu]) {
+  z-index: 10000;
+}
+
 .editableCell {
   border: 0;
   background: rgba(0, 0, 0, 0.2);
+  cursor: default;
 }
 
 .editableCell:hover {

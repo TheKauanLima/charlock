@@ -90,6 +90,14 @@
   z-index: 30;
 }
 
+.cell:has([data-scaling-picker-menu]) {
+  z-index: 10000;
+}
+
+.editableCell {
+  cursor: default;
+}
+
 .powerCell {
   min-height: 42px;
   align-items: flex-start;

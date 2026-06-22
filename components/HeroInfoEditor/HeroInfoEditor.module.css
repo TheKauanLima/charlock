@@ -754,6 +754,12 @@
   transform: translateY(-1px);
 }
 
+.anchorAbilityButtonSelected {
+  border-color: rgba(255, 243, 221, 0.9);
+  background: rgba(198, 154, 246, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(255, 243, 221, 0.36);
+}
+
 .anchorAbilityIcon {
   width: 58px;
   aspect-ratio: 1;

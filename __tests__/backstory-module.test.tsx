@@ -87,4 +87,34 @@ describe('BackstoryModule', () => {
 
     expect(screen.getByText('No character backstory has been added yet.')).toBeInTheDocument()
   })
+
+  it('keeps focus inside the editable modal while it is open', async () => {
+    const user = userEvent.setup()
+    const onBackstoryChange = () => undefined
+
+    render(
+      <>
+        <BackstoryModule hero={TEST_HERO} isEditable onBackstoryChange={onBackstoryChange} />
+        <input aria-label="Outside field" />
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Edit Test Hero character backstory' }))
+
+    const backstoryInput = screen.getByLabelText('Backstory')
+    const closeButton = screen.getByRole('button', { name: 'CLOSE' })
+
+    expect(backstoryInput).toHaveFocus()
+    expect(document.body).toHaveStyle({ overflow: 'hidden' })
+
+    await user.tab()
+    expect(closeButton).toHaveFocus()
+
+    await user.tab()
+    expect(backstoryInput).toHaveFocus()
+    expect(screen.getByLabelText('Outside field')).not.toHaveFocus()
+
+    await user.click(closeButton)
+    expect(document.body.style.overflow).toBe('')
+  })
 })

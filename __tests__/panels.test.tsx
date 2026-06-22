@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -53,35 +53,79 @@ describe('migrated stat panels', () => {
     expect(screen.getByText(/increases the effectiveness/i)).toBeInTheDocument()
   })
 
-  it('edits weapon stats and cycles scaling state without panel-local save actions', async () => {
+  it('edits weapon stats and scaling from the dropdown without panel-local save actions', async () => {
     const user = userEvent.setup()
 
-    render(<WeaponPanel isEditable />)
+    render(
+      <WeaponPanel
+        isEditable
+        weaponMinRange={15}
+        weaponMaxRange={40}
+        onWeaponNameChange={() => undefined}
+        onWeaponMinRangeChange={() => undefined}
+        onWeaponMaxRangeChange={() => undefined}
+      />,
+    )
 
-    const bulletDamageButton = screen.getByRole('button', { name: /Bullet Damage/ })
-    expect(bulletDamageButton).toHaveAttribute('data-scaling', 'none')
+    const bulletDamageCell = screen.getByRole('group', { name: /Bullet Damage/ })
+    expect(bulletDamageCell).toHaveAttribute('data-scaling', 'none')
 
-    await user.click(bulletDamageButton)
-    expect(bulletDamageButton).toHaveAttribute('data-scaling', 'spirit')
+    await user.click(within(bulletDamageCell).getByRole('button', { name: 'Edit Bullet Damage scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Bullet Damage scaling controls' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Bullet Damage scaling to spirit' }))
+    expect(bulletDamageCell).toHaveAttribute('data-scaling', 'spirit')
 
-    const scalingInput = screen.getByLabelText('spirit scaling value')
-    expect(scalingInput).toHaveStyle({ color: '#e1a0ff' })
-    expect(scalingInput).toHaveAttribute('style', expect.stringContaining('-webkit-text-stroke: 3px #2c1139'))
-    expect(scalingInput).toHaveClass('bg-transparent')
-    expect(scalingInput).toHaveClass('border-0')
-    expect(scalingInput.parentElement).toHaveTextContent('x')
+    const scalingInput = screen.getByLabelText('Bullet Damage scaling value')
 
+    expect(scalingInput).toHaveAttribute('placeholder', '0')
     await user.clear(scalingInput)
     await user.type(scalingInput, '12.345')
     expect(scalingInput).toHaveValue('12.34')
 
     const bulletDamageInput = screen.getByLabelText('Bullet Damage value')
+    expect(bulletDamageInput).toHaveAttribute('placeholder', '0')
+    expect(screen.getByLabelText('Weapon name')).toHaveAttribute('placeholder', 'Weapon name')
+    expect(screen.getByLabelText('Minimum falloff range')).toHaveAttribute('placeholder', '0')
+    expect(screen.getByLabelText('Maximum falloff range')).toHaveAttribute('placeholder', '0')
     await user.clear(bulletDamageInput)
     await user.type(bulletDamageInput, '8.5')
 
     expect(bulletDamageInput).toHaveValue('8.5')
+    await user.click(screen.getByText('Weapon description'))
+    expect(screen.queryByRole('dialog', { name: 'Bullet Damage scaling controls' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('edits vitality and spirit stat scaling from the same dropdown control', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <>
+        <HeroStatsVitalityPanel isEditable />
+        <HeroStatsSpiritPanel isEditable />
+      </>,
+    )
+
+    const vitalityPanel = screen.getByTestId('hero-stats-vitality-panel')
+    const maxHealthCell = within(vitalityPanel).getByRole('group', { name: /Max Health/ })
+    expect(within(maxHealthCell).getByLabelText('Max Health value')).toHaveAttribute('placeholder', '0')
+
+    await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
+    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to boon' }))
+    expect(maxHealthCell).toHaveAttribute('data-scaling', 'boon')
+    await user.clear(screen.getByLabelText('Max Health scaling value'))
+    await user.type(screen.getByLabelText('Max Health scaling value'), '0.8759')
+    expect(screen.getByLabelText('Max Health scaling value')).toHaveValue('0.8759')
+
+    const spiritPanel = screen.getByTestId('hero-stats-spirit-panel')
+    const spiritPowerCell = within(spiritPanel).getByRole('group', { name: /Spirit Power/ })
+    expect(within(spiritPowerCell).getByLabelText('Spirit Power value')).toHaveAttribute('placeholder', '0')
+
+    await user.click(within(spiritPowerCell).getByRole('button', { name: 'Edit Spirit Power scaling' }))
+    expect(screen.queryByRole('dialog', { name: 'Max Health scaling controls' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Spirit Power scaling to melee' }))
+    expect(spiritPowerCell).toHaveAttribute('data-scaling', 'melee')
   })
 
   it('always shows scaling icons but hides numeric scaling values until showDetails is enabled', () => {
@@ -101,6 +145,6 @@ describe('migrated stat panels', () => {
 
     rerender(<WeaponPanel weaponStats={weaponStats} isEditable />)
 
-    expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Bullet Damage scaling' })).toBeInTheDocument()
   })
 })

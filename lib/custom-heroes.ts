@@ -5,7 +5,7 @@ import { Types, type PipelineStage } from 'mongoose'
 
 import dbConnect, { isDatabaseConnectionError } from '@/lib/dbConnect'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
-import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { normalizeAbilityStats } from '@/lib/ability-editor-types'
 import { ApiRequestError } from '@/lib/api-errors'
 import { customHeroSaveSchema } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
@@ -59,6 +59,7 @@ interface SpiritStatsRecord {
 interface AbilityStatsRecord {
   abilities: AbilityStatsPayload['abilities']
   secondaryAbilities?: AbilityStatsPayload['secondaryAbilities']
+  secondaryAbilitySlots?: AbilityStatsPayload['secondaryAbilitySlots']
   secondaryAbilityAnchorIndex?: AbilityStatsPayload['secondaryAbilityAnchorIndex']
 }
 
@@ -795,15 +796,18 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
       abilities: payload.abilityStats.abilities,
       ...(payload.abilityStats.secondaryAbilities ? {
         secondaryAbilities: payload.abilityStats.secondaryAbilities,
-        secondaryAbilityAnchorIndex: payload.abilityStats.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX,
+        secondaryAbilitySlots: payload.abilityStats.secondaryAbilitySlots,
       } : {}),
     },
-    ...(!payload.abilityStats.secondaryAbilities ? {
-      $unset: {
-        secondaryAbilities: '',
-        secondaryAbilityAnchorIndex: '',
-      },
-    } : {}),
+    $unset: payload.abilityStats.secondaryAbilities
+      ? {
+          secondaryAbilityAnchorIndex: '',
+        }
+      : {
+          secondaryAbilities: '',
+          secondaryAbilitySlots: '',
+          secondaryAbilityAnchorIndex: '',
+        },
   }
 
   await Promise.all([

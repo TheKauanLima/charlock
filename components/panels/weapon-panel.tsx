@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode } from 'react'
+import { useRef, useState } from 'react'
+import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react'
 
-import { formatPanelValue, getNextScaling } from '@/components/panels/scaling-utils'
+import { formatPanelValue } from '@/components/panels/scaling-utils'
+import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
@@ -44,7 +45,10 @@ interface CompactStatElementProps extends PanelStat {
   isEditable?: boolean
   showDetails?: boolean
   panelType: 'weapon' | 'armor' | 'tech'
+  boundaryRef?: RefObject<HTMLElement | null>
+  openScalingPickerId?: string | null
   onChange?: (updates: Partial<PanelStat>) => void
+  onOpenScalingPickerChange?: (pickerId: string | null) => void
 }
 
 interface IconAsset {
@@ -190,33 +194,15 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
   }
 }
 
-function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, onChange }: CompactStatElementProps) {
+function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
-
-  function handleScalingClick() {
-    const nextScaling = getNextScaling(scaling)
-
-    onChange?.({
-      scaling: nextScaling,
-      scalingValue: nextScaling === 'none' ? '0' : scalingValue,
-    })
-  }
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
   }
 
-  return (
-    <button
-      type="button"
-      className={cn(
-        styles.statCell,
-        isEditable && styles.editableCell,
-      )}
-      onClick={handleScalingClick}
-      data-scaling={scaling}
-      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
-    >
+  const content = (
+    <>
       <span
         className={styles.statIcon}
         style={getIconStyle(icon, theme.iconColor)}
@@ -230,7 +216,6 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
             value={value}
             onChange={handleValueChange}
             placeholder="0"
-            onClick={event => event.stopPropagation()}
             aria-label={`${label} value`}
           />
         ) : (
@@ -239,7 +224,43 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
         {unit ? <span className={styles.statUnit}>{unit}</span> : null}
         <span className={cn(styles.statLabel, theme.labelClassName)}>{label}</span>
       </span>
-      <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} isEditable={isEditable} showValue={showDetails} position="raised" onChange={nextScalingValue => onChange?.({ scalingValue: nextScalingValue })} />
+      {isEditable && onOpenScalingPickerChange ? (
+        <ScalingPicker
+          label={label}
+          scaling={scaling}
+          scalingValue={scalingValue}
+          boundaryRef={boundaryRef}
+          openPickerId={openScalingPickerId}
+          onChange={updates => onChange?.(updates)}
+          onOpenPickerChange={onOpenScalingPickerChange}
+        />
+      ) : (
+        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+      )}
+    </>
+  )
+
+  if (isEditable) {
+    return (
+      <div
+        className={cn(styles.statCell, styles.editableCell)}
+        data-scaling={scaling}
+        role="group"
+        aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+      >
+        {content}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      className={styles.statCell}
+      data-scaling={scaling}
+      aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
+    >
+      {content}
     </button>
   )
 }
@@ -271,6 +292,7 @@ export default function WeaponPanel({
   onWeaponMaxRangeChange,
   onOpenWeaponAssetPicker,
 }: WeaponPanelProps) {
+  const panelRef = useRef<HTMLElement | null>(null)
   const theme = PANEL_THEMES[panelType]
   const sourceStats = weaponStats ?? (statsSource ? buildWeaponStatsArray(statsSource) : DEFAULT_WEAPON_STATS)
   const combinedWeaponStats = sourceStats.length ? sourceStats : [...initialStats, ...secondaryStats, ...otherStats]
@@ -283,6 +305,7 @@ export default function WeaponPanel({
   const hasFalloffRange = weaponMinRange !== null || weaponMaxRange !== null || isEditable
   const editableAttributesText = weaponAttributesText ?? weaponAttributes.join(', ')
   const editableTagDraft = getEditableTagDraft(editableAttributesText)
+  const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
 
   function handleAttributeInputChange(value: string) {
     if (!onWeaponAttributesTextChange) {
@@ -330,6 +353,7 @@ export default function WeaponPanel({
 
   return (
     <section
+      ref={panelRef}
       className={styles.panel}
       aria-label={`${weaponName} weapon stats`}
       data-testid="weapon-panel"
@@ -359,6 +383,7 @@ export default function WeaponPanel({
               className={styles.weaponNameInput}
               value={weaponName}
               onChange={event => onWeaponNameChange(event.target.value)}
+              placeholder="Weapon name"
               aria-label="Weapon name"
             />
           ) : (
@@ -416,6 +441,7 @@ export default function WeaponPanel({
                         className={styles.falloffInput}
                         value={weaponMinRange}
                         onChange={event => onWeaponMinRangeChange(event.target.value)}
+                        placeholder="0"
                         aria-label="Minimum falloff range"
                       />
                     ) : (
@@ -435,6 +461,7 @@ export default function WeaponPanel({
                         className={styles.falloffInput}
                         value={weaponMaxRange}
                         onChange={event => onWeaponMaxRangeChange(event.target.value)}
+                        placeholder="0"
                         aria-label="Maximum falloff range"
                       />
                     ) : (
@@ -475,6 +502,9 @@ export default function WeaponPanel({
                     panelType={panelType}
                     isEditable={isEditable}
                     showDetails={showDetails}
+                    boundaryRef={panelRef}
+                    openScalingPickerId={openScalingPickerId}
+                    onOpenScalingPickerChange={setOpenScalingPickerId}
                     onChange={updates => handleStatChange(absoluteIndex, updates)}
                   />
                 )
@@ -495,6 +525,9 @@ export default function WeaponPanel({
                     panelType={panelType}
                     isEditable={isEditable}
                     showDetails={showDetails}
+                    boundaryRef={panelRef}
+                    openScalingPickerId={openScalingPickerId}
+                    onOpenScalingPickerChange={setOpenScalingPickerId}
                     onChange={updates => handleStatChange(absoluteIndex, updates)}
                   />
                 )

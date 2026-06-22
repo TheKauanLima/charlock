@@ -40,6 +40,7 @@ describe('Mongoose model schemas', () => {
     const tierVariantSectionsPath = AbilityStats.schema.path('abilities.tiers.variant.sections')
     const secondaryAbilitiesPath = AbilityStats.schema.path('secondaryAbilities')
     const secondaryAbilityNamePath = AbilityStats.schema.path('secondaryAbilities.name')
+    const secondaryAbilitySlotsPath = AbilityStats.schema.path('secondaryAbilitySlots')
     const secondaryAbilityAnchorPath = AbilityStats.schema.path('secondaryAbilityAnchorIndex')
 
     expect(AbilityStats.collection.name).toBe('abilitystats')
@@ -54,6 +55,7 @@ describe('Mongoose model schemas', () => {
     expect(tierVariantSectionsPath).toBeDefined()
     expect(secondaryAbilitiesPath).toBeDefined()
     expect(secondaryAbilityNamePath).toBeDefined()
+    expect(secondaryAbilitySlotsPath).toBeDefined()
     expect(secondaryAbilityAnchorPath).toBeDefined()
   })
 

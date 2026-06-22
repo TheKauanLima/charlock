@@ -16,7 +16,7 @@ import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
-import { DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX, buildDefaultAbilityStats } from '@/lib/ability-editor-types'
+import { buildDefaultAbilityStats, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import cn from '@/lib/utilsd'
@@ -283,7 +283,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
   const abilityStats = statsData.abilityStats ?? (hero as SocialHeroDefinition).abilityStats
   const previewAbilityStats = abilityStats ?? fallbackAbilityStats
   const secondaryAbilities = abilityStats?.secondaryAbilities ?? []
-  const secondaryAbilityAnchorIndex = abilityStats?.secondaryAbilityAnchorIndex ?? DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX
+  const secondaryAbilitySlots = secondaryAbilities.length
+    ? getSecondaryAbilitySlots(abilityStats?.secondaryAbilitySlots, abilityStats?.secondaryAbilityAnchorIndex, [])
+    : []
   const selectedAbility = selectedAbilityTarget?.set === 'secondary'
     ? secondaryAbilities[selectedAbilityTarget.index] ?? null
     : selectedAbilityTarget
@@ -337,7 +339,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
           <HeroAbilityIconRow
             heroInfo={heroInfo}
             secondaryAbilities={secondaryAbilities}
-            secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+            secondaryAbilitySlots={secondaryAbilitySlots}
             activeTarget={selectedAbilityTarget}
             onAbilityClick={target => {
               setSelectedAbilityTarget(current => (
@@ -473,7 +475,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
           heroInfo={heroInfo}
           activeAbilityTarget={selectedAbilityTarget ?? undefined}
           secondaryAbilities={secondaryAbilities}
-          secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
+          secondaryAbilitySlots={secondaryAbilitySlots}
           isSecondAbilitySetEnabled={secondaryAbilities.length > 0}
           abilityIconGroups={ABILITY_ICON_GROUPS}
           onAbilitySelect={target => setSelectedAbilityTarget(target)}
