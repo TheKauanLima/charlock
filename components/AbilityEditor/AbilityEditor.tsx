@@ -79,6 +79,7 @@ interface AbilityEditorProps {
   secondaryAbilityAnchorIndex?: number
   isSecondAbilitySetEnabled?: boolean
   abilityIconGroups?: AbilityIconGroup[]
+  showDetails?: boolean
   onHeroInfoChange?: (heroInfo: HeroInfoDefinition) => void
   onAbilityIconChange?: (target: AbilityEditorTarget, iconPath: string) => void
   onAbilitySelect?: (target: AbilityEditorTarget, currentAbility: AbilityDefinition) => void
@@ -110,12 +111,16 @@ const RICH_TEXT_COLORS: Array<{ id: string; label: string; token: string }> = [
   { id: 'healing', label: 'Healing', token: 'healing' },
   { id: 'damage', label: 'Damage', token: 'damage' },
   { id: 'warning', label: 'Warning', token: 'warning' },
+  { id: 'green', label: 'Green', token: 'green' },
+  { id: 'orange', label: 'Orange', token: 'orange' },
 ]
 
 const ICON_COLOR_SWATCHES = [
   { id: 'default', label: 'Default', value: '' },
   { id: 'green', label: 'Green', value: '#2e9860' },
+  { id: 'freshGreen', label: 'Fresh Green', value: '#84c955' },
   { id: 'olive', label: 'Olive', value: '#919814' },
+  { id: 'amber', label: 'Amber', value: '#e5a535' },
   { id: 'violet', label: 'Violet', value: '#594561' },
   { id: 'cream', label: 'Cream', value: '#f5eadb' },
 ] as const
@@ -128,6 +133,7 @@ const TIER_BOXES: Array<{ tier: AbilityTierLevel; cost: string }> = [
 ]
 type ActiveTier = 0 | AbilityTierLevel
 const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
+const TIER_TEXT_APPROX_CHARS_PER_LINE = 16
 
 type RichTextEffect =
   | { type: 'bold' }
@@ -206,7 +212,7 @@ function tokenTextToHtml(text: string) {
   html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<strong>$1</strong>')
   html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<em>$1</em>')
   html = html.replace(/\[dark\]([\s\S]*?)\[\/dark\]/g, `<span class="${styles.darkenText}" data-rich-dark="true">$1</span>`)
-  html = html.replace(/\[c:(spirit|healing|damage|warning)\]([\s\S]*?)\[\/c\]/g, (_, color: string, content: string) => `<span class="${styles[`richColor${color.charAt(0).toUpperCase()}${color.slice(1)}`]}" data-rich-color="${color}">${content}</span>`)
+  html = html.replace(/\[c:(spirit|healing|damage|warning|green|orange)\]([\s\S]*?)\[\/c\]/g, (_, color: string, content: string) => `<span class="${styles[`richColor${color.charAt(0).toUpperCase()}${color.slice(1)}`]}" data-rich-color="${color}">${content}</span>`)
 
   return html.replaceAll('\n', '<br>')
 }
@@ -286,13 +292,55 @@ function editableHtmlToTokenText(element: HTMLElement) {
   return Array.from(element.childNodes).map(serializeRichNode).join('').replace(/\n+$/g, '')
 }
 
-function removeRichTextColoring(fragment: DocumentFragment) {
-  const richColorClasses = RICH_TEXT_COLORS.map(color => styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`])
+function estimateTierTextLineCount(text: string) {
+  return text.split(/\r?\n/).reduce((total, paragraph) => {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean)
 
-  fragment.querySelectorAll<HTMLElement>('[data-rich-color], [data-rich-dark]').forEach(element => {
-    delete element.dataset.richColor
-    delete element.dataset.richDark
-    element.classList.remove(styles.darkenText, ...richColorClasses)
+    if (!words.length) {
+      return total + 1
+    }
+
+    let lines = 1
+    let currentLineLength = 0
+
+    for (const word of words) {
+      const wordLength = word.length
+      const nextLength = currentLineLength ? currentLineLength + 1 + wordLength : wordLength
+
+      if (nextLength > TIER_TEXT_APPROX_CHARS_PER_LINE && currentLineLength > 0) {
+        lines += 1
+        currentLineLength = wordLength
+      } else {
+        currentLineLength = nextLength
+      }
+    }
+
+    return total + lines
+  }, 0)
+}
+
+function getTierTextDensity(text: string) {
+  const normalizedText = text.replace(/\[[^\]]+\]/g, '').replace(/\s+/g, ' ').trim()
+  const lineCount = estimateTierTextLineCount(normalizedText)
+
+  if (lineCount > 5 || normalizedText.length > 68) {
+    return 'tiny'
+  }
+
+  if (lineCount > 4 || normalizedText.length > 50) {
+    return 'compact'
+  }
+
+  if (lineCount > 3 || normalizedText.length > 42) {
+    return 'dense'
+  }
+
+  return 'default'
+}
+
+function removeRichTextColoring(fragment: DocumentFragment) {
+  fragment.querySelectorAll<HTMLElement>('[data-rich-color]').forEach(element => {
+    unwrapRichTextElement(element)
   })
 }
 
@@ -423,6 +471,26 @@ function unwrapEffectFromRange(range: Range, root: HTMLElement, effect: RichText
   return nextRange
 }
 
+function unwrapColorEffectsFromRange(range: Range, root: HTMLElement) {
+  let nextRange = range
+
+  for (const color of RICH_TEXT_COLORS) {
+    const effect: RichTextEffect = { type: 'color', token: color.token }
+
+    if (!rangeFullyHasEffect(nextRange, root, effect)) {
+      continue
+    }
+
+    const unwrappedRange = unwrapEffectFromRange(nextRange, root, effect)
+
+    if (unwrappedRange) {
+      nextRange = unwrappedRange
+    }
+  }
+
+  return nextRange
+}
+
 function getInlineIconIdentity(node: Node | null) {
   if (!(node instanceof HTMLElement)) {
     return null
@@ -472,11 +540,16 @@ function removeAdjacentDuplicateInlineIcons(wrapper: HTMLElement) {
   }
 }
 
+function normalizeTierUpgradeText(text: string) {
+  return text.trim().toLowerCase() === 'n/a' ? '' : text
+}
+
 function syncAbilityNames(ability: AbilityDefinition): AbilityDefinition {
   return {
     ...ability,
     tiers: ability.tiers.map(tier => ({
       ...tier,
+      upgradeText: normalizeTierUpgradeText(tier.upgradeText),
       variant: {
         ...tier.variant,
         name: ability.name,
@@ -563,7 +636,7 @@ function getMainCellTitleInputValue(cell: AbilityGridCell) {
   return cell.label === 'Damage' || cell.label === 'Value' ? '' : cell.label
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onSave, onCancel }: AbilityEditorProps) {
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onSave, onCancel }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
   const [draftAbility, setDraftAbility] = useState(() => cloneAbility(ability))
@@ -679,7 +752,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
     setDraftAbility(current => ({
       ...current,
-      tiers: current.tiers.map(tier => tier.tier === tierToUpdate ? { ...tier, upgradeText } : tier),
+      tiers: current.tiers.map(tier => tier.tier === tierToUpdate ? { ...tier, upgradeText: normalizeTierUpgradeText(upgradeText) } : tier),
     }))
   }
 
@@ -847,6 +920,12 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     if (iconTarget?.type === 'inlineIcon') {
       const markerToken = `[[inline-icon-marker:${iconTarget.marker}]]`
 
+      document.querySelectorAll<HTMLElement>('[data-inline-icon-marker]').forEach(element => {
+        if (element.dataset.inlineIconMarker === iconTarget.marker) {
+          element.remove()
+        }
+      })
+
       updateSection(iconTarget.sectionId, section => {
         if (section.type !== 'richText') {
           return section
@@ -870,11 +949,12 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   }
 
   function renderInlineStat(stat: AbilityStat, label: string, onChange: (stat: AbilityStat) => void, onIconClick: () => void, variant: 'timing' | 'sub' | 'main' | 'lower' = 'sub') {
+    const canEditStat = capabilities.canEditStats
     const showAppend = (variant === 'main' || variant === 'lower') && (capabilities.canEditStats || Boolean(stat.append))
     const showDetail = variant !== 'lower'
     const valueInputStyle = { width: `${Math.max(2, String(stat.value).length + 1)}ch` }
     const unitInputStyle = variant === 'main'
-      ? { width: `${Math.max(4, (stat.unit ?? '').length + 1)}ch`, visibility: 'visible' as const }
+      ? { width: `${Math.max(6, (stat.unit ?? '').length + 1)}ch`, visibility: 'visible' as const }
       : variant === 'sub'
         ? { width: stat.unit ? `${Math.max(2, stat.unit.length + 1)}ch` : '2ch', visibility: (capabilities.canEditStats || stat.unit) ? 'visible' as const : 'hidden' as const }
         : variant === 'timing'
@@ -899,10 +979,18 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           {iconContent}
         </button>
       )
+    const hasScalingControl = canEditStat || stat.scaling !== 'none'
+    const renderStatText = (className: string, value: string | number | undefined, fallback = '', wrap = true) => (
+      canEditStat ? null : (
+        <span className={cn(className, styles.readonlyStatText, !wrap && styles.readonlyStatTextNoWrap)}>
+          {value === undefined || value === '' ? fallback : value}
+        </span>
+      )
+    )
 
     return (
       <div
-        className={cn(styles.inlineStatEditor, styles[`inlineStatEditor${variant.charAt(0).toUpperCase()}${variant.slice(1)}`], stat.scaling !== 'none' && styles.inlineStatEditorScaled)}
+        className={cn(styles.inlineStatEditor, styles[`inlineStatEditor${variant.charAt(0).toUpperCase()}${variant.slice(1)}`], stat.scaling !== 'none' && styles.inlineStatEditorScaled, hasScalingControl && styles.inlineStatEditorHasScaling)}
         data-scaling={stat.scaling}
         data-testid={`ability-stat-${variant}-${label.toLowerCase().replaceAll(' ', '-')}`}
         role="group"
@@ -913,28 +1001,28 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             {iconControl}
             <label className={styles.valueInputLabel}>
               <span className={styles.srOnly}>Value</span>
-              <input
-                className={styles.valueInput}
-                style={valueInputStyle}
-                value={stat.value}
-                placeholder="0"
-                readOnly={!capabilities.canEditStats}
-                tabIndex={capabilities.canEditStats ? undefined : -1}
-                onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
-              />
+              {canEditStat ? (
+                <input
+                  className={styles.valueInput}
+                  style={valueInputStyle}
+                  value={stat.value}
+                  placeholder="0"
+                  onChange={event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
+                />
+              ) : renderStatText(styles.valueInput, stat.value, '0', false)}
             </label>
             {showAppend ? (
               <label className={styles.appendInputLabel}>
                 <span className={styles.srOnly}>Append</span>
-                <input
-                  className={styles.appendInput}
-                  style={appendInputStyle}
-                  value={stat.append ?? ''}
-                  placeholder="+"
-                  readOnly={!capabilities.canEditStats}
-                  tabIndex={capabilities.canEditStats ? undefined : -1}
-                  onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { append: event.target.value }))}
-                />
+                {canEditStat ? (
+                  <input
+                    className={styles.appendInput}
+                    style={appendInputStyle}
+                    value={stat.append ?? ''}
+                    placeholder="+"
+                    onChange={event => onChange(updateStat(stat, { append: event.target.value }))}
+                  />
+                ) : renderStatText(styles.appendInput, stat.append, '', false)}
               </label>
             ) : null}
           </div>
@@ -943,28 +1031,28 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             {iconControl}
             <label className={styles.valueInputLabel}>
               <span className={styles.srOnly}>Value</span>
-              <input
-                className={styles.valueInput}
-                style={variant === 'timing' || variant === 'sub' || variant === 'lower' ? valueInputStyle : undefined}
-                value={stat.value}
-                placeholder="0"
-                readOnly={!capabilities.canEditStats}
-                tabIndex={capabilities.canEditStats ? undefined : -1}
-                onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
-              />
+              {canEditStat ? (
+                <input
+                  className={styles.valueInput}
+                  style={variant === 'timing' || variant === 'sub' || variant === 'lower' ? valueInputStyle : undefined}
+                  value={stat.value}
+                  placeholder="0"
+                  onChange={event => onChange(updateStat(stat, { value: nextValue(event.target.value) }))}
+                />
+              ) : renderStatText(styles.valueInput, stat.value, '0', false)}
             </label>
             {showAppend ? (
               <label className={styles.appendInputLabel}>
                 <span className={styles.srOnly}>Append</span>
-                <input
-                  className={styles.appendInput}
-                  style={appendInputStyle}
-                  value={stat.append ?? ''}
-                  placeholder="+"
-                  readOnly={!capabilities.canEditStats}
-                  tabIndex={capabilities.canEditStats ? undefined : -1}
-                  onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { append: event.target.value }))}
-                />
+                {canEditStat ? (
+                  <input
+                    className={styles.appendInput}
+                    style={appendInputStyle}
+                    value={stat.append ?? ''}
+                    placeholder="+"
+                    onChange={event => onChange(updateStat(stat, { append: event.target.value }))}
+                  />
+                ) : renderStatText(styles.appendInput, stat.append, '', false)}
               </label>
             ) : null}
           </>
@@ -972,29 +1060,29 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
         {showDetail ? (
           <label className={styles.unitInputLabel}>
           <span className={styles.srOnly}>{variant === 'main' ? 'Detail' : 'Unit'}</span>
-          <input
-            className={styles.unitInput}
-            style={unitInputStyle}
-            placeholder={variant === 'main' ? 'Detail' : 'Unit'}
-            value={stat.unit ?? ''}
-            readOnly={!capabilities.canEditStats}
-            tabIndex={capabilities.canEditStats ? undefined : -1}
-            onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { unit: event.target.value }))}
-          />
+          {canEditStat ? (
+            <input
+              className={styles.unitInput}
+              style={unitInputStyle}
+              placeholder={variant === 'main' ? 'Detail' : 'Unit'}
+              value={stat.unit ?? ''}
+              onChange={event => onChange(updateStat(stat, { unit: event.target.value }))}
+            />
+          ) : renderStatText(styles.unitInput, stat.unit, '', variant === 'main')}
           </label>
         ) : null}
         {variant !== 'timing' && variant !== 'sub' && variant !== 'main' ? (
           <label className={styles.statLabelInputLabel}>
             <span className={styles.srOnly}>Detail</span>
-            <input
-              className={styles.statLabelInput}
-              value={stat.label}
-              aria-label="Detail"
-              placeholder="Detail"
-              readOnly={!capabilities.canEditStats}
-              tabIndex={capabilities.canEditStats ? undefined : -1}
-              onChange={!capabilities.canEditStats ? undefined : event => onChange(updateStat(stat, { label: event.target.value }))}
-            />
+            {canEditStat ? (
+              <input
+                className={styles.statLabelInput}
+                value={stat.label}
+                aria-label="Detail"
+                placeholder="Detail"
+                onChange={event => onChange(updateStat(stat, { label: event.target.value }))}
+              />
+            ) : renderStatText(styles.statLabelInput, stat.label)}
           </label>
         ) : null}
         <span className={styles.scalingValueWrap}>
@@ -1009,7 +1097,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               onOpenPickerChange={setOpenScalingPickerId}
             />
           ) : (
-            <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} />
+            <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} showValue={showDetails} valuePosition={variant === 'main' ? 'lower' : 'center'} />
           )}
         </span>
       </div>
@@ -1062,7 +1150,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           />
         </>
       ) : null}
-      <div className={styles.editorLayout}>
+      <div className={cn(styles.editorLayout, isPreviewMode && styles.editorLayoutPreview)} data-ability-preview-panel={isPreviewMode ? 'true' : undefined}>
         {capabilities.canAddSections ? (
           <aside className={styles.sideTabs} aria-label="Append ability sections">
           <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat(`ability-${draftAbility.slot}-tier-${activeTier}-sub-${Date.now()}`, 'Stat')] }), { cascadeToHigher: true })}>
@@ -1073,7 +1161,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           </aside>
         ) : null}
 
-        <div className={styles.mainEditorColumn} ref={mainEditorColumnRef}>
+        <div className={cn(styles.mainEditorColumn, isPreviewMode && styles.mainEditorColumnPreview)} ref={mainEditorColumnRef}>
           <div className={styles.tooltipSurface}>
             <div className={styles.scrollContent}>
               <div className={styles.tooltipTexture} />
@@ -1323,8 +1411,7 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
   const lastTextRef = useRef('')
   const lastSelectionRef = useRef<Range | null>(null)
   const handledToolbarPointerRef = useRef(false)
-  const visibleLineCount = text.split(/\r?\n/).length
-  const isDense = visibleLineCount > 4 || text.length > 92
+  const textDensity = getTierTextDensity(text)
   const isEmpty = text.trim().length === 0
 
   useEffect(() => {
@@ -1456,7 +1543,7 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
   }
 
   return (
-    <div className={styles.tierTextShell} onClick={event => event.stopPropagation()}>
+    <div className={cn(styles.tierTextShell, readOnly && styles.tierTextShellReadOnly)} onClick={readOnly ? undefined : event => event.stopPropagation()}>
       {!readOnly ? (
         <div className={styles.tierTextToolbar}>
         <button
@@ -1472,10 +1559,17 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
       ) : null}
       <div
         ref={editorRef}
-        className={cn(styles.tierTextEditor, isDense && styles.tierTextEditorDense)}
+        className={cn(
+          styles.tierTextEditor,
+          readOnly && styles.tierTextEditorReadOnly,
+          textDensity === 'dense' && styles.tierTextEditorDense,
+          textDensity === 'compact' && styles.tierTextEditorCompact,
+          textDensity === 'tiny' && styles.tierTextEditorTiny,
+        )}
         contentEditable={!readOnly}
         role="textbox"
         aria-label={`Tier ${tier} upgrade text`}
+        aria-readonly={readOnly || undefined}
         data-placeholder={`Tier ${tier} upgrade`}
         data-empty={isEmpty ? 'true' : undefined}
         spellCheck
@@ -1569,6 +1663,7 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
 
 function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon }: RichTextSectionProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
+  const swatchMenuRef = useRef<HTMLDivElement | null>(null)
   const lastTextRef = useRef('')
   const lastSelectionRef = useRef<Range | null>(null)
   const [isSwatchOpen, setIsSwatchOpen] = useState(false)
@@ -1581,6 +1676,26 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     editorRef.current.innerHTML = tokenTextToHtml(section.text)
     lastTextRef.current = section.text
   }, [section.text])
+
+  useEffect(() => {
+    if (!isSwatchOpen) {
+      return
+    }
+
+    function handleDocumentPointerDown(event: globalThis.PointerEvent) {
+      if (event.target instanceof Node && swatchMenuRef.current?.contains(event.target)) {
+        return
+      }
+
+      setIsSwatchOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true)
+
+    return () => {
+      document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
+    }
+  }, [isSwatchOpen])
 
   function syncEditorText() {
     if (!editorRef.current) {
@@ -1859,11 +1974,17 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
   }
 
   function applyInlineElement(tagName: 'strong' | 'em' | 'span', attributes: Record<string, string> = {}, className = '', options: { clearColoring?: boolean; toggleEffect?: RichTextEffect } = {}) {
-    const range = getEditorRange()
+    let range = getEditorRange()
     const selection = window.getSelection()
 
     if (!range || !selection || range.collapsed) {
       return
+    }
+
+    if (editorRef.current && options.clearColoring) {
+      range = unwrapColorEffectsFromRange(range, editorRef.current)
+      selection.removeAllRanges()
+      selection.addRange(range)
     }
 
     if (editorRef.current && options.toggleEffect && rangeFullyHasEffect(range, editorRef.current, options.toggleEffect)) {
@@ -1900,6 +2021,50 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     removeAdjacentDuplicateInlineIcons(wrapper)
     const nextRange = document.createRange()
     nextRange.selectNodeContents(wrapper)
+    selection.removeAllRanges()
+    selection.addRange(nextRange)
+    lastSelectionRef.current = nextRange.cloneRange()
+    editorRef.current?.focus()
+    syncEditorText()
+  }
+
+  function clearInlineColoring() {
+    let range = getEditorRange()
+    const selection = window.getSelection()
+
+    if (!range || !selection || range.collapsed) {
+      return
+    }
+
+    if (editorRef.current) {
+      range = unwrapColorEffectsFromRange(range, editorRef.current)
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }
+
+    const selectedContent = range.extractContents()
+
+    removeRichTextColoring(selectedContent)
+
+    const firstNode = selectedContent.firstChild
+    const lastNode = selectedContent.lastChild
+
+    if (!firstNode || !lastNode) {
+      syncEditorText()
+      return
+    }
+
+    range.insertNode(selectedContent)
+
+    if (!firstNode.parentNode || !lastNode.parentNode) {
+      syncEditorText()
+      return
+    }
+
+    const nextRange = document.createRange()
+
+    nextRange.setStartBefore(firstNode)
+    nextRange.setEndAfter(lastNode)
     selection.removeAllRanges()
     selection.addRange(nextRange)
     lastSelectionRef.current = nextRange.cloneRange()
@@ -1945,12 +2110,24 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
         <button type="button" aria-label="Bold selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('strong', {}, '', { toggleEffect: { type: 'bold' } })}><Bold aria-hidden="true" /></button>
         <button type="button" aria-label="Italicize selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('em', {}, '', { toggleEffect: { type: 'italic' } })}><Italic aria-hidden="true" /></button>
         <button type="button" aria-label="Darken selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('span', { 'data-rich-dark': 'true' }, styles.darkenText, { toggleEffect: { type: 'dark' } })}><Moon aria-hidden="true" /></button>
-        <div className={styles.swatchMenu}>
+        <div className={styles.swatchMenu} ref={swatchMenuRef}>
           <button type="button" aria-label="Open text color swatches" onMouseDown={handleToolbarMouseDown} onClick={() => setIsSwatchOpen(open => !open)}>
             Swatches
           </button>
           {isSwatchOpen ? (
             <div className={styles.swatchPanel}>
+              <button
+                type="button"
+                className={styles.swatchDefault}
+                aria-label="Apply Default color"
+                onMouseDown={handleToolbarMouseDown}
+                onClick={() => {
+                  clearInlineColoring()
+                  setIsSwatchOpen(false)
+                }}
+              >
+                Default
+              </button>
               {RICH_TEXT_COLORS.map(color => (
                 <button
                   key={color.id}
@@ -1959,7 +2136,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
                   className={styles[`swatch${color.id.charAt(0).toUpperCase()}${color.id.slice(1)}`]}
                   onMouseDown={handleToolbarMouseDown}
                   onClick={() => {
-                    applyInlineElement('span', { 'data-rich-color': color.token }, styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`], { clearColoring: true, toggleEffect: { type: 'color', token: color.token } })
+                    applyInlineElement('span', { 'data-rich-color': color.token }, styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`], { clearColoring: true })
                     setIsSwatchOpen(false)
                   }}
                 />
@@ -2021,17 +2198,21 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
       >
         {section.mainCells.map((cell, index) => (
           <div key={cell.id} className={styles.mainCell}>
-            <label className={styles.mainCellTitleLabel}>
-              <span className={styles.srOnly}>Main Cell Title</span>
-              <input
-                value={getMainCellTitleInputValue(cell)}
-                aria-label={`Main cell ${index + 1} title`}
-                placeholder="Detail"
-                readOnly={readOnly}
-                tabIndex={readOnly ? -1 : undefined}
-                onChange={readOnly ? undefined : event => onMainCellChange(index, { ...cell, label: event.target.value })}
-              />
-            </label>
+            {readOnly && !getMainCellTitleInputValue(cell) ? (
+              <span className={styles.mainCellTitleSpacer} aria-hidden="true" />
+            ) : (
+              <label className={styles.mainCellTitleLabel}>
+                <span className={styles.srOnly}>Main Cell Title</span>
+                <input
+                  value={getMainCellTitleInputValue(cell)}
+                  aria-label={`Main cell ${index + 1} title`}
+                  placeholder="Detail"
+                  readOnly={readOnly}
+                  tabIndex={readOnly ? -1 : undefined}
+                  onChange={readOnly ? undefined : event => onMainCellChange(index, { ...cell, label: event.target.value })}
+                />
+              </label>
+            )}
             {renderInlineStat(cell, cell.label, stat => onMainCellChange(index, { ...cell, ...stat }), () => onMainIconClick(index), 'main')}
             {!readOnly ? (
               <button type="button" className={styles.removeGridCellButton} aria-label={`Remove main cell ${index + 1}`} onClick={() => onMainCellRemove(index)}>
@@ -2077,6 +2258,12 @@ interface IconSearchModalProps {
 
 function IconSearchModal({ groups, search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
   const isAbilityPicker = previewMode === 'ability'
+  function handleBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.target === event.currentTarget) {
+      onClose()
+    }
+  }
+
   const renderIconButton = (asset: EditorAssetGroup['assets'][number]) => (
     <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => onSelect(asset.path)}>
       <span
@@ -2100,7 +2287,7 @@ function IconSearchModal({ groups, search, selectedIconColor, title = 'Property 
   )
 
   return (
-    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId}>
+    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId} onPointerDown={handleBackdropPointerDown}>
       <div className={cn(styles.iconModal, isAbilityPicker && styles.iconModalAbility)}>
         <div className={styles.iconHeader}>
           <label>

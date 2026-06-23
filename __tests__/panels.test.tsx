@@ -136,12 +136,12 @@ describe('migrated stat panels', () => {
     const { rerender } = render(<WeaponPanel weaponStats={weaponStats} />)
 
     expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
-    expect(screen.queryByLabelText('spirit scaling value x0.2')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).not.toContain('valueWrapVisible')
 
     rerender(<WeaponPanel weaponStats={weaponStats} showDetails />)
 
     expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
-    expect(screen.getByLabelText('spirit scaling value x0.2')).toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).toContain('valueWrapVisible')
 
     rerender(<WeaponPanel weaponStats={weaponStats} isEditable />)
 

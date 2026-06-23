@@ -167,7 +167,7 @@ function buildEmptyAbilityStats(hero: HeroDefinition) {
       sections: [],
       tiers: ability.tiers.map(tier => ({
         tier: tier.tier,
-        upgradeText: 'N/A',
+        upgradeText: '',
         variant: {
           ...tier.variant,
           name: `Ability ${ability.slot}`,

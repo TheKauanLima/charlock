@@ -26,6 +26,10 @@
   transform: translateY(-15px);
 }
 
+.rootValueLower .valueWrap {
+  top: calc(100% - 3px);
+}
+
 .icon {
   display: block;
   width: 34px;

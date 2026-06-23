@@ -120,12 +120,12 @@ describe('HeroGrid', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
     expect(await screen.findByTitle('spirit scaling 0.2')).toBeInTheDocument()
-    expect(screen.queryByLabelText('spirit scaling value x0.2')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).not.toContain('valueWrapVisible')
 
     await user.click(screen.getByRole('button', { name: 'Show Details' }))
 
     expect(screen.getByRole('button', { name: 'Hide Details' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByLabelText('spirit scaling value x0.2')).toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).toContain('valueWrapVisible')
     expect(window.localStorage.getItem('charlock_show_details')).toBe('true')
   })
 

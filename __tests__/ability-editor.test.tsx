@@ -130,10 +130,11 @@ describe('AbilityEditor', () => {
   it('exposes placeholders on editable ability text fields', () => {
     const hero = HEROES[0]
     const ability = structuredClone(buildDefaultAbilityStats(hero).abilities[0])
+    const onSave = vi.fn()
 
     ability.tiers = ability.tiers.map(tier => ({
       ...tier,
-      upgradeText: '',
+      upgradeText: tier.tier === 2 ? 'N/A' : '',
     }))
 
     render(
@@ -143,18 +144,152 @@ describe('AbilityEditor', () => {
         hero={hero}
         heroInfo={hero.heroInfo}
         abilityIconGroups={ABILITY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const tierOneText = screen.getByLabelText('Tier 1 upgrade text')
+    const tierTwoText = screen.getByLabelText('Tier 2 upgrade text')
+    const tierOneShell = tierOneText.parentElement
+
+    expect(screen.getByLabelText('Ability Name')).toHaveAttribute('placeholder', 'Ability name')
+    expect(screen.getByLabelText('Description rich text')).toHaveAttribute('data-placeholder', 'Write ability text...')
+    expect(tierOneText).toHaveAttribute('data-placeholder', 'Tier 1 upgrade')
+    expect(tierOneText).toHaveAttribute('data-empty', 'true')
+    expect(tierOneShell?.className).toContain('tierTextShell')
+    expect(tierTwoText).toHaveAttribute('data-placeholder', 'Tier 2 upgrade')
+    expect(tierTwoText).toHaveAttribute('data-empty', 'true')
+    expect(tierTwoText).not.toHaveTextContent('N/A')
+    expect(screen.getByLabelText('Tier 3 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 3 upgrade')
+    expect(screen.getByLabelText('Main cell 1 title')).toHaveAttribute('placeholder', 'Detail')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedTierTwo = savedAbility?.tiers.find(tier => tier.tier === 2)
+
+    expect(savedTierTwo?.upgradeText).toBe('')
+  })
+
+  it('renders preview tier text without editable boxes and shrinks long upgrades', () => {
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.tiers = ability.tiers.map(tier => ({
+      ...tier,
+      upgradeText: tier.tier === 1
+        ? 'Take 35% less damage from Pain Cycle while the timer is active'
+        : tier.upgradeText,
+    }))
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        mode="preview"
         onSave={vi.fn()}
         onCancel={vi.fn()}
       />,
     )
 
-    expect(screen.getByLabelText('Ability Name')).toHaveAttribute('placeholder', 'Ability name')
-    expect(screen.getByLabelText('Description rich text')).toHaveAttribute('data-placeholder', 'Write ability text...')
-    expect(screen.getByLabelText('Tier 1 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 1 upgrade')
-    expect(screen.getByLabelText('Tier 1 upgrade text')).toHaveAttribute('data-empty', 'true')
-    expect(screen.getByLabelText('Tier 2 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 2 upgrade')
-    expect(screen.getByLabelText('Tier 3 upgrade text')).toHaveAttribute('data-placeholder', 'Tier 3 upgrade')
-    expect(screen.getByLabelText('Main cell 1 title')).toHaveAttribute('placeholder', 'Detail')
+    const tierOneText = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
+    const tierTextShell = tierOneText.parentElement
+
+    expect(tierOneText.className).toContain('tierTextEditorReadOnly')
+    expect(tierOneText.className).toContain('tierTextEditorCompact')
+    expect(tierTextShell?.className).toContain('tierTextShellReadOnly')
+    expect(tierOneText).toHaveAttribute('aria-readonly', 'true')
+    expect(screen.queryByRole('button', { name: 'Bold Tier 1 selected text' })).not.toBeInTheDocument()
+  })
+
+  it('renders preview grid cells without empty detail titles and exposes scaling values', () => {
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.sections = [
+      {
+        id: 'preview-grid',
+        type: 'grid',
+        title: 'Stats',
+        mainCells: [
+          {
+            ...ability.cooldown,
+            id: 'preview-main-cell',
+            label: 'Damage',
+            value: '12',
+            unit: 'Missing Health as Damage',
+            append: '+very-long-append',
+            scaling: 'spirit',
+            scalingValue: '0.15',
+          },
+        ],
+        lowerCells: [
+          {
+            ...ability.cooldown,
+            id: 'preview-lower-cell',
+            label: 'Very Long Lower Stat Label',
+            value: '203',
+            unit: '',
+            append: 'm/s',
+            scaling: 'none',
+            scalingValue: '0',
+          },
+        ],
+      },
+    ]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        mode="preview"
+        showDetails
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const mainStat = screen.getByTestId('ability-stat-main-damage')
+    const lowerStat = screen.getByTestId('ability-stat-lower-very-long-lower-stat-label')
+    const mainCell = mainStat.closest('[class*="mainCell"]')
+    const mainRow = mainStat.querySelector('[class*="mainRow"]')
+
+    expect(screen.queryByLabelText('Main cell 1 title')).not.toBeInTheDocument()
+    expect(mainCell?.querySelector('[class*="mainCellTitleSpacer"]')).toBeInTheDocument()
+    expect(mainRow).toBeInTheDocument()
+    expect(within(mainStat).getByLabelText('spirit scaling value x0.15')).toBeInTheDocument()
+    expect(within(mainStat).getByText('Missing Health as Damage').className).toContain('readonlyStatText')
+    expect(within(mainStat).getByText('+very-long-append').className).toContain('readonlyStatText')
+    expect(within(mainStat).getByText('+very-long-append').className).toContain('readonlyStatTextNoWrap')
+    expect(within(mainStat).getByText('Missing Health as Damage').className).not.toContain('readonlyStatTextNoWrap')
+    expect(within(lowerStat).getByText('Very Long Lower Stat Label').className).toContain('readonlyStatText')
+  })
+
+  it('keeps tier box line breaks in one vertical text flow', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
+
+    const tierOneText = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
+
+    tierOneText.innerHTML = '<div>Line one</div><div>Line two</div>'
+    fireEvent.input(tierOneText)
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
+
+    expect(savedTierOne?.upgradeText).toBe('Line one\nLine two')
   })
 
   it('manages focused ability state and saves a scaled rich-text payload', async () => {
@@ -489,7 +624,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
     await user.click(screen.getByRole('button', { name: 'Apply Healing color' }))
     await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
-    await user.click(screen.getByRole('button', { name: 'Apply Healing color' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Default color' }))
 
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
@@ -501,6 +636,85 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text).not.toContain('[i]Abrams')
     expect(savedRichText?.text).not.toContain('[dark]Abrams')
     expect(savedRichText?.text).not.toContain('[c:healing]Abrams')
+  })
+
+  it('closes text swatches on outside click and exposes the expanded palette', async () => {
+    const user = userEvent.setup()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
+
+    expect(screen.getByRole('button', { name: 'Apply Default color' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply Green color' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply Orange color' })).toBeInTheDocument()
+
+    fireEvent.pointerDown(document.body)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Apply Orange color' })).not.toBeInTheDocument()
+    })
+  })
+
+  it('replaces rich text colors instead of stacking them and clears them with Default', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.sections = [{
+      id: 'description',
+      type: 'richText',
+      title: 'Description',
+      text: '[c:green]Abrams[/c] channels custom ability 1.',
+    }]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+    await waitFor(() => {
+      expect(richTextEditor.querySelector('[data-rich-color="green"]')).not.toBeNull()
+    })
+
+    const greenText = richTextEditor.querySelector('[data-rich-color="green"]')
+    const range = document.createRange()
+
+    expect(greenText).not.toBeNull()
+    range.selectNodeContents(greenText!)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+
+    await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Orange color' }))
+
+    expect(richTextEditor.querySelector('[data-rich-color="green"]')).toBeNull()
+    expect(richTextEditor.querySelector('[data-rich-color="orange"]')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Default color' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toContain('Abrams channels custom ability 1.')
+    expect(savedRichText?.text).not.toContain('[c:green]')
+    expect(savedRichText?.text).not.toContain('[c:orange]')
   })
 
   it('extends an effect when only part of the selection already has it', async () => {
@@ -573,13 +787,15 @@ describe('AbilityEditor', () => {
     expect(screen.getByLabelText('Main cell 1 title')).toHaveValue('')
     expect(screen.queryByDisplayValue('Damage')).not.toBeInTheDocument()
     const firstMainStat = screen.getByTestId('ability-stat-main-damage')
+    const mainDetailInput = within(firstMainStat).getByPlaceholderText('Detail')
 
-    expect(within(firstMainStat).getByPlaceholderText('Detail')).toBeVisible()
+    expect(mainDetailInput).toBeVisible()
+    expect(mainDetailInput).toHaveStyle({ width: '6ch' })
     await user.clear(within(firstMainStat).getByLabelText('Value'))
     await user.type(within(firstMainStat).getByLabelText('Value'), 'Impact Text')
     expect(within(firstMainStat).getByLabelText('Value')).toHaveValue('ImpactText')
     await user.type(within(firstMainStat).getByLabelText('Append'), 'm')
-    await user.type(within(firstMainStat).getByPlaceholderText('Detail'), 'Radius')
+    await user.type(mainDetailInput, 'Radius')
 
     const mainCellGrid = screen.getByLabelText('Main cell 1 title').closest('[class*="mainCellGrid"]') as HTMLElement | null
 
@@ -770,13 +986,17 @@ describe('AbilityEditor', () => {
 
     expect(healPreview?.style.backgroundColor).toBe('rgb(46, 152, 96)')
 
+    await user.click(within(iconModal).getByRole('button', { name: 'Fresh Green icon color' }))
+
+    expect(healPreview?.style.backgroundColor).toBe('rgb(132, 201, 85)')
+
     await user.click(healOption)
     await user.click(screen.getByRole('button', { name: 'Go Back' }))
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
 
-    expect(savedRichText?.text).toContain('[i:heal|#2e9860]')
+    expect(savedRichText?.text).toContain('[i:heal|#84c955]')
   })
 
   it('persists selected icon swatch colors on tintable stat icons', async () => {
@@ -984,7 +1204,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon-marker]')).not.toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Close property icon selector' }))
+    fireEvent.pointerDown(screen.getByTestId('property-icon-modal'))
 
     await waitFor(() => {
       expect(richTextEditor.querySelector('[data-inline-icon-marker]')).toBeNull()

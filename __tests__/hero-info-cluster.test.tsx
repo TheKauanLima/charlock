@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -135,7 +135,11 @@ describe('HeroInfoCluster', () => {
 
     await user.click(screen.getByRole('button', { name: 'View Ability 1' }))
 
-    expect(screen.getByTestId('ability-editor')).toHaveTextContent('Base Snare')
+    const abilityEditor = screen.getByTestId('ability-editor')
+    expect(abilityEditor).toHaveTextContent('Base Snare')
+    expect(abilityEditor.className).toContain('abilityViewerDock')
+    expect(abilityEditor.querySelector('[class*="editorLayoutPreview"]')).toBeInTheDocument()
+    expect(abilityEditor.querySelector('[class*="mainEditorColumnPreview"]')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Main Cell' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Bold selected text' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Append ability sections')).not.toBeInTheDocument()
@@ -151,6 +155,10 @@ describe('HeroInfoCluster', () => {
     expect(screen.getByTestId('ability-editor')).toHaveTextContent('Base Snare')
     expect(screen.getByTestId('ability-editor')).not.toHaveTextContent('Tier Snare')
     expect(screen.getByTestId('ability-editor')).toHaveTextContent('+150')
+
+    fireEvent.pointerDown(document.body)
+
+    expect(screen.queryByTestId('ability-editor')).not.toBeInTheDocument()
   })
 
   it('supports the text name mode', () => {
@@ -293,11 +301,11 @@ describe('HeroInfoCluster', () => {
     await screen.findByTestId('weapon-panel')
 
     expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
-    expect(screen.queryByLabelText('spirit scaling value x0.2')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).not.toContain('valueWrapVisible')
 
     rerender(<HeroInfoCluster hero={hero} showDetails />)
 
-    expect(screen.getByLabelText('spirit scaling value x0.2')).toBeInTheDocument()
+    expect(screen.getByLabelText('spirit scaling value x0.2').className).toContain('valueWrapVisible')
   })
 
   it('replaces fallback panel data with fetched hero stats', async () => {

@@ -2,7 +2,7 @@ import type { PanelStat, ScalingType } from '@/components/panels/scaling-utils'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 
 export type AbilitySectionType = 'richText' | 'grid'
-export type AbilityTextColor = 'default' | 'spirit' | 'healing' | 'damage' | 'warning'
+export type AbilityTextColor = 'default' | 'spirit' | 'healing' | 'damage' | 'warning' | 'green' | 'orange'
 
 export interface AbilityStat extends PanelStat {
   icon: string

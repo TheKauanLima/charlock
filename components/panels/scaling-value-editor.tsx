@@ -11,6 +11,7 @@ interface ScalingValueEditorProps {
   isEditable?: boolean
   showValue?: boolean
   position?: 'default' | 'raised'
+  valuePosition?: 'center' | 'lower'
   onChange?: (scalingValue: string) => void
 }
 
@@ -37,7 +38,7 @@ function getScalingValueStyle(scaling: Exclude<ScalingType, 'none'>): CSSPropert
   }
 }
 
-export default function ScalingValueEditor({ scaling, scalingValue, isEditable = false, showValue = false, position = 'default', onChange }: ScalingValueEditorProps) {
+export default function ScalingValueEditor({ scaling, scalingValue, isEditable = false, showValue = false, position = 'default', valuePosition = 'center', onChange }: ScalingValueEditorProps) {
   const scalingIconStyle = getScalingIconStyle(scaling)
 
   if (!scalingIconStyle) {
@@ -59,7 +60,7 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
   }
 
   return (
-    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''}`} data-scaling-editor="true" title={`${scaling} scaling ${scalingValue}`}>
+    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''} ${valuePosition === 'lower' ? styles.rootValueLower : ''}`} data-scaling-editor="true" title={`${scaling} scaling ${scalingValue}`}>
       <span className={styles.icon} style={scalingIconStyle} aria-hidden="true" />
       {isEditable && scaling !== 'none' ? (
         <span className={styles.valueWrap} style={getScalingValueStyle(scaling)}>
@@ -76,8 +77,8 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
             style={getScalingValueStyle(scaling)}
           />
         </span>
-      ) : showValue && scaling !== 'none' ? (
-        <span className={`${styles.valueWrap} ${styles.valueWrapVisible}`} style={getScalingValueStyle(scaling)} aria-label={`${scaling} scaling value x${scalingValue}`}>
+      ) : scaling !== 'none' ? (
+        <span className={`${styles.valueWrap} ${showValue ? styles.valueWrapVisible : ''}`} style={getScalingValueStyle(scaling)} aria-label={`${scaling} scaling value x${scalingValue}`}>
           <span className={styles.prefix} aria-hidden="true">x</span>
           <span className={styles.valueText}>{scalingValue}</span>
         </span>

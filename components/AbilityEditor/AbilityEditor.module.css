@@ -241,6 +241,20 @@
   pointer-events: auto;
 }
 
+.editorLayoutPreview {
+  top: auto;
+  right: clamp(72px, 5vw, 120px);
+  bottom: calc(clamp(36px, 4vw, 60px) + 58px + 14px + clamp(54px, 4.5vw, 75px) + 20px);
+  width: min(43vw, 560px);
+  grid-template-columns: minmax(0, 1fr);
+  pointer-events: none;
+}
+
+.editorLayoutPreview .returnPanel {
+  grid-column: 1;
+  pointer-events: auto;
+}
+
 .mainEditorColumn {
   position: relative;
   display: grid;
@@ -251,6 +265,72 @@
   overflow-x: hidden;
   scrollbar-color: rgb(198 127 255 / 52%) rgb(255 255 255 / 8%);
   scrollbar-width: thin;
+}
+
+.mainEditorColumnPreview {
+  width: 100%;
+  max-height: min(62dvh, calc(100dvh - 170px));
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.mainEditorColumnPreview .mainCell,
+.mainEditorColumnPreview .inlineStatEditorMain {
+  overflow: visible;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain {
+  height: 94px;
+  min-height: 94px;
+  padding: 8px 24px 8px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .mainRow {
+  align-items: baseline;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100% + 24px);
+  column-gap: 4px;
+  row-gap: 0;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .valueInput,
+.mainEditorColumnPreview .inlineStatEditorMain .appendInput,
+.mainEditorColumnPreview .inlineStatEditorMain .unitInput {
+  text-align: center;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .valueInput,
+.mainEditorColumnPreview .inlineStatEditorMain .appendInput {
+  max-width: none;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .valueInputLabel,
+.mainEditorColumnPreview .inlineStatEditorMain .appendInputLabel {
+  width: max-content;
+  min-width: max-content;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .appendInputLabel {
+  justify-content: center;
+  margin-inline: 0;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .unitInputLabel {
+  margin-top: 1px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .scalingValueWrap {
+  top: -4px;
+  right: -13px;
+  z-index: 4;
+  transform: none;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .scalingValueWrap > span {
+  margin-right: 0;
 }
 
 .tooltipSurface {
@@ -406,7 +486,7 @@
 .sideTabs {
   display: grid;
   gap: 8px;
-  margin-top: 76px;
+  margin-top: 36px;
 }
 
 .sideTabs button,
@@ -487,16 +567,21 @@
 
 .inlineStatEditorTiming {
   display: inline-grid;
-  grid-template-columns: 18px max-content max-content 28px;
-  grid-template-areas: "icon value unit scaleButton";
+  grid-template-columns: 18px max-content max-content;
+  grid-template-areas: "icon value unit";
   align-items: center;
   justify-content: flex-start;
-  column-gap: 4px;
+  column-gap: 2px;
   width: max-content;
   max-width: max-content;
   padding: 4px 8px;
   background: rgb(255 255 255 / 15%);
   color: #170f1f;
+}
+
+.inlineStatEditorTiming.inlineStatEditorHasScaling {
+  grid-template-columns: 18px max-content max-content 28px;
+  grid-template-areas: "icon value unit scaleButton";
 }
 
 .inlineStatEditorTiming .iconButton {
@@ -542,17 +627,22 @@
 
 .inlineStatEditorSub {
   display: inline-grid;
-  grid-template-columns: 18px max-content max-content 28px;
-  grid-template-areas: "icon value unit scaleButton";
+  grid-template-columns: 18px max-content max-content;
+  grid-template-areas: "icon value unit";
   align-items: center;
   justify-content: start;
-  column-gap: 4px;
+  column-gap: 2px;
   width: max-content;
   max-width: max-content;
   min-width: max-content;
   padding: 4px 8px;
   background: rgb(255 255 255 / 15%);
   color: #170f1f;
+}
+
+.inlineStatEditorSub.inlineStatEditorHasScaling {
+  grid-template-columns: 18px max-content max-content 28px;
+  grid-template-areas: "icon value unit scaleButton";
 }
 
 .inlineStatEditorSub .iconButton {
@@ -613,16 +703,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  flex-wrap: nowrap;
+  column-gap: 2px;
+  row-gap: 0;
   width: 100%;
 }
 
 .inlineStatEditorLower {
-  width: max-content;
-  grid-template-columns: 26px max-content max-content 1fr max-content;
-  grid-template-areas: "icon value append label scaleButton";
+  width: 100%;
+  grid-template-columns: 22px max-content max-content minmax(0, 1fr);
+  grid-template-areas: "icon value append label";
   align-items: center;
-  column-gap: 0px;
+  column-gap: 2px;
   padding: 0;
   background: transparent;
   box-shadow: none;
@@ -648,9 +740,17 @@
   mask-position: center;
 }
 
-.inlineStatEditorTiming .propertyIcon,
-.inlineStatEditorSub .propertyIcon {
+.inlineStatEditorTiming .propertyIcon {
   color: #7e61a1;
+}
+
+.inlineStatEditorLower.inlineStatEditorHasScaling {
+  grid-template-columns: 22px max-content max-content minmax(0, 1fr) 28px;
+  grid-template-areas: "icon value append label scaleButton";
+}
+
+.inlineStatEditorSub .propertyIcon {
+  color: #f7e9ff;
 }
 
 .valueInputLabel {
@@ -664,7 +764,7 @@
 .appendInputLabel {
   grid-area: append;
   min-width: 3ch;
-  margin-inline: -3px 3px;
+  margin-inline: -1px 1px;
 }
 
 .statLabelInputLabel {
@@ -959,20 +1059,21 @@
 }
 
 .inlineStatEditorMain .valueInputLabel {
-  flex: 0 0 auto;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .inlineStatEditorMain .appendInputLabel {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   min-width: 3ch;
-  margin-inline: 4px 0;
+  margin-inline: 1px 0;
 }
 
 .inlineStatEditorMain .unitInputLabel {
   display: flex;
   justify-content: center;
   min-width: 0;
-  margin-top: -9px;
+  margin-top: 2px;
   width: 100%;
 }
 
@@ -987,7 +1088,7 @@
   display: flex;
   align-items: baseline;
   justify-content: flex-start;
-  margin-inline: 4px 0;
+  margin-inline: 1px 0;
 }
 
 .inlineStatEditorMain .appendInput {
@@ -1082,7 +1183,8 @@
   display: flex;
   align-items: baseline;
   justify-content: flex-start;
-  margin-left: 2px;
+  min-width: 0;
+  margin-left: 0;
 }
 
 .inlineStatEditorLower .appendInput {
@@ -1097,6 +1199,24 @@
   width: 100%;
   color: rgb(255 255 255 / 84%);
   text-align: left;
+}
+
+.readonlyStatText {
+  display: inline-block;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.08;
+}
+
+.readonlyStatTextNoWrap {
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .inlineStatEditorLower .scalingValueWrap {
@@ -1187,6 +1307,14 @@
   color: #f7d65a;
 }
 
+.richColorGreen {
+  color: #84c955;
+}
+
+.richColorOrange {
+  color: #e5a535;
+}
+
 .inlineIcon {
   display: inline-block;
   width: 18px;
@@ -1270,6 +1398,25 @@
   background-color: #f7d65a;
 }
 
+.swatchPanel .swatchGreen {
+  background-color: #84c955;
+}
+
+.swatchPanel .swatchOrange {
+  background-color: #e5a535;
+}
+
+.swatchPanel .swatchDefault {
+  width: auto;
+  min-width: 66px;
+  padding: 0 8px;
+  color: #efe2ff;
+  background: rgb(255 255 255 / 10%);
+  font-size: 0.58rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .swatchPanel .swatchSpirit:hover {
   background-color: #d6a1ff;
 }
@@ -1284,6 +1431,18 @@
 
 .swatchPanel .swatchWarning:hover {
   background-color: #f7d65a;
+}
+
+.swatchPanel .swatchGreen:hover {
+  background-color: #84c955;
+}
+
+.swatchPanel .swatchOrange:hover {
+  background-color: #e5a535;
+}
+
+.swatchPanel .swatchDefault:hover {
+  background: rgb(255 255 255 / 16%);
 }
 
 .gridEditor {
@@ -1322,6 +1481,12 @@
 .mainCellTitleLabel {
   display: block;
   min-width: 0;
+}
+
+.mainCellTitleSpacer {
+  display: block;
+  min-height: 0.95rem;
+  visibility: hidden;
 }
 
 .mainCellTitleLabel input {
@@ -1558,9 +1723,14 @@
 .tierTextShell {
   position: relative;
   z-index: 1;
-  display: block;
+  display: grid;
+  align-items: center;
   min-height: 0;
   padding: 4px 8px 8px;
+}
+
+.tierTextShellReadOnly {
+  padding: 3px 6px 5px;
 }
 
 .tierTextToolbar {
@@ -1599,7 +1769,10 @@
 .tierTextEditor {
   position: relative;
   z-index: 1;
-  display: block;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: calc(100% - 4px);
   padding: 8px 8px 6px;
@@ -1607,7 +1780,7 @@
   border-radius: 2px;
   color: #f5eadb;
   background: rgb(255 255 255 / 7%);
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   font-weight: 100;
   line-height: 1.18;
   text-align: center;
@@ -1617,9 +1790,32 @@
   overflow: hidden;
 }
 
+.tierTextEditor > div {
+  width: 100%;
+}
+
+.tierTextEditorReadOnly {
+  align-self: center;
+  min-height: 0;
+  padding: 0 4px;
+  border-color: transparent;
+  background: transparent;
+  cursor: pointer;
+}
+
 .tierTextEditorDense {
-  font-size: 1rem;
+  font-size: 1.18rem;
   line-height: 1.08;
+}
+
+.tierTextEditorCompact {
+  font-size: 0.92rem;
+  line-height: 1.04;
+}
+
+.tierTextEditorTiny {
+  font-size: 0.78rem;
+  line-height: 1;
 }
 
 .tierTextEditor strong {
@@ -1945,6 +2141,11 @@
   .editorLayout {
     right: 24px;
   }
+
+  .editorLayoutPreview {
+    right: clamp(24px, 5vw, 72px);
+    width: min(52vw, 500px);
+  }
 }
 
 @media (max-width: 760px) {
@@ -1953,6 +2154,19 @@
     right: 16px;
     left: 16px;
     grid-template-columns: 1fr;
+  }
+
+  .editorLayoutPreview {
+    top: auto;
+    right: 12px;
+    bottom: calc(12px + 58px + 14px + clamp(54px, 4.5vw, 75px) + 18px);
+    left: auto;
+    width: min(88vw, 380px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mainEditorColumnPreview {
+    max-height: min(64dvh, calc(100dvh - 110px));
   }
 
   .sideTabs {
@@ -1978,6 +2192,15 @@
     order: -1;
   }
 
+  .editorLayoutPreview .returnPanel {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    grid-column: 1;
+    justify-content: end;
+    order: 0;
+  }
+
   .mainCellGrid {
     grid-template-columns: 1fr;
   }
@@ -1985,14 +2208,19 @@
 
 .inlineStatEditorSub {
   display: inline-grid;
-  grid-template-columns: 18px max-content max-content 28px;
-  grid-template-areas: "icon value unit scaleButton";
-  column-gap: 4px;
+  grid-template-columns: 18px max-content max-content;
+  grid-template-areas: "icon value unit";
+  column-gap: 2px;
   align-items: center;
   width: max-content;
   min-width: max-content;
   max-width: max-content;
   padding: 4px 8px;
+}
+
+.inlineStatEditorSub.inlineStatEditorHasScaling {
+  grid-template-columns: 18px max-content max-content 28px;
+  grid-template-areas: "icon value unit scaleButton";
 }
 
 .inlineStatEditorSub .iconButton {
@@ -2028,7 +2256,7 @@
   justify-content: flex-end;
   width: 28px;
   min-width: 28px;
-  margin-left: 4px;
+  margin-left: 1px;
 }
 
 .inlineStatEditorSub .scalingValueWrap:empty {
@@ -2091,5 +2319,10 @@
 }
 
 .inlineStatEditorLower {
-  grid-template-columns: 26px max-content max-content 1fr 32px;
+  grid-template-columns: 22px max-content max-content minmax(0, 1fr);
+  column-gap: 2px;
+}
+
+.inlineStatEditorLower.inlineStatEditorHasScaling {
+  grid-template-columns: 22px max-content max-content minmax(0, 1fr) 28px;
 }

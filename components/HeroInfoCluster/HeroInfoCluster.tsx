@@ -292,6 +292,26 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       ? previewAbilityStats.abilities[selectedAbilityTarget.index] ?? null
       : null
 
+  useEffect(() => {
+    if (!selectedAbilityTarget) {
+      return
+    }
+
+    function handlePreviewClickAway(event: globalThis.PointerEvent) {
+      if (event.target instanceof Element && event.target.closest('[data-ability-preview-panel="true"]')) {
+        return
+      }
+
+      setSelectedAbilityTarget(null)
+    }
+
+    document.addEventListener('pointerdown', handlePreviewClickAway)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePreviewClickAway)
+    }
+  }, [selectedAbilityTarget])
+
   return (
     <>
       <aside
@@ -478,6 +498,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
           secondaryAbilitySlots={secondaryAbilitySlots}
           isSecondAbilitySetEnabled={secondaryAbilities.length > 0}
           abilityIconGroups={ABILITY_ICON_GROUPS}
+          showDetails={showDetails}
           onAbilitySelect={target => setSelectedAbilityTarget(target)}
           onCancel={() => setSelectedAbilityTarget(null)}
         />
