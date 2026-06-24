@@ -89,7 +89,7 @@
   min-height: 32px;
   width: fit-content;
   flex-shrink: 0;
-  cursor: grab;
+  cursor: default;
   touch-action: none;
   user-select: none;
   align-items: center;
@@ -119,10 +119,6 @@
   filter: brightness(1.1);
 }
 
-.tagPreview:active {
-  cursor: grabbing;
-}
-
 .tagText {
   color: inherit;
   text-align: center;
@@ -137,6 +133,7 @@
 .tagTextInput {
   position: absolute;
   inset: 4px var(--tag-horizontal-padding);
+  z-index: 1;
   width: calc(100% - (var(--tag-horizontal-padding) * 2));
   height: calc(100% - 8px);
   min-width: 0;
@@ -159,6 +156,97 @@
 .tagTextInput::placeholder {
   color: currentColor;
   opacity: 0.62;
+}
+
+.tagDragHandle {
+  position: absolute;
+  z-index: 2;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  touch-action: none;
+}
+
+.tagDragHandle::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  transition:
+    background 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.tagPreview:hover .tagDragHandle::after,
+.tagDragHandle:focus-visible::after {
+  border-color: rgba(255, 239, 214, 0.28);
+  background: rgba(255, 239, 214, 0.08);
+}
+
+.tagDragHandle:focus-visible {
+  outline: 0;
+}
+
+.tagCornerHandle {
+  width: 14px;
+  height: 14px;
+  cursor: grab;
+}
+
+.tagCornerHandle:active {
+  cursor: grabbing;
+}
+
+.tagCornerTopLeft {
+  top: -7px;
+  left: -7px;
+}
+
+.tagCornerTopRight {
+  top: -7px;
+  right: -7px;
+}
+
+.tagCornerBottomLeft {
+  bottom: -7px;
+  left: -7px;
+}
+
+.tagCornerBottomRight {
+  right: -7px;
+  bottom: -7px;
+}
+
+.tagEdgeHandle {
+  right: 10px;
+  left: 10px;
+  height: 12px;
+  cursor: ns-resize;
+}
+
+.tagEdgeTop {
+  top: -6px;
+}
+
+.tagEdgeBottom {
+  bottom: -6px;
+}
+
+.tagSideEdgeHandle {
+  top: 6px;
+  bottom: 6px;
+  width: 12px;
+  cursor: ns-resize;
+}
+
+.tagEdgeLeft {
+  left: -6px;
+}
+
+.tagEdgeRight {
+  right: -6px;
 }
 
 .abilitiesRow {
@@ -363,14 +451,12 @@
 }
 
 .segmentedGrid,
-.renderModeGrid,
-.twoColumnGrid {
+.renderModeGrid {
   display: grid;
   gap: 8px;
 }
 
-.segmentedGrid,
-.twoColumnGrid {
+.segmentedGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -378,8 +464,7 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.fieldLabel,
-.compactLabel {
+.fieldLabel {
   display: grid;
   gap: 6px;
   color: rgba(255, 239, 214, 0.75);
@@ -390,17 +475,6 @@
 .fieldLabel {
   font-size: 0.64rem;
   letter-spacing: 0.22em;
-}
-
-.compactLabel {
-  font-size: 0.6rem;
-  letter-spacing: 0.2em;
-}
-
-.tinyLabel {
-  font-size: 0.56rem;
-  letter-spacing: 0.18em;
-  color: rgba(255, 239, 214, 0.62);
 }
 
 .input,
@@ -422,22 +496,85 @@
   font-size: 0.8rem;
 }
 
-.compactInput {
-  padding: 6px 8px;
-  font-size: 0.75rem;
-}
-
-.compactTextarea {
-  min-height: 58px;
-  padding: 6px 8px;
-  font-size: 0.72rem;
-  line-height: 1.05rem;
-  letter-spacing: 0.02em;
-}
-
 .select {
   font-size: 0.74rem;
   letter-spacing: 0.08em;
+}
+
+.backgroundPickerButton {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 239, 214, 0.15);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 6px;
+  color: #ffefd6;
+  text-align: left;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.backgroundPickerButton:hover {
+  border-color: rgba(47, 200, 144, 0.62);
+  background: rgba(47, 200, 144, 0.08);
+}
+
+.backgroundPickerButton:focus-visible {
+  border-color: #2fc890;
+  outline: 0;
+  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.25);
+}
+
+.backgroundPickerPreview {
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 64px;
+  border-radius: 3px;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.backgroundPickerText {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.sizeControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+}
+
+.sizeRange {
+  width: 100%;
+  accent-color: #2fc890;
+  cursor: pointer;
+}
+
+.sizeNumber {
+  min-width: 0;
+  padding-inline: 8px;
+  text-align: center;
+}
+
+.sizeHint {
+  color: rgba(255, 239, 214, 0.52);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .textarea {
@@ -556,23 +693,6 @@
   font-size: 0.68rem;
   letter-spacing: 0.18em;
   color: rgba(255, 239, 214, 0.78);
-}
-
-.tagControl {
-  display: grid;
-  gap: 8px;
-  border: 1px solid rgba(255, 239, 214, 0.1);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.15);
-  padding: 10px;
-}
-
-.tagControlTitle {
-  color: rgba(255, 239, 214, 0.68);
-  font-size: 0.6rem;
-  font-weight: 900;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
 }
 
 .weaponActionGrid {

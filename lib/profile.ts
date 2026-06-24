@@ -138,6 +138,10 @@ export function getProfilePathSegment(user: { username?: string | null; clerkId:
   return encodeURIComponent(user.username?.trim() || user.clerkId)
 }
 
+export function getProfileRedirectPath(user: { username?: string | null; clerkId: string }) {
+  return `/profile/${getProfilePathSegment(user)}`
+}
+
 function buildOwnerIds(user: UserRecord) {
   return [user.clerkId, user._id.toString()]
 }

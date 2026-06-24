@@ -40,6 +40,9 @@ const GRID_SIZE = 40
 const BROWSE_PAGE_SIZE = 24
 const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
 const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
+const HERO_BACKGROUND_SLUG_OVERRIDES: Record<string, string> = {
+  ladygeist: 'geist',
+}
 
 function getStoredShowDetails() {
   if (typeof window === 'undefined') {
@@ -82,10 +85,23 @@ function cloneHeroInfo(heroInfo: HeroInfoDefinition): HeroInfoDefinition {
 }
 
 function getEditorBackgroundForHero(hero: HeroDefinition) {
-  const assetMatch = HERO_BACKGROUND_OPTIONS.find(option => option.path.endsWith(`/${hero.assetSlug}_bg_psd.png`))
-  const slugMatch = HERO_BACKGROUND_OPTIONS.find(option => option.path.endsWith(`/${hero.slug}_bg_psd.png`))
+  const displayNameSlug = hero.displayName
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+  const backgroundSlugs = [
+    hero.assetSlug,
+    hero.slug,
+    displayNameSlug,
+    HERO_BACKGROUND_SLUG_OVERRIDES[hero.slug],
+  ].filter((slug): slug is string => Boolean(slug))
+  const backgroundMatch = HERO_BACKGROUND_OPTIONS.find(option =>
+    backgroundSlugs.some(backgroundSlug => option.path.endsWith(`/${backgroundSlug}_bg_psd.png`)),
+  )
 
-  return assetMatch?.path ?? slugMatch?.path ?? FALLBACK_EDITOR_BACKGROUND
+  return backgroundMatch?.path ?? FALLBACK_EDITOR_BACKGROUND
 }
 
 function getSavedRenderSelection(renderPath: string): { background: string; renderSelection: EditorRenderSelection } {

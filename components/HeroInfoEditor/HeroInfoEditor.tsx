@@ -14,7 +14,7 @@ import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
-import { ABILITY_ICON_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
+import { ABILITY_ICON_GROUPS, HERO_BACKGROUND_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
 import {
@@ -94,11 +94,15 @@ interface ActiveAbilityTarget {
 }
 
 type SecondAbilitySetModal = 'selectSlots' | 'confirmRemove'
+type TagDragMode = 'rotate' | 'moveY'
 
-interface TagRotationDrag {
+interface TagDragState {
   tag: TagControl
+  mode: TagDragMode
   startX: number
+  startY: number
   startTilt: number
+  startOffsetY: number
 }
 
 const TAG_CONTROLS: TagControl[] = [
@@ -127,11 +131,25 @@ const TAG_TILT_MIN = -45
 const TAG_TILT_MAX = 45
 const TAG_WHEEL_STEP = 0.5
 const TAG_DRAG_PIXELS_PER_DEGREE = 6
+const TAG_OFFSET_MIN = -28
+const TAG_OFFSET_MAX = 28
+const NAME_SIZE_MIN = 1
+const NAME_SIZE_MAX = 30
+const NAME_SIZE_DEFAULT = 6
+const NAME_SIZE_BASE_REM = 1.5
+const NAME_SIZE_STEP_REM = 0.3
+const NAME_FONT_VALUE_VALVE_PULP = '"Valve Pulp", VALVEPulp, "Noto Sans", sans-serif'
 const NAME_FONT_OPTIONS = [
-  { label: 'Valve Pulp', value: DEFAULT_HERO_NAME_FONT_FAMILY },
-  { label: 'Sans', value: 'var(--sans, "Noto Sans", sans-serif)' },
-  { label: 'Mono', value: 'var(--font-geist-mono), "Roboto Mono", monospace' },
-  { label: 'Serif', value: 'Georgia, serif' },
+  { label: 'Valve Pulp', value: NAME_FONT_VALUE_VALVE_PULP },
+  { label: 'Valve Occult', value: '"Valve Occult", Georgia, "Times New Roman", serif' },
+  { label: 'Retail Demo', value: '"Retail Demo", "Noto Sans", Arial, sans-serif' },
+  { label: 'Radiance', value: 'Radiance, Arial, sans-serif' },
+  { label: 'Reaver', value: 'Reaver, Georgia, serif' },
+  { label: 'Forevs Demo', value: '"Forevs Demo", "Valve Pulp", sans-serif' },
+  { label: 'Geist Sans', value: 'var(--font-geist-sans), Arial, sans-serif' },
+  { label: 'Geist Mono', value: 'var(--font-geist-mono), "Roboto Mono", monospace' },
+  { label: 'Georgia', value: 'Georgia, serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
 ]
 const NAME_FONT_WEIGHTS = [
   { label: 'Light', value: '400' },
@@ -155,14 +173,12 @@ function sanitizeNumberInput(value: string | number) {
   return String(value).replace(/[^\d.-]/g, '')
 }
 
-function parseTagControlNumber(value: string, fallbackValue: number) {
-  const parsedValue = Number(value)
-
-  return Number.isFinite(parsedValue) ? parsedValue : fallbackValue
-}
-
 function clampTagTilt(value: number) {
   return Number(Math.min(TAG_TILT_MAX, Math.max(TAG_TILT_MIN, value)).toFixed(1))
+}
+
+function clampTagOffset(value: number) {
+  return Math.min(TAG_OFFSET_MAX, Math.max(TAG_OFFSET_MIN, Math.round(value)))
 }
 
 function getHeroNameTextStyle(heroInfo: HeroInfoDefinition): CSSProperties {
@@ -172,6 +188,56 @@ function getHeroNameTextStyle(heroInfo: HeroInfoDefinition): CSSProperties {
     fontFamily: heroInfo.nameFontFamily || DEFAULT_HERO_NAME_FONT_FAMILY,
     fontWeight: heroInfo.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT,
   }
+}
+
+function clampNameSizeLevel(value: number) {
+  return Math.min(NAME_SIZE_MAX, Math.max(NAME_SIZE_MIN, Math.round(value)))
+}
+
+function getNameSizeRemByLevel(level: number) {
+  return Number((NAME_SIZE_BASE_REM + (level - 1) * NAME_SIZE_STEP_REM).toFixed(1))
+}
+
+function getNameSizeControlValue(fontSize?: string) {
+  const normalizedFontSize = (fontSize || DEFAULT_HERO_NAME_FONT_SIZE).trim()
+
+  if (!normalizedFontSize || normalizedFontSize === DEFAULT_HERO_NAME_FONT_SIZE) {
+    return NAME_SIZE_DEFAULT
+  }
+
+  const remMatches = Array.from(normalizedFontSize.matchAll(/([\d.]+)\s*rem/g))
+  const remValue = remMatches.length ? Number(remMatches.at(-1)?.[1]) : NaN
+  const pxMatch = normalizedFontSize.match(/([\d.]+)\s*px/)
+  const pxValue = pxMatch ? Number(pxMatch[1]) / 16 : NaN
+  const sizeValue = Number.isFinite(remValue) ? remValue : pxValue
+
+  if (!Number.isFinite(sizeValue)) {
+    return NAME_SIZE_DEFAULT
+  }
+
+  return clampNameSizeLevel(((sizeValue - NAME_SIZE_BASE_REM) / NAME_SIZE_STEP_REM) + 1)
+}
+
+function getNameSizeCss(level: number) {
+  const nextLevel = Number.isFinite(level) ? clampNameSizeLevel(level) : NAME_SIZE_DEFAULT
+
+  if (nextLevel === NAME_SIZE_DEFAULT) {
+    return DEFAULT_HERO_NAME_FONT_SIZE
+  }
+
+  return `${getNameSizeRemByLevel(nextLevel)}rem`
+}
+
+function getNameFontSelectValue(fontFamily?: string) {
+  const normalizedFontFamily = fontFamily || DEFAULT_HERO_NAME_FONT_FAMILY
+
+  if (normalizedFontFamily === DEFAULT_HERO_NAME_FONT_FAMILY || normalizedFontFamily.includes('VALVEPulp') || normalizedFontFamily.includes('Valve Pulp')) {
+    return NAME_FONT_VALUE_VALVE_PULP
+  }
+
+  return NAME_FONT_OPTIONS.some(option => option.value === normalizedFontFamily)
+    ? normalizedFontFamily
+    : NAME_FONT_VALUE_VALVE_PULP
 }
 
 function formatCalculatedWeaponStat(label: string, value: number) {
@@ -288,9 +354,10 @@ export default function HeroInfoEditor({
   const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
   const [activeAbilityTarget, setActiveAbilityTarget] = useState<ActiveAbilityTarget | null>(null)
   const [isWeaponAssetModalOpen, setIsWeaponAssetModalOpen] = useState(false)
+  const [isBackgroundAssetModalOpen, setIsBackgroundAssetModalOpen] = useState(false)
   const [isHeroRenderAssetModalOpen, setIsHeroRenderAssetModalOpen] = useState(false)
   const [secondAbilitySetModal, setSecondAbilitySetModal] = useState<SecondAbilitySetModal | null>(null)
-  const [tagRotationDrag, setTagRotationDrag] = useState<TagRotationDrag | null>(null)
+  const [tagDragState, setTagDragState] = useState<TagDragState | null>(null)
   const initialStatsDraft = initialStats ?? buildHeroStatsSeed(hero)
   const initialAbilityDraft = initialAbilityStats ?? buildDefaultAbilityStats(hero)
   const normalizedInitialAbilityDraft = normalizeAbilityStats(initialAbilityDraft, hero)
@@ -304,6 +371,8 @@ export default function HeroInfoEditor({
   const [saveError, setSaveError] = useState<string | null>(null)
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
   const heroNameTextStyle = getHeroNameTextStyle(draft)
+  const nameSizeControlValue = getNameSizeControlValue(draft.nameFontSize)
+  const selectedBackgroundOption = backgroundOptions.find(option => option.path === selectedBackground) ?? backgroundOptions[0]
   const exportHeroName = getDraftName() || heroNamePreview
   const exportShareUrl = savedHeroId && typeof window !== 'undefined' ? getCharacterShareUrl(savedHeroId, window.location.origin) : null
   const exportPayload = buildCharacterExportPayload(
@@ -697,6 +766,12 @@ export default function HeroInfoEditor({
     })
   }
 
+  function updateTagOffset(tag: TagControl, offsetY: number) {
+    updateDraft({
+      [tag.offsetKey]: clampTagOffset(offsetY),
+    })
+  }
+
   function handleTagWheel(event: WheelEvent<HTMLSpanElement>, tag: TagControl) {
     event.preventDefault()
 
@@ -704,36 +779,49 @@ export default function HeroInfoEditor({
     updateTagTilt(tag, draft[tag.tiltKey] + wheelDirection * TAG_WHEEL_STEP)
   }
 
-  function handleTagPointerDown(event: PointerEvent<HTMLSpanElement>, tag: TagControl) {
+  function handleTagHandlePointerDown(event: PointerEvent<HTMLElement>, tag: TagControl, mode: TagDragMode) {
     if (event.button !== 0) {
       return
     }
 
+    event.preventDefault()
+    event.stopPropagation()
+
     if (event.currentTarget.setPointerCapture) {
       event.currentTarget.setPointerCapture(event.pointerId)
     }
-    setTagRotationDrag({
+    setTagDragState({
       tag,
+      mode,
       startX: event.clientX,
+      startY: event.clientY,
       startTilt: draft[tag.tiltKey],
+      startOffsetY: draft[tag.offsetKey],
     })
   }
 
-  function handleTagPointerMove(event: PointerEvent<HTMLSpanElement>) {
-    if (!tagRotationDrag) {
+  function handleTagHandlePointerMove(event: PointerEvent<HTMLElement>) {
+    if (!tagDragState) {
       return
     }
 
-    const tiltDelta = (event.clientX - tagRotationDrag.startX) / TAG_DRAG_PIXELS_PER_DEGREE
-    updateTagTilt(tagRotationDrag.tag, tagRotationDrag.startTilt + tiltDelta)
+    event.preventDefault()
+
+    if (tagDragState.mode === 'rotate') {
+      const tiltDelta = (event.clientX - tagDragState.startX) / TAG_DRAG_PIXELS_PER_DEGREE
+      updateTagTilt(tagDragState.tag, tagDragState.startTilt + tiltDelta)
+      return
+    }
+
+    updateTagOffset(tagDragState.tag, tagDragState.startOffsetY + event.clientY - tagDragState.startY)
   }
 
-  function handleTagPointerEnd(event: PointerEvent<HTMLSpanElement>) {
+  function handleTagHandlePointerEnd(event: PointerEvent<HTMLElement>) {
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId)
     }
 
-    setTagRotationDrag(null)
+    setTagDragState(null)
   }
 
   function renderSecondAbilitySetModal() {
@@ -889,17 +977,11 @@ export default function HeroInfoEditor({
               {tagPreview.map((tag, index) => (
                 <span
                   key={tag.label}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${tag.label} preview. Scroll or drag horizontally to rotate.`}
+                  aria-label={`${tag.label} preview`}
                   className={cn(styles.tagPreview, 'w-fit shrink-0')}
                   data-testid={`editor-tag-${index + 1}`}
                   data-tag-text={tag.text.trim() || tag.label}
                   onWheel={event => handleTagWheel(event, tag)}
-                  onPointerDown={event => handleTagPointerDown(event, tag)}
-                  onPointerMove={handleTagPointerMove}
-                  onPointerUp={handleTagPointerEnd}
-                  onPointerCancel={handleTagPointerEnd}
                   style={{
                     transform: `rotate(${tag.tilt}deg) translateY(${tag.offsetY}px)`,
                     backgroundColor: draft.tagColor,
@@ -916,6 +998,78 @@ export default function HeroInfoEditor({
                     onClick={event => event.stopPropagation()}
                     onPointerDown={event => event.stopPropagation()}
                     onWheel={event => event.stopPropagation()}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} rotate top left handle`}
+                    className={cn(styles.tagDragHandle, styles.tagCornerHandle, styles.tagCornerTopLeft)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'rotate')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} rotate top right handle`}
+                    className={cn(styles.tagDragHandle, styles.tagCornerHandle, styles.tagCornerTopRight)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'rotate')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} rotate bottom left handle`}
+                    className={cn(styles.tagDragHandle, styles.tagCornerHandle, styles.tagCornerBottomLeft)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'rotate')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} rotate bottom right handle`}
+                    className={cn(styles.tagDragHandle, styles.tagCornerHandle, styles.tagCornerBottomRight)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'rotate')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} vertical top edge handle`}
+                    className={cn(styles.tagDragHandle, styles.tagEdgeHandle, styles.tagEdgeTop)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'moveY')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} vertical bottom edge handle`}
+                    className={cn(styles.tagDragHandle, styles.tagEdgeHandle, styles.tagEdgeBottom)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'moveY')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} vertical left edge handle`}
+                    className={cn(styles.tagDragHandle, styles.tagSideEdgeHandle, styles.tagEdgeLeft)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'moveY')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
+                  />
+                  <button
+                    type="button"
+                    aria-label={`${tag.label} vertical right edge handle`}
+                    className={cn(styles.tagDragHandle, styles.tagSideEdgeHandle, styles.tagEdgeRight)}
+                    onPointerDown={event => handleTagHandlePointerDown(event, tag, 'moveY')}
+                    onPointerMove={handleTagHandlePointerMove}
+                    onPointerUp={handleTagHandlePointerEnd}
+                    onPointerCancel={handleTagHandlePointerEnd}
                   />
                 </span>
               ))}
@@ -1016,22 +1170,25 @@ export default function HeroInfoEditor({
             </div>
           ) : null}
 
-          <label className={styles.fieldLabel} htmlFor="editor-background">
-            Background
-            <select
-              id="editor-background"
-              value={selectedBackground}
-              onChange={event => onBackgroundChange(event.target.value)}
-              className={styles.select}
-              data-testid="editor-background-select"
+          <div className={styles.fieldLabel}>
+            <span>Background</span>
+            <button
+              type="button"
+              className={styles.backgroundPickerButton}
+              onClick={() => setIsBackgroundAssetModalOpen(true)}
+              aria-label={`Choose background. Current: ${selectedBackgroundOption?.label ?? 'Unknown'}`}
+              data-testid="editor-background-picker"
             >
-              {backgroundOptions.map(option => (
-                <option key={option.path} value={option.path}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <span
+                className={styles.backgroundPickerPreview}
+                aria-hidden="true"
+                style={{ backgroundImage: `url('${selectedBackground}')` }}
+              />
+              <span className={styles.backgroundPickerText}>
+                {selectedBackgroundOption?.label ?? 'Choose Background'}
+              </span>
+            </button>
+          </div>
 
           <div className={styles.fieldGroup}>
             <span className={styles.sectionTitle}>Hero Name</span>
@@ -1058,7 +1215,7 @@ export default function HeroInfoEditor({
                   Font
                   <select
                     id="editor-name-font"
-                    value={draft.nameFontFamily || DEFAULT_HERO_NAME_FONT_FAMILY}
+                    value={getNameFontSelectValue(draft.nameFontFamily)}
                     onChange={event => updateDraft({ nameFontFamily: event.target.value })}
                     className={styles.select}
                   >
@@ -1071,14 +1228,32 @@ export default function HeroInfoEditor({
                 </label>
                 <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
                   Font Size
-                  <input
-                    id="editor-name-font-size"
-                    type="text"
-                    value={draft.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE}
-                    placeholder={DEFAULT_HERO_NAME_FONT_SIZE}
-                    onChange={event => updateDraft({ nameFontSize: event.target.value })}
-                    className={styles.input}
-                  />
+                  <span className={styles.sizeControl}>
+                    <input
+                      id="editor-name-font-size"
+                      type="range"
+                      min={NAME_SIZE_MIN}
+                      max={NAME_SIZE_MAX}
+                      step="1"
+                      value={nameSizeControlValue}
+                      onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
+                      className={styles.sizeRange}
+                      aria-label="Font Size"
+                    />
+                    <input
+                      type="number"
+                      min={NAME_SIZE_MIN}
+                      max={NAME_SIZE_MAX}
+                      step="1"
+                      value={nameSizeControlValue}
+                      onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
+                      className={cn(styles.input, styles.sizeNumber)}
+                      aria-label="Font size value"
+                    />
+                  </span>
+                  <span className={styles.sizeHint}>
+                    Size {nameSizeControlValue} of {NAME_SIZE_MAX}
+                  </span>
                 </label>
                 <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
                   Weight
@@ -1105,47 +1280,6 @@ export default function HeroInfoEditor({
                 onUploaded={handleNameUpload}
               />
             )}
-          </div>
-
-          <div className={styles.sectionGroup}>
-            <span className={styles.sectionTitle}>Tag Position</span>
-            {TAG_CONTROLS.map(tag => (
-              <div key={tag.textKey} className={styles.tagControl}>
-                <span className={styles.tagControlTitle}>{tag.label}</span>
-                <div className={styles.twoColumnGrid}>
-                  <label className={cn(styles.compactLabel, styles.tinyLabel)} htmlFor={`editor-${tag.tiltKey}`}>
-                    Tilt
-                    <input
-                      id={`editor-${tag.tiltKey}`}
-                      type="number"
-                      min={TAG_TILT_MIN}
-                      max={TAG_TILT_MAX}
-                      step="0.5"
-                      value={draft[tag.tiltKey]}
-                      placeholder="0"
-                      aria-label={`${tag.label} tilt`}
-                      onChange={event => updateTagTilt(tag, parseTagControlNumber(event.target.value, draft[tag.tiltKey]))}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                  <label className={cn(styles.compactLabel, styles.tinyLabel)} htmlFor={`editor-${tag.offsetKey}`}>
-                    Vertical
-                    <input
-                      id={`editor-${tag.offsetKey}`}
-                      type="number"
-                      min="-28"
-                      max="28"
-                      step="1"
-                      value={draft[tag.offsetKey]}
-                      placeholder="0"
-                      aria-label={`${tag.label} vertical position`}
-                      onChange={event => updateDraft({ [tag.offsetKey]: parseTagControlNumber(event.target.value, draft[tag.offsetKey]) })}
-                      className={cn(styles.input, styles.compactInput)}
-                    />
-                  </label>
-                </div>
-              </div>
-            ))}
           </div>
 
           <div className={styles.sectionGroup}>
@@ -1289,6 +1423,21 @@ export default function HeroInfoEditor({
             )}
           </section>
         </div>
+      ) : null}
+
+      {isBackgroundAssetModalOpen ? (
+        <EditorAssetModal
+          title="Background"
+          description="Choose a hero background for the editor stage."
+          groups={HERO_BACKGROUND_GROUPS}
+          previewMode="image"
+          testId="background-modal"
+          onClose={() => setIsBackgroundAssetModalOpen(false)}
+          onSelect={assetPath => {
+            onBackgroundChange(assetPath)
+            setIsBackgroundAssetModalOpen(false)
+          }}
+        />
       ) : null}
 
       {isHeroRenderAssetModalOpen ? (

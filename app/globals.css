@@ -9,6 +9,14 @@
 }
 
 @font-face {
+  font-family: 'VALVEPulp';
+  src: url('/font/ValvePulp-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Valve Occult';
   src: url('/font/ValveOccult-SemiBold.woff2') format('woff2');
   font-weight: 600;
@@ -36,6 +44,30 @@
   font-family: 'Radiance';
   src: url('/font/Radiance-SemiBold.woff2') format('woff2');
   font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reaver';
+  src: url('/font/Reaver-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Reaver';
+  src: url('/font/Reaver-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Forevs Demo';
+  src: url('/font/forevsdemo-bold.otf') format('opentype');
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }

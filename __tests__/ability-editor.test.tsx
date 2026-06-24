@@ -221,6 +221,16 @@ describe('AbilityEditor', () => {
             scaling: 'spirit',
             scalingValue: '0.15',
           },
+          {
+            ...ability.cooldown,
+            id: 'preview-titled-main-cell',
+            label: 'Alt Cast',
+            value: '-13',
+            unit: 'Spirit Resist',
+            append: '%',
+            scaling: 'none',
+            scalingValue: '0',
+          },
         ],
         lowerCells: [
           {
@@ -249,12 +259,16 @@ describe('AbilityEditor', () => {
     )
 
     const mainStat = screen.getByTestId('ability-stat-main-damage')
+    const titledMainStat = screen.getByTestId('ability-stat-main-alt-cast')
     const lowerStat = screen.getByTestId('ability-stat-lower-very-long-lower-stat-label')
     const mainCell = mainStat.closest('[class*="mainCell"]')
+    const titledMainCell = titledMainStat.closest('[class*="mainCell"]')
     const mainRow = mainStat.querySelector('[class*="mainRow"]')
 
     expect(screen.queryByLabelText('Main cell 1 title')).not.toBeInTheDocument()
     expect(mainCell?.querySelector('[class*="mainCellTitleSpacer"]')).toBeInTheDocument()
+    expect(screen.getByLabelText('Main cell 2 title')).toHaveValue('Alt Cast')
+    expect(titledMainCell?.querySelector('[class*="mainCellTitleLabel"]')).toBeInTheDocument()
     expect(mainRow).toBeInTheDocument()
     expect(within(mainStat).getByLabelText('spirit scaling value x0.15')).toBeInTheDocument()
     expect(within(mainStat).getByText('Missing Health as Damage').className).toContain('readonlyStatText')

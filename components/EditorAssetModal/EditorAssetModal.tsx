@@ -16,15 +16,15 @@ type UploadEndpoint = keyof OurFileRouter
 interface EditorAssetModalProps {
   title: string
   description: string
-  uploadLabel: string
-  uploadEndpoint: UploadEndpoint
+  uploadLabel?: string
+  uploadEndpoint?: UploadEndpoint
   groups: EditorAssetGroup[]
   previewMode: 'mask' | 'image'
   previewColor?: string
   testId: string
   onClose: () => void
   onSelect: (assetPath: string) => void
-  onUpload: (url: string) => void
+  onUpload?: (url: string) => void
 }
 
 interface UploadedAsset {
@@ -56,6 +56,7 @@ function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
 
 export default function EditorAssetModal({ title, description, uploadLabel, uploadEndpoint, groups, previewMode, previewColor, testId, onClose, onSelect, onUpload }: EditorAssetModalProps) {
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const canUpload = Boolean(uploadLabel && uploadEndpoint && onUpload)
 
   return (
     <div className={cn(styles.backdrop, 'pointer-events-auto')} role="dialog" aria-modal="true" aria-label={`${title} selector`} data-testid={testId}>
@@ -75,33 +76,35 @@ export default function EditorAssetModal({ title, description, uploadLabel, uplo
           </button>
         </div>
 
-        <div className={styles.uploadArea}>
-          <UploadButton
-            endpoint={uploadEndpoint}
-            appearance={{
-              container: styles.uploadThingContainer,
-              button: styles.uploadThingButton,
-              allowedContent: styles.uploadThingAllowed,
-            }}
-            content={{
-              button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadLabel),
-              allowedContent: () => null,
-            }}
-            onUploadBegin={() => setUploadError(null)}
-            onClientUploadComplete={uploadedAssets => {
-              const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
+        {canUpload ? (
+          <div className={styles.uploadArea}>
+            <UploadButton
+              endpoint={uploadEndpoint as UploadEndpoint}
+              appearance={{
+                container: styles.uploadThingContainer,
+                button: styles.uploadThingButton,
+                allowedContent: styles.uploadThingAllowed,
+              }}
+              content={{
+                button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadLabel ?? 'Upload'),
+                allowedContent: () => null,
+              }}
+              onUploadBegin={() => setUploadError(null)}
+              onClientUploadComplete={uploadedAssets => {
+                const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
 
-              if (!uploadedUrl) {
-                setUploadError('Upload completed without a file URL.')
-                return
-              }
+                if (!uploadedUrl) {
+                  setUploadError('Upload completed without a file URL.')
+                  return
+                }
 
-              onUpload(uploadedUrl)
-            }}
-            onUploadError={error => setUploadError(error.message || 'Upload failed.')}
-          />
-          {uploadError ? <p className={styles.uploadError} role="alert">{uploadError}</p> : null}
-        </div>
+                onUpload?.(uploadedUrl)
+              }}
+              onUploadError={error => setUploadError(error.message || 'Upload failed.')}
+            />
+            {uploadError ? <p className={styles.uploadError} role="alert">{uploadError}</p> : null}
+          </div>
+        ) : null}
 
         <div className={styles.assetList}>
           {groups.map(group => (

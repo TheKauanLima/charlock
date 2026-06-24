@@ -29,45 +29,50 @@ export interface EditorRenderSelection {
 
 const HERO_BACKGROUND_PATHS = [
   '/panorama/images/heroes/backgrounds/abrams_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/astro_bg_psd.png',
   '/panorama/images/heroes/backgrounds/bebop_bg_psd.png',
   '/panorama/images/heroes/backgrounds/billy_bg_psd.png',
   '/panorama/images/heroes/backgrounds/calico_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/celeste_bg_psd.png',
   '/panorama/images/heroes/backgrounds/doorman_bg_psd.png',
   '/panorama/images/heroes/backgrounds/drifter_bg_psd.png',
   '/panorama/images/heroes/backgrounds/dynamo_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/familiar_bg_psd.png',
   '/panorama/images/heroes/backgrounds/fencer_bg_psd.png',
   '/panorama/images/heroes/backgrounds/geist_bg_psd.png',
   '/panorama/images/heroes/backgrounds/generic_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/graves_bg_psd.png',
   '/panorama/images/heroes/backgrounds/grey_talon_bg_psd.png',
   '/panorama/images/heroes/backgrounds/haze_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/holliday_bg_psd.png',
   '/panorama/images/heroes/backgrounds/infernus_bg_psd.png',
   '/panorama/images/heroes/backgrounds/ivy_bg_psd.png',
   '/panorama/images/heroes/backgrounds/kelvin_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/krill_bg_psd.png',
   '/panorama/images/heroes/backgrounds/lash_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/magician_bg_psd.png',
   '/panorama/images/heroes/backgrounds/mcginnis_bg_psd.png',
   '/panorama/images/heroes/backgrounds/mina_bg_psd.png',
   '/panorama/images/heroes/backgrounds/mirage_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/necro_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/mo_and_krill_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/paige_bg_psd.png',
   '/panorama/images/heroes/backgrounds/paradox_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/patience_bg_psd.png',
   '/panorama/images/heroes/backgrounds/pocket_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/priest_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/rem_bg_psd.png',
   '/panorama/images/heroes/backgrounds/seven_bg_psd.png',
   '/panorama/images/heroes/backgrounds/shiv_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/unicorn_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/silver_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/sinclair_bg_psd.png',
+  '/panorama/images/heroes/backgrounds/venator_bg_psd.png',
   '/panorama/images/heroes/backgrounds/victor_bg_psd.png',
   '/panorama/images/heroes/backgrounds/vindicta_bg_psd.png',
   '/panorama/images/heroes/backgrounds/viscous_bg_psd.png',
   '/panorama/images/heroes/backgrounds/vyper_bg_psd.png',
   '/panorama/images/heroes/backgrounds/warden_bg_psd.png',
-  '/panorama/images/heroes/backgrounds/werewolf_bg_psd.png',
   '/panorama/images/heroes/backgrounds/wraith_bg_psd.png',
   '/panorama/images/heroes/backgrounds/yamato_bg_psd.png',
 ] as const
+
+const HERO_BACKGROUND_LABEL_OVERRIDES: Record<string, string> = {
+  geist: 'Lady Geist',
+  mo_and_krill: 'Mo & Krill',
+}
 
 const HERO_WEAPON_IMAGE_PATHS = [
   '/panorama/images/heroes/guns/Abrams_Weapon.png',
@@ -203,6 +208,11 @@ const PROPERTY_ICON_PATHS = [
 function formatBackgroundLabel(path: string) {
   const fileName = path.split('/').at(-1) ?? path
   const rawName = fileName.replace('_bg_psd.png', '')
+  const labelOverride = HERO_BACKGROUND_LABEL_OVERRIDES[rawName]
+
+  if (labelOverride) {
+    return labelOverride
+  }
 
   return rawName
     .split('_')
@@ -214,7 +224,28 @@ function formatBackgroundLabel(path: string) {
 export const HERO_BACKGROUND_OPTIONS: HeroBackgroundOption[] = HERO_BACKGROUND_PATHS.map(path => ({
   label: formatBackgroundLabel(path),
   path,
-}))
+})).sort((firstOption, secondOption) => {
+  if (firstOption.label === 'Generic') {
+    return -1
+  }
+
+  if (secondOption.label === 'Generic') {
+    return 1
+  }
+
+  return firstOption.label.localeCompare(secondOption.label)
+})
+
+export const HERO_BACKGROUND_GROUPS: EditorAssetGroup[] = [
+  {
+    id: 'hero-backgrounds',
+    label: 'Backgrounds',
+    assets: HERO_BACKGROUND_OPTIONS.map(option => ({
+      label: option.label,
+      path: option.path,
+    })),
+  },
+]
 
 export const ABILITY_ICON_GROUPS: AbilityIconGroup[] = HEROES.map(hero => ({
   heroSlug: hero.slug,

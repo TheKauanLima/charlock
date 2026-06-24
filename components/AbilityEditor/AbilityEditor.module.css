@@ -279,6 +279,27 @@
   overflow: visible;
 }
 
+.mainEditorColumnPreview .mainCell {
+  padding-top: 22px;
+}
+
+.mainEditorColumnPreview .mainCellTitleLabel,
+.mainEditorColumnPreview .mainCellTitleSpacer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  display: block;
+  height: 16px;
+  pointer-events: none;
+}
+
+.mainEditorColumnPreview .mainCellTitleLabel input {
+  height: 16px;
+  line-height: 1;
+}
+
 .mainEditorColumnPreview .inlineStatEditorMain {
   height: 94px;
   min-height: 94px;
@@ -323,8 +344,8 @@
 }
 
 .mainEditorColumnPreview .inlineStatEditorMain .scalingValueWrap {
-  top: -4px;
-  right: -13px;
+  top: -13px;
+  right: -10px;
   z-index: 4;
   transform: none;
 }
