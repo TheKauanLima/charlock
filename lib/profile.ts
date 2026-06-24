@@ -142,6 +142,12 @@ export function getProfileRedirectPath(user: { username?: string | null; clerkId
   return `/profile/${getProfilePathSegment(user)}`
 }
 
+export function isProfilePathSegmentForUser(segment: string, user: { username?: string | null; clerkId: string }) {
+  const decodedSegment = decodeURIComponent(segment)
+
+  return [user.username?.trim(), user.clerkId].filter(Boolean).includes(decodedSegment)
+}
+
 function buildOwnerIds(user: UserRecord) {
   return [user.clerkId, user._id.toString()]
 }
@@ -245,13 +251,30 @@ export async function getCurrentProfileUser() {
   }
 }
 
+async function getCurrentProfileUserForSegment(profileSegment: string) {
+  const clerkUser = await currentUser()
+
+  if (!clerkUser) {
+    return null
+  }
+
+  const metadataUsername = clerkUser.unsafeMetadata?.username
+  const username = clerkUser.username || (typeof metadataUsername === 'string' ? metadataUsername : null)
+
+  if (!isProfilePathSegmentForUser(profileSegment, { username, clerkId: clerkUser.id })) {
+    return null
+  }
+
+  return getCurrentProfileUser()
+}
+
 export async function getUserProfile(username: string): Promise<UserProfileData> {
   let user: UserRecord | null
+  const decodedUsername = decodeURIComponent(username)
 
   try {
     await dbConnect()
 
-    const decodedUsername = decodeURIComponent(username)
     user = await User.findOne({
       $or: [
         { username: decodedUsername },
@@ -267,7 +290,11 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
   }
 
   if (!user) {
-    notFound()
+    user = await getCurrentProfileUserForSegment(username)
+
+    if (!user) {
+      notFound()
+    }
   }
 
   const { userId } = await auth()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getProfileHero, getProfilePathSegment, getProfileRedirectPath, getUserLevel, isProfileUnavailableError, ProfileUnavailableError } from '@/lib/profile'
+import { getProfileHero, getProfilePathSegment, getProfileRedirectPath, getUserLevel, isProfilePathSegmentForUser, isProfileUnavailableError, ProfileUnavailableError } from '@/lib/profile'
 
 describe('profile helpers', () => {
   it('calculates user level from contribution count', () => {
@@ -22,6 +22,12 @@ describe('profile helpers', () => {
   it('builds the canonical profile redirect path', () => {
     expect(getProfileRedirectPath({ username: 'profile one', clerkId: 'clerk_123' })).toBe('/profile/profile%20one')
     expect(getProfileRedirectPath({ username: '', clerkId: 'clerk_123' })).toBe('/profile/clerk_123')
+  })
+
+  it('matches profile route segments for a current user', () => {
+    expect(isProfilePathSegmentForUser('profile%20one', { username: 'profile one', clerkId: 'clerk_123' })).toBe(true)
+    expect(isProfilePathSegmentForUser('clerk_123', { username: null, clerkId: 'clerk_123' })).toBe(true)
+    expect(isProfilePathSegmentForUser('other-user', { username: 'profile one', clerkId: 'clerk_123' })).toBe(false)
   })
 
   it('classifies temporary profile availability errors', () => {

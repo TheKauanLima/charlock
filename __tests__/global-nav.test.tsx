@@ -70,7 +70,7 @@ describe('GlobalNav', () => {
     render(<GlobalNav />)
     await user.click(screen.getByLabelText('Open profile navigation'))
 
-    expect(screen.getByRole('menuitem', { name: /view profile/i })).toHaveAttribute('href', '/profile/metadata_user')
+    expect(screen.getByRole('menuitem', { name: /view profile/i })).toHaveAttribute('href', '/profile')
     expect(screen.getByRole('menuitem', { name: /bookmarks/i })).toHaveAttribute('href', '/?tab=bookmarks')
     expect(screen.getByRole('menuitem', { name: /settings/i })).toHaveAttribute('href', '/profile/settings')
 

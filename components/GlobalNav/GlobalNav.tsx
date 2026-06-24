@@ -8,13 +8,6 @@ import { useClerk, useUser } from '@clerk/nextjs'
 
 import styles from './GlobalNav.module.css'
 
-function getProfileSegment(user: NonNullable<ReturnType<typeof useUser>['user']>) {
-  const metadataUsername = user.unsafeMetadata?.username
-  const username = user.username || (typeof metadataUsername === 'string' ? metadataUsername : null)
-
-  return encodeURIComponent(username || user.id)
-}
-
 function getInitials(name: string) {
   return name
     .split(/\s+/)
@@ -87,7 +80,6 @@ export default function GlobalNav() {
   }
 
   const displayName = user.fullName || user.username || user.primaryEmailAddress?.emailAddress || 'Charlock User'
-  const profilePath = `/profile/${getProfileSegment(user)}`
 
   return (
     <div className={styles.nav} ref={menuRef}>
@@ -125,7 +117,7 @@ export default function GlobalNav() {
             </span>
             <span>Bookmarks</span>
           </Link>
-          <Link className={styles.menuItem} href={profilePath} role="menuitem" onClick={() => setIsOpen(false)}>
+          <Link className={styles.menuItem} href="/profile" role="menuitem" onClick={() => setIsOpen(false)}>
             <UserRound aria-hidden="true" size={17} />
             <span>View Profile</span>
           </Link>
