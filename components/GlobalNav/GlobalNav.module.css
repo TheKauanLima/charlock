@@ -36,7 +36,7 @@
   place-items: center;
   width: 56px;
   height: 56px;
-  clip-path: polygon(18% 0, 82% 0, 100% 28%, 100% 72%, 82% 100%, 18% 100%, 0 72%, 0 28%);
+  border-radius: 999px;
   border: 2px solid rgba(255, 239, 215, 0.72);
   background:
     linear-gradient(135deg, rgba(34, 146, 175, 0.34), rgba(254, 52, 53, 0.22)),

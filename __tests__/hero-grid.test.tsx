@@ -83,6 +83,7 @@ describe('HeroGrid', () => {
 
     expect(screen.getAllByTestId('hero-card')).toHaveLength(38)
     expect(screen.getAllByTestId('hero-empty-slot')).toHaveLength(2)
+    expect(screen.getAllByTestId('hero-name-badge')[0]).toHaveTextContent('Abrams')
   })
 
   it('opens the create template picker with only Empty available', async () => {
@@ -137,8 +138,7 @@ describe('HeroGrid', () => {
     expect(screen.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it('loads the bookmarks tab', async () => {
-    const user = userEvent.setup()
+  it('loads the notifications tab from the profile menu route', async () => {
     const stats = buildHeroStatsSeed(HEROES[0])
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
       const url = String(input)
@@ -169,13 +169,64 @@ describe('HeroGrid', () => {
       }))
     })
 
-    render(<HeroGrid />)
-
-    await user.click(screen.getByRole('button', { name: 'Bookmarks' }))
+    render(<HeroGrid initialTab="Notifications" />)
 
     expect(await screen.findByRole('heading', { name: 'Arc Light' })).toBeInTheDocument()
     expect(screen.getByText('Great lore hook.')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/feed', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  })
+
+  it('loads bookmarked heroes from the profile menu route', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const bookmarkedHero = {
+      id: 'bookmarked_hero_1',
+      slug: 'saved-arc-light',
+      assetSlug: 'saved-arc-light',
+      displayName: 'Saved Arc Light',
+      portrait: abrams.portrait,
+      render: abrams.render,
+      background: '/panorama/images/heroes/backgrounds/yamato_bg_psd.png',
+      heroInfo: {
+        ...abrams.heroInfo,
+        nameType: 'text' as const,
+        nameValue: 'Saved Arc Light',
+      },
+      status: 'published',
+      likesCount: 7,
+      likedByCurrentUser: false,
+      bookmarkedByCurrentUser: true,
+      allowCopies: true,
+      viewerCanEdit: false,
+      publishedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      updatedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+    }
+    const abilityStats = buildDefaultAbilityStats({
+      ...abrams,
+      slug: bookmarkedHero.slug,
+      displayName: bookmarkedHero.displayName,
+      heroInfo: bookmarkedHero.heroInfo,
+    })
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      heroes: [{ ...bookmarkedHero, abilityStats }],
+      pagination: { limit: 24, offset: 0, total: 1, hasMore: false },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    render(<HeroGrid initialTab="Bookmarks" />)
+
+    expect(await screen.findByRole('button', { name: 'Select character Saved Arc Light' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Bookmarks' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Use as Template' })).toBeInTheDocument()
+    expect(screen.getByTestId('hero-info-cluster')).toHaveAttribute('data-hero-slug', 'saved-arc-light')
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Saved')
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes?bookmarked=true&limit=24&offset=0&search=Saved', expect.objectContaining({ signal: expect.any(AbortSignal) })))
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes?bookmarked=true&limit=24&offset=0', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 
   it('updates the active render when a hero is clicked', async () => {
@@ -542,6 +593,9 @@ describe('HeroGrid', () => {
 
     await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/heroRender.png')))
 
+    await user.click(screen.getByTestId('uploadthing-heroPortrait'))
+    expect(screen.getByTestId('editor-portrait-preview-image')).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/heroPortrait.png'))
+
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
     await user.click(within(screen.getByTestId('weapon-panel')).getByTestId('uploadthing-weaponImage'))
 
@@ -613,6 +667,7 @@ describe('HeroGrid', () => {
     render(<HeroGrid />)
 
     await openEmptyCreateEditor(user)
+    await user.click(screen.getByTestId('uploadthing-heroPortrait'))
     await user.clear(screen.getByPlaceholderText('Name this save'))
     await user.type(screen.getByPlaceholderText('Name this save'), 'Arc Light')
     await user.click(screen.getByLabelText('Second Ability Set'))
@@ -635,7 +690,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
@@ -643,6 +698,7 @@ describe('HeroGrid', () => {
       allowCopies: true,
       hero: {
         background: expect.stringContaining('/panorama/images/heroes/backgrounds/generic_bg_psd.png'),
+        portrait: 'https://utfs.io/f/heroPortrait.png',
       },
       heroInfo: {
         nameValue: 'NAME',
@@ -759,6 +815,7 @@ describe('HeroGrid', () => {
     expect(screen.getByTestId('browse-card-background')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/yamato_bg_psd.png'))
     expect(screen.getByRole('button', { name: 'Use as Template' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Like Public Arc Light' })).toHaveTextContent('4')
+    expect(screen.getByTestId('hero-name-badge')).toHaveTextContent('Public Arc Light')
     expect(await screen.findByTestId('hero-info-secondary-ability-1')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Like Public Arc Light' }))

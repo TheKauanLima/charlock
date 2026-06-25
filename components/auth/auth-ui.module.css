@@ -101,6 +101,51 @@
   opacity: 0.48;
 }
 
+.oauthButton {
+  min-height: 44px;
+  border: 1px solid rgba(255, 239, 215, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 239, 215, 0.08);
+  color: #ffefd7;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: opacity 150ms ease-out, border-color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.oauthButton:hover:not(:disabled) {
+  border-color: #ffefd7;
+  background: rgba(255, 239, 215, 0.14);
+}
+
+.oauthButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 239, 215, 0.5);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(255, 239, 215, 0.16);
+}
+
 .message {
   margin: 0;
   color: rgba(255, 239, 215, 0.78);

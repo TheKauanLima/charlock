@@ -23,7 +23,7 @@ interface TabItem {
   disabled?: boolean
 }
 
-type PrimaryTab = 'Select' | 'Browse' | 'Bookmarks' | 'Create'
+type PrimaryTab = 'Select' | 'Browse' | 'Bookmarks' | 'Notifications' | 'Create'
 
 interface HeroGridProps {
   initialTab?: PrimaryTab
@@ -32,7 +32,6 @@ interface HeroGridProps {
 const TAB_ITEMS: TabItem[] = [
   { label: 'Select' },
   { label: 'Browse' },
-  { label: 'Bookmarks' },
   { label: 'Create' },
 ]
 
@@ -155,6 +154,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [isBrowseLoadingMore, setIsBrowseLoadingMore] = useState(false)
   const [selectedBrowseHeroId, setSelectedBrowseHeroId] = useState<string | null>(null)
   const [browseStatus, setBrowseStatus] = useState<string | null>(null)
+  const [bookmarkedHeroes, setBookmarkedHeroes] = useState<CustomHeroSummary[]>([])
+  const [bookmarksPagination, setBookmarksPagination] = useState<BrowsePagination | null>(null)
+  const [isBookmarksLoadingMore, setIsBookmarksLoadingMore] = useState(false)
+  const [selectedBookmarkedHeroId, setSelectedBookmarkedHeroId] = useState<string | null>(null)
+  const [bookmarksStatus, setBookmarksStatus] = useState<string | null>(null)
   const [feedItems, setFeedItems] = useState<ActivityFeedItem[]>([])
   const [feedStatus, setFeedStatus] = useState<string | null>(null)
   const [activeHeroSlug, setActiveHeroSlug] = useState(HEROES[0]?.slug ?? '')
@@ -183,16 +187,22 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     () => browseHeroes.find(hero => hero.id === selectedBrowseHeroId) ?? browseHeroes[0] ?? null,
     [browseHeroes, selectedBrowseHeroId],
   )
+  const selectedBookmarkedHero = useMemo(
+    () => bookmarkedHeroes.find(hero => hero.id === selectedBookmarkedHeroId) ?? bookmarkedHeroes[0] ?? null,
+    [bookmarkedHeroes, selectedBookmarkedHeroId],
+  )
+  const selectedCollectionHero = activeTab === 'Browse' ? selectedBrowseHero : activeTab === 'Bookmarks' ? selectedBookmarkedHero : null
   const [editorDraft, setEditorDraft] = useState<HeroInfoDefinition>(() => cloneHeroInfo(activeHero.heroInfo))
   const [editorBackground, setEditorBackground] = useState(() => getEditorBackgroundForHero(activeHero))
   const [editorRenderSelection, setEditorRenderSelection] = useState<EditorRenderSelection>({ mode: 'background', src: null })
   const isCreateMode = activeTab === 'Create'
+  const isCollectionTab = activeTab === 'Browse' || activeTab === 'Bookmarks'
   const editorRenderImage = editorRenderSelection.mode === 'hero' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
-  const displayRenderImage = isCreateMode ? editorRenderImage : activeTab === 'Browse' && selectedBrowseHero ? selectedBrowseHero.render : renderHero.render
+  const displayRenderImage = isCreateMode ? editorRenderImage : selectedCollectionHero ? selectedCollectionHero.render : renderHero.render
   const displayRenderLabel = isCreateMode
     ? (editorRenderSelection.mode === 'hero' ? 'Selected editor hero render' : 'Selected editor background')
-    : activeTab === 'Browse' && selectedBrowseHero
-      ? `${selectedBrowseHero.displayName} render`
+    : selectedCollectionHero
+      ? `${selectedCollectionHero.displayName} render`
       : `${activeHero.displayName} render`
   const backstoryHero = useMemo(
     () =>
@@ -340,7 +350,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     const heroId = searchParams.get('heroId')
     const requestedTab = searchParams.get('tab')
 
-    if (heroId && requestedTab !== 'browse') {
+    if (heroId && requestedTab !== 'browse' && requestedTab !== 'bookmarks') {
       const timeoutId = window.setTimeout(() => {
         void loadSavedHero(heroId)
       }, 0)
@@ -366,6 +376,21 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
     return `/api/heroes?${searchParams.toString()}`
   }, [browseSearch, browseSort])
+
+  const getBookmarksUrl = useCallback((offset: number) => {
+    const searchParams = new URLSearchParams({
+      bookmarked: 'true',
+      limit: String(BROWSE_PAGE_SIZE),
+      offset: String(offset),
+    })
+    const trimmedSearch = browseSearch.trim()
+
+    if (trimmedSearch) {
+      searchParams.set('search', trimmedSearch)
+    }
+
+    return `/api/heroes?${searchParams.toString()}`
+  }, [browseSearch])
 
   useEffect(() => {
     if (activeTab !== 'Browse') {
@@ -417,6 +442,53 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
   useEffect(() => {
     if (activeTab !== 'Bookmarks') {
+      return undefined
+    }
+
+    const abortController = new AbortController()
+
+    async function loadBookmarkedHeroes() {
+      setBookmarksStatus('Loading bookmarks...')
+
+      try {
+        const response = await fetch(getBookmarksUrl(0), {
+          signal: abortController.signal,
+        })
+        const body = await response.json() as { heroes?: CustomHeroSummary[]; pagination?: BrowsePagination; error?: string }
+
+        if (!response.ok) {
+          throw new Error(getHeroResponseError(body, `Bookmarks request failed with ${response.status}`))
+        }
+
+        const nextHeroes = body.heroes ?? []
+        const requestedHeroId = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('heroId')
+
+        setBookmarkedHeroes(nextHeroes)
+        setBookmarksPagination(body.pagination ?? null)
+        setSelectedBookmarkedHeroId(currentId => {
+          if (requestedHeroId && nextHeroes.some(hero => hero.id === requestedHeroId)) {
+            return requestedHeroId
+          }
+
+          return currentId && nextHeroes.some(hero => hero.id === currentId) ? currentId : nextHeroes[0]?.id ?? null
+        })
+        setBookmarksStatus(nextHeroes.length ? null : 'No bookmarked characters yet.')
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return
+        }
+
+        setBookmarksStatus(error instanceof Error ? error.message : 'Failed to load bookmarks.')
+      }
+    }
+
+    void loadBookmarkedHeroes()
+
+    return () => abortController.abort()
+  }, [activeTab, getBookmarksUrl])
+
+  useEffect(() => {
+    if (activeTab !== 'Notifications') {
       return undefined
     }
 
@@ -521,8 +593,15 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       }
 
       setBrowseHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? body.hero : hero)))
+      setBookmarkedHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? body.hero : hero)))
     } catch (error) {
-      setBrowseStatus(error instanceof Error ? error.message : 'Failed to like hero.')
+      const message = error instanceof Error ? error.message : 'Failed to like hero.'
+
+      if (activeTab === 'Bookmarks') {
+        setBookmarksStatus(message)
+      } else {
+        setBrowseStatus(message)
+      }
     }
   }
 
@@ -553,6 +632,33 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     }
   }
 
+  async function handleLoadMoreBookmarkedHeroes() {
+    if (!bookmarksPagination?.hasMore || isBookmarksLoadingMore) {
+      return
+    }
+
+    setIsBookmarksLoadingMore(true)
+
+    try {
+      const response = await fetch(getBookmarksUrl(bookmarkedHeroes.length))
+      const body = await response.json() as { heroes?: CustomHeroSummary[]; pagination?: BrowsePagination; error?: string }
+
+      if (!response.ok) {
+        throw new Error(getHeroResponseError(body, `Bookmarks request failed with ${response.status}`))
+      }
+
+      const nextHeroes = body.heroes ?? []
+
+      setBookmarkedHeroes(currentHeroes => [...currentHeroes, ...nextHeroes.filter(nextHero => !currentHeroes.some(currentHero => currentHero.id === nextHero.id))])
+      setBookmarksPagination(body.pagination ?? null)
+      setBookmarksStatus(null)
+    } catch (error) {
+      setBookmarksStatus(error instanceof Error ? error.message : 'Failed to load more bookmarks.')
+    } finally {
+      setIsBookmarksLoadingMore(false)
+    }
+  }
+
   async function recordTemplateCopy(heroId: string) {
     try {
       await fetch(`/api/heroes/${encodeURIComponent(heroId)}/copy`, {
@@ -568,7 +674,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
   async function handleUseTemplate(heroId: string) {
     try {
-      setBrowseStatus('Loading template...')
+      if (activeTab === 'Bookmarks') {
+        setBookmarksStatus('Loading template...')
+      } else {
+        setBrowseStatus('Loading template...')
+      }
 
       const response = await fetch(`/api/heroes?id=${encodeURIComponent(heroId)}`)
       const body = await response.json() as { hero?: CustomHeroDetail; error?: string }
@@ -579,9 +689,16 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       applyTemplateHeroToEditor(body.hero)
       void recordTemplateCopy(heroId)
+      setBookmarksStatus(null)
       setBrowseStatus(null)
     } catch (error) {
-      setBrowseStatus(error instanceof Error ? error.message : 'Failed to load template.')
+      const message = error instanceof Error ? error.message : 'Failed to load template.'
+
+      if (activeTab === 'Bookmarks') {
+        setBookmarksStatus(message)
+      } else {
+        setBrowseStatus(message)
+      }
     }
   }
 
@@ -657,7 +774,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       <div className={styles.renderLayer}>
         <div className={styles.renderFade} />
         <div
-          key={isCreateMode ? editorBackground : activeTab === 'Browse' ? selectedBrowseHero?.id ?? 'browse-empty' : renderHero.slug}
+          key={isCreateMode ? editorBackground : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
           className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
           role="img"
           aria-label={displayRenderLabel}
@@ -697,7 +814,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           })}
         </nav>
 
-        {activeTab === 'Browse' ? (
+        {isCollectionTab ? (
           <div className={styles.browseTools}>
             <label className={styles.searchField} htmlFor="browse-hero-search">
               <span>Search</span>
@@ -709,7 +826,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                 placeholder="Find characters"
               />
             </label>
-            <nav className={styles.browseNav} aria-label="Browse categories">
+            {activeTab === 'Browse' ? <nav className={styles.browseNav} aria-label="Browse categories">
               {[
                 { id: 'new', label: 'New' },
                 { id: 'liked', label: 'Most Liked' },
@@ -725,26 +842,26 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                   {item.label}
                 </button>
               ))}
-            </nav>
+            </nav> : null}
           </div>
         ) : null}
 
-        {activeTab === 'Browse' && selectedBrowseHero ? (
+        {isCollectionTab && selectedCollectionHero ? (
           <div className={styles.browseHeroActions}>
-            {selectedBrowseHero.viewerCanEdit ? (
-              <button type="button" onClick={() => loadSavedHero(selectedBrowseHero.id)}>
+            {selectedCollectionHero.viewerCanEdit ? (
+              <button type="button" onClick={() => loadSavedHero(selectedCollectionHero.id)}>
                 Edit Hero
               </button>
             ) : null}
-            {!selectedBrowseHero.viewerCanEdit && selectedBrowseHero.allowCopies ? (
-              <button type="button" onClick={() => handleUseTemplate(selectedBrowseHero.id)}>
+            {!selectedCollectionHero.viewerCanEdit && selectedCollectionHero.allowCopies ? (
+              <button type="button" onClick={() => handleUseTemplate(selectedCollectionHero.id)}>
                 Use as Template
               </button>
             ) : null}
           </div>
         ) : null}
 
-        {activeTab === 'Bookmarks' ? (
+        {activeTab === 'Notifications' ? (
           <main className={styles.activityMain}>
             {feedStatus ? <p className={styles.browseStatus} role="status">{feedStatus}</p> : null}
             <section className={styles.activityFeed} aria-label="Activity feed">
@@ -767,7 +884,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
             </section>
           </main>
         ) : !isCreateMode ? (
-          <main className={`${styles.main} ${activeTab === 'Browse' ? styles.browseMain : ''}`}>
+          <main className={`${styles.main} ${isCollectionTab ? styles.browseMain : ''}`}>
             <button
               type="button"
               className={`${styles.detailsToggle} ${showDetails ? styles.detailsToggleActive : ''}`}
@@ -779,16 +896,18 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
               <span aria-hidden="true" />
             </button>
             {activeTab === 'Browse' && browseStatus ? <p className={styles.browseStatus} role="status">{browseStatus}</p> : null}
+            {activeTab === 'Bookmarks' && bookmarksStatus ? <p className={styles.browseStatus} role="status">{bookmarksStatus}</p> : null}
             <section className={styles.grid}>
-              {Array.from({ length: activeTab === 'Browse' ? Math.max(GRID_SIZE, browseHeroes.length) : GRID_SIZE }).map((_, index) => {
-                if (activeTab === 'Browse') {
-                  const hero = browseHeroes[index]
+              {Array.from({ length: isCollectionTab ? Math.max(GRID_SIZE, activeTab === 'Browse' ? browseHeroes.length : bookmarkedHeroes.length) : GRID_SIZE }).map((_, index) => {
+                if (isCollectionTab) {
+                  const heroes = activeTab === 'Browse' ? browseHeroes : bookmarkedHeroes
+                  const hero = heroes[index]
 
                   if (!hero) {
                     return <div key={`empty-${index}`} data-testid="hero-empty-slot" aria-hidden="true" className={styles.emptySlot} />
                   }
 
-                  const isSelected = hero.id === selectedBrowseHero?.id
+                  const isSelected = hero.id === selectedCollectionHero?.id
 
                   return (
                     <article key={hero.id} className={styles.browseCard}>
@@ -797,7 +916,13 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                         data-testid="hero-card"
                         aria-label={`Select character ${hero.displayName}`}
                         aria-pressed={isSelected}
-                        onClick={() => setSelectedBrowseHeroId(hero.id)}
+                        onClick={() => {
+                          if (activeTab === 'Browse') {
+                            setSelectedBrowseHeroId(hero.id)
+                          } else {
+                            setSelectedBookmarkedHeroId(hero.id)
+                          }
+                        }}
                         className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
                       >
                         <span className={styles.heroBacker} />
@@ -813,6 +938,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                         </span>
                         <span className={styles.heroBorder} />
                         <span className={styles.heroTint} />
+                        <span className={styles.heroNameBadge} data-testid="hero-name-badge" aria-hidden="true">
+                          {hero.displayName}
+                        </span>
                       </button>
                       <button
                         type="button"
@@ -857,6 +985,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                     </span>
                     <span className={styles.heroBorder} />
                     <span className={styles.heroTint} />
+                    <span className={styles.heroNameBadge} data-testid="hero-name-badge" aria-hidden="true">
+                      {hero.displayName}
+                    </span>
                   </button>
                 )
               })}
@@ -864,6 +995,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
             {activeTab === 'Browse' && browsePagination?.hasMore ? (
               <button type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBrowseHeroes} disabled={isBrowseLoadingMore}>
                 {isBrowseLoadingMore ? 'Loading...' : 'Load More'}
+              </button>
+            ) : null}
+            {activeTab === 'Bookmarks' && bookmarksPagination?.hasMore ? (
+              <button type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBookmarkedHeroes} disabled={isBookmarksLoadingMore}>
+                {isBookmarksLoadingMore ? 'Loading...' : 'Load More'}
               </button>
             ) : null}
           </main>
@@ -890,10 +1026,8 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           onDraftChange={setEditorDraft}
           onSaveHero={handleSaveHero}
         />
-      ) : activeTab === 'Browse' ? (
-        selectedBrowseHero ? <HeroInfoCluster hero={selectedBrowseHero} showDetails={showDetails} /> : null
-      ) : activeTab === 'Bookmarks' ? (
-        null
+      ) : isCollectionTab ? (
+        selectedCollectionHero ? <HeroInfoCluster hero={selectedCollectionHero} showDetails={showDetails} /> : null
       ) : (
         <HeroInfoCluster hero={activeHero} showDetails={showDetails} onCreateFromHero={() => void handleCreateFromSelectedHero(activeHero)} />
       )}

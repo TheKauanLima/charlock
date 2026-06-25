@@ -19,6 +19,7 @@ export default function SignUpForm() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
 
   async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -59,6 +60,32 @@ export default function SignUpForm() {
       setError(getAuthErrorMessage(caughtError))
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleGoogleSignUp() {
+    if (!signUp || isGoogleSubmitting) {
+      return
+    }
+
+    setError(null)
+    setNotice(null)
+    setIsGoogleSubmitting(true)
+
+    try {
+      const result = await signUp.sso({
+        strategy: 'oauth_google',
+        redirectUrl: '/',
+        redirectCallbackUrl: '/sso-callback',
+        ...(username.trim() ? { unsafeMetadata: { username: username.trim() } } : {}),
+      })
+
+      if (result.error) {
+        throw result.error
+      }
+    } catch (caughtError) {
+      setError(getAuthErrorMessage(caughtError))
+      setIsGoogleSubmitting(false)
     }
   }
 
@@ -111,6 +138,10 @@ export default function SignUpForm() {
   return (
     <form className={styles.form} onSubmit={handleCreateAccount}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <button className={styles.oauthButton} type="button" disabled={!signUp || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignUp}>
+        {isGoogleSubmitting ? 'Opening Google' : 'Continue with Google'}
+      </button>
+      <span className={styles.divider}>or</span>
       <label className={styles.field}>
         <span className={styles.label}>Email</span>
         <input className={styles.input} value={email} onChange={event => setEmail(event.target.value)} required type="email" autoComplete="email" />

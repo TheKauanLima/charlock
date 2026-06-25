@@ -652,6 +652,93 @@ export async function listCustomHeroes(status: CustomHeroStatus, sort: CustomHer
   return result.heroes
 }
 
+export async function listBookmarkedCustomHeroPage(filters: Pick<CustomHeroListFilters, 'search' | 'limit' | 'offset'>): Promise<CustomHeroListResult> {
+  const actor = await getActor()
+
+  try {
+    await dbConnect()
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return {
+        heroes: [],
+        pagination: {
+          limit: filters.limit,
+          offset: filters.offset,
+          total: 0,
+          hasMore: false,
+        },
+      }
+    }
+
+    throw error
+  }
+
+  try {
+    const user = await User.findOne({ clerkId: actor.clerkId }).select('bookmarks').lean<{ bookmarks?: Types.ObjectId[] } | null>()
+    const bookmarkedIds = uniqueObjectIds(user?.bookmarks ?? [])
+
+    if (!bookmarkedIds.length) {
+      return {
+        heroes: [],
+        pagination: {
+          limit: filters.limit,
+          offset: filters.offset,
+          total: 0,
+          hasMore: false,
+        },
+      }
+    }
+
+    const pipeline = await buildHeroListPipeline({
+      status: 'published',
+      sort: 'new',
+      search: filters.search,
+      limit: filters.limit,
+      offset: filters.offset,
+    })
+    pipeline.push({ $match: { _id: { $in: bookmarkedIds } } })
+
+    const totalResult = await CustomHero.aggregate<{ total: number }>([
+      ...pipeline,
+      { $count: 'total' },
+    ])
+    const total = totalResult[0]?.total ?? 0
+    const heroes = await CustomHero.aggregate<HeroAggregateRecord>([
+      ...pipeline,
+      { $sort: { updatedAt: -1, _id: -1 } },
+      { $skip: filters.offset },
+      { $limit: filters.limit },
+    ])
+    const bookmarks = new Set(bookmarkedIds.map(heroId => heroId.toString()))
+    const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
+    const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
+
+    return {
+      heroes: summaries,
+      pagination: {
+        limit: filters.limit,
+        offset: filters.offset,
+        total,
+        hasMore: filters.offset + summaries.length < total,
+      },
+    }
+  } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return {
+        heroes: [],
+        pagination: {
+          limit: filters.limit,
+          offset: filters.offset,
+          total: 0,
+          hasMore: false,
+        },
+      }
+    }
+
+    throw error
+  }
+}
+
 export async function getEditableCustomHero(id: string): Promise<CustomHeroDetail> {
   const actor = await getActor()
 

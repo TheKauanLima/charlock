@@ -20,8 +20,12 @@ function getInitialTab(tab: string | string[] | undefined) {
     return 'Browse'
   }
 
-  if (tabValue === 'bookmarks' || tabValue === 'feed') {
+  if (tabValue === 'bookmarks') {
     return 'Bookmarks'
+  }
+
+  if (tabValue === 'notifications' || tabValue === 'feed') {
+    return 'Notifications'
   }
 
   return 'Select'

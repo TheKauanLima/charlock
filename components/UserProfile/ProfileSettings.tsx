@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { Bell, Bookmark, Heart, MessageSquare, Settings, UsersRound } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
 import { deleteAccount, updateProfileSettings } from '@/app/profile/actions'
@@ -29,15 +30,60 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
       <Image src={preferredHero.render} alt="" fill priority sizes="100vw" className={styles.backgroundRender} />
       <div className={styles.noiseLayer} aria-hidden="true" />
 
-      <section className={styles.panel} aria-label="Profile settings">
-        <header className={styles.header}>
-          <div className={styles.avatar}>
-            {avatarUrl ? (
-              <Image src={avatarUrl} alt="" fill unoptimized sizes="92px" className={styles.avatarImage} />
-            ) : (
-              <span>{user.username.slice(0, 2).toUpperCase()}</span>
-            )}
+      <div className={styles.content}>
+        <aside className={styles.sidePanel} aria-label="Profile sections">
+          <div className={styles.railIdentity}>
+            <div className={styles.railTopline}>
+              <Link href="/" className={styles.backButton} aria-label="Back to site">
+                <span aria-hidden="true">&lt;</span>
+              </Link>
+              <div>
+                <span>Profile</span>
+                <strong>{user.username}</strong>
+              </div>
+            </div>
+            <div className={styles.avatar}>
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="" fill unoptimized sizes="132px" className={styles.avatarImage} />
+              ) : (
+                <span>{user.username.slice(0, 2).toUpperCase()}</span>
+              )}
+            </div>
+            <div className={styles.sideProfileCopy}>
+              <p className={styles.eyebrow}>Profile</p>
+              <h1>{user.username}</h1>
+            </div>
           </div>
+          <div className={styles.sidePanelList}>
+            <Link href="/profile#characters-created" className={styles.sidePanelItem}>
+              <UsersRound aria-hidden="true" size={17} />
+              Saved Characters
+            </Link>
+            <Link href="/profile#bookmarks" className={styles.sidePanelItem}>
+              <Bookmark aria-hidden="true" size={17} />
+              Bookmarks
+            </Link>
+            <Link href="/profile#likes" className={styles.sidePanelItem}>
+              <Heart aria-hidden="true" size={17} />
+              Likes
+            </Link>
+            <Link href="/profile#comments" className={styles.sidePanelItem}>
+              <MessageSquare aria-hidden="true" size={17} />
+              Comments
+            </Link>
+            <Link href="/profile#notifications" className={styles.sidePanelItem}>
+              <Bell aria-hidden="true" size={17} />
+              Notifications
+            </Link>
+            <Link href="/profile/settings" className={`${styles.sidePanelItem} ${styles.sidePanelItemActive}`} aria-current="page">
+              <Settings aria-hidden="true" size={17} />
+              Settings
+            </Link>
+          </div>
+        </aside>
+
+        <section className={styles.panel} aria-label="Profile settings">
+        <header className={styles.header}>
           <div>
             <p className={styles.eyebrow}>Profile</p>
             <h1>Settings</h1>
@@ -103,6 +149,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
           </form>
         </section>
       </section>
+      </div>
     </main>
   )
 }

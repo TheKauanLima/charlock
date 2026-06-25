@@ -15,6 +15,7 @@ export default function SignInForm() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -51,9 +52,37 @@ export default function SignInForm() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    if (!signIn || isGoogleSubmitting) {
+      return
+    }
+
+    setError(null)
+    setIsGoogleSubmitting(true)
+
+    try {
+      const result = await signIn.sso({
+        strategy: 'oauth_google',
+        redirectUrl: '/',
+        redirectCallbackUrl: '/sso-callback',
+      })
+
+      if (result.error) {
+        throw result.error
+      }
+    } catch (caughtError) {
+      setError(getAuthErrorMessage(caughtError))
+      setIsGoogleSubmitting(false)
+    }
+  }
+
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      <button className={styles.oauthButton} type="button" disabled={!signIn || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignIn}>
+        {isGoogleSubmitting ? 'Opening Google' : 'Continue with Google'}
+      </button>
+      <span className={styles.divider}>or</span>
       <label className={styles.field}>
         <span className={styles.label}>Email or Username</span>
         <input className={styles.input} value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" />

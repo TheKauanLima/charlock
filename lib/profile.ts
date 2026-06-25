@@ -24,6 +24,7 @@ export interface ProfileUser {
   email: string
   username: string
   preferredHero: string
+  profileBackground: string
   isPublic: boolean
   anonymousEdits: boolean
   customBio: string
@@ -41,11 +42,20 @@ export interface ProfileHeroCard {
   status: string
 }
 
+export interface ProfileBackgroundVisual {
+  id: string
+  label: string
+  render: string
+  accent: string
+  nameColor: string
+}
+
 export interface UserProfileData {
   user: ProfileUser
   viewerIsOwner: boolean
   avatarUrl: string | null
   preferredHero: HeroDefinition
+  profileBackground: ProfileBackgroundVisual
   authoredHeroes: ProfileHeroCard[]
   savedHeroes: CustomHeroSummary[]
   bookmarkedHeroes: CustomHeroSummary[]
@@ -63,6 +73,7 @@ interface UserRecord {
   email: string
   username?: string | null
   preferredHero?: string | null
+  profileBackground?: string | null
   isPublic?: boolean | null
   anonymousEdits?: boolean | null
   customBio?: string | null
@@ -154,13 +165,15 @@ function buildOwnerIds(user: UserRecord) {
 
 function serializeUser(user: UserRecord): ProfileUser {
   const username = user.username?.trim() || user.email.split('@')[0] || user.clerkId
+  const preferredHero = user.preferredHero || 'abrams'
 
   return {
     id: user._id.toString(),
     clerkId: user.clerkId,
     email: user.email,
     username,
-    preferredHero: user.preferredHero || 'abrams',
+    preferredHero,
+    profileBackground: user.profileBackground || `official:${preferredHero}`,
     isPublic: user.isPublic ?? true,
     anonymousEdits: user.anonymousEdits ?? false,
     customBio: user.customBio?.trim() || DEFAULT_PROFILE_BIO,
@@ -251,6 +264,34 @@ export async function getCurrentProfileUser() {
   }
 }
 
+function getProfileBackgroundVisual(value: string, preferredHero: HeroDefinition, authoredHeroes: HeroRecord[]): ProfileBackgroundVisual {
+  const [type, id] = value.split(':')
+
+  if (type === 'custom') {
+    const customHero = authoredHeroes.find(hero => hero._id.toString() === id)
+
+    if (customHero) {
+      return {
+        id: value,
+        label: customHero.name,
+        render: customHero.render,
+        accent: preferredHero.heroInfo.tagColor,
+        nameColor: preferredHero.heroInfo.nameColor,
+      }
+    }
+  }
+
+  const officialHero = HEROES.find(hero => hero.slug === (type === 'official' ? id : value)) ?? preferredHero
+
+  return {
+    id: `official:${officialHero.slug}`,
+    label: officialHero.displayName,
+    render: officialHero.render,
+    accent: officialHero.heroInfo.tagColor,
+    nameColor: officialHero.heroInfo.nameColor,
+  }
+}
+
 async function getCurrentProfileUserForSegment(profileSegment: string) {
   const clerkUser = await currentUser()
 
@@ -330,12 +371,14 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
   const charactersCreated = authoredHeroRecords.length
   const contributionCount = charactersCreated + heroInfoContributionCount
   const serializedUser = serializeUser(user)
+  const preferredHero = getProfileHero(serializedUser.preferredHero)
 
   return {
     user: serializedUser,
     viewerIsOwner,
     avatarUrl,
-    preferredHero: getProfileHero(serializedUser.preferredHero),
+    preferredHero,
+    profileBackground: getProfileBackgroundVisual(serializedUser.profileBackground, preferredHero, authoredHeroRecords),
     authoredHeroes: authoredHeroRecords.map(serializeHero),
     savedHeroes,
     bookmarkedHeroes,

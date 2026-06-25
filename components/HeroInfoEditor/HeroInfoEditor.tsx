@@ -367,6 +367,7 @@ export default function HeroInfoEditor({
   const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(initialStatsDraft.weapon.stats))
   const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
+  const [heroPortraitInput, setHeroPortraitInput] = useState(hero.portrait)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
   const [saveError, setSaveError] = useState<string | null>(null)
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
@@ -386,7 +387,7 @@ export default function HeroInfoEditor({
       hero: {
         slug: hero.slug,
         name: exportHeroName,
-        portrait: hero.portrait,
+        portrait: heroPortraitInput,
         render: getRenderPath(),
       },
       heroInfo: draft,
@@ -585,7 +586,7 @@ export default function HeroInfoEditor({
       name,
       status,
       hero: {
-        portrait: hero.portrait,
+        portrait: heroPortraitInput,
         render: getRenderPath(),
         background: selectedBackground,
       },
@@ -1302,6 +1303,25 @@ export default function HeroInfoEditor({
         </div>
 
         <div className={styles.globalActions}>
+          <div className={styles.portraitUploadPanel}>
+            <span className={styles.portraitUploadTitle}>Portrait</span>
+            <div className={styles.portraitUploadContent}>
+              <div className={styles.portraitPreviewCard} aria-label={`${exportHeroName} portrait preview`} role="img" data-testid="editor-portrait-preview">
+                <span className={styles.portraitPreviewBacker} />
+                <span className={styles.portraitPreviewImage} data-testid="editor-portrait-preview-image" aria-hidden="true" style={{ backgroundImage: `url('${heroPortraitInput}')` }} />
+                <span className={styles.portraitPreviewBorder} />
+                <span className={styles.portraitPreviewTint} />
+              </div>
+              <div className={styles.portraitUploadControls}>
+                <CloudUploadButton endpoint="heroPortrait" label="Upload portrait" onUploaded={setHeroPortraitInput} />
+                {heroPortraitInput !== hero.portrait ? (
+                  <button type="button" className={styles.resetPortraitButton} onClick={() => setHeroPortraitInput(hero.portrait)}>
+                    Default Portrait
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          </div>
           <label className={styles.heroNamePrompt} htmlFor="editor-save-hero-name">
             Hero Name
             <input

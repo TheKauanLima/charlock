@@ -57,4 +57,20 @@ describe('Home auth gate', () => {
       undefined,
     )
   })
+
+  it('passes profile-menu tab routes into the hero grid', async () => {
+    authMock.mockResolvedValue({ userId: 'user_123' })
+
+    render(await Home({ searchParams: Promise.resolve({ tab: 'bookmarks' }) }))
+    expect(heroGridMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialTab: 'Bookmarks' }),
+      undefined,
+    )
+
+    render(await Home({ searchParams: Promise.resolve({ tab: 'notifications' }) }))
+    expect(heroGridMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialTab: 'Notifications' }),
+      undefined,
+    )
+  })
 })

@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { Bell, LogOut, Settings, UserRound } from 'lucide-react'
+import { Bell, Bookmark, LogOut, Settings, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useClerk, useUser } from '@clerk/nextjs'
 
@@ -110,11 +110,15 @@ export default function GlobalNav() {
 
       {isOpen ? (
         <div className={styles.menu} role="menu" aria-label="Profile navigation">
-          <Link className={styles.menuItem} href="/?tab=bookmarks" role="menuitem" onClick={() => setIsOpen(false)}>
+          <Link className={styles.menuItem} href="/?tab=notifications" role="menuitem" onClick={() => setIsOpen(false)}>
             <span className={styles.notificationIcon}>
               <Bell aria-hidden="true" size={17} />
               {notificationCount > 0 ? <span className={styles.notificationDot} aria-label={`${notificationCount} new activity updates`} /> : null}
             </span>
+            <span>Notifications</span>
+          </Link>
+          <Link className={styles.menuItem} href="/?tab=bookmarks" role="menuitem" onClick={() => setIsOpen(false)}>
+            <Bookmark aria-hidden="true" size={17} />
             <span>Bookmarks</span>
           </Link>
           <Link className={styles.menuItem} href="/profile" role="menuitem" onClick={() => setIsOpen(false)}>
@@ -135,7 +139,7 @@ export default function GlobalNav() {
             }}
           >
             <LogOut aria-hidden="true" size={17} />
-            <span>Leave Precinct</span>
+            <span>Sign Out</span>
           </button>
         </div>
       ) : null}

@@ -3,9 +3,11 @@
 import { clerkClient } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import { revalidatePath } from 'next/cache'
+import { Types } from 'mongoose'
 
 import { HEROES } from '@/lib/hero-data'
 import dbConnect from '@/lib/dbConnect'
+import CustomHero from '@/lib/models/CustomHero'
 import User from '@/lib/models/User'
 import { getCurrentProfileUser, getProfilePathSegment } from '@/lib/profile'
 
@@ -17,6 +19,28 @@ function getStringField(formData: FormData, field: string) {
 
 function getValidHeroSlug(value: string) {
   return HEROES.some(hero => hero.slug === value) ? value : 'abrams'
+}
+
+async function getValidProfileBackground(value: string, user: Awaited<ReturnType<typeof getRequiredProfileUser>>) {
+  const [type, id] = value.split(':')
+
+  if (type === 'official') {
+    return `official:${getValidHeroSlug(id)}`
+  }
+
+  if (type === 'custom' && Types.ObjectId.isValid(id)) {
+    const ownerIds = [user.clerkId, user._id.toString()]
+    const customHero = await CustomHero.exists({
+      _id: new Types.ObjectId(id),
+      createdByUserId: { $in: ownerIds },
+    })
+
+    if (customHero) {
+      return `custom:${id}`
+    }
+  }
+
+  return `official:${getValidHeroSlug(user.preferredHero ?? 'abrams')}`
 }
 
 async function getRequiredProfileUser() {
@@ -39,6 +63,26 @@ export async function updatePreferredHero(preferredHero: string) {
     {
       $set: {
         preferredHero: nextHero,
+      },
+    },
+  )
+
+  revalidatePath(`/profile/${getProfilePathSegment(user)}`)
+  revalidatePath('/profile/settings')
+}
+
+export async function updateProfileBackground(profileBackground: string) {
+  const user = await getRequiredProfileUser()
+
+  await dbConnect()
+
+  const nextBackground = await getValidProfileBackground(profileBackground, user)
+
+  await User.updateOne(
+    { clerkId: user.clerkId },
+    {
+      $set: {
+        profileBackground: nextBackground,
       },
     },
   )

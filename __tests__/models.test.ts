@@ -61,6 +61,7 @@ describe('Mongoose model schemas', () => {
 
   it('stores profile preferences and privacy settings', () => {
     expect(User.schema.path('preferredHero')).toBeDefined()
+    expect(User.schema.path('profileBackground')).toBeDefined()
     expect(User.schema.path('isPublic')).toBeDefined()
     expect(User.schema.path('anonymousEdits')).toBeDefined()
     expect(User.schema.path('customBio')).toBeDefined()

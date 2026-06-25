@@ -46,6 +46,10 @@ describe('security hardening', () => {
           protocol: 'https',
           hostname: 'clerk.cursedconcepts.xyz',
         }),
+        expect.objectContaining({
+          protocol: 'https',
+          hostname: 'utfs.io',
+        }),
       ]),
     )
   })

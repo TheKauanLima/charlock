@@ -2,7 +2,7 @@
 
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const signUpMocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -10,6 +10,7 @@ const signUpMocks = vi.hoisted(() => ({
   sendEmailCode: vi.fn(),
   verifyEmailCode: vi.fn(),
   finalize: vi.fn(),
+  sso: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -29,6 +30,7 @@ vi.mock('@clerk/nextjs', () => ({
         verifyEmailCode: signUpMocks.verifyEmailCode,
       },
       finalize: signUpMocks.finalize,
+      sso: signUpMocks.sso,
     },
   }),
 }))
@@ -39,6 +41,10 @@ vi.mock('@/components/auth/auth-errors', () => ({
 }))
 
 import SignUpForm from '@/components/auth/SignUpForm'
+
+beforeEach(() => {
+  Object.values(signUpMocks).forEach(mock => mock.mockReset())
+})
 
 describe('SignUpForm', () => {
   it('renders the Clerk Smart CAPTCHA mount point for custom sign-up flows', () => {
@@ -63,6 +69,26 @@ describe('SignUpForm', () => {
 
     expect(signUpMocks.create).toHaveBeenCalledWith({
       emailAddress: 'player@example.com',
+      unsafeMetadata: {
+        username: 'playerone',
+      },
+    })
+  })
+
+  it('starts Google OAuth sign-up with optional username metadata', async () => {
+    const user = userEvent.setup()
+
+    signUpMocks.sso.mockResolvedValueOnce({ error: null })
+
+    render(<SignUpForm />)
+
+    await user.type(screen.getByLabelText('Username'), 'playerone')
+    await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
+
+    expect(signUpMocks.sso).toHaveBeenCalledWith({
+      strategy: 'oauth_google',
+      redirectUrl: '/',
+      redirectCallbackUrl: '/sso-callback',
       unsafeMetadata: {
         username: 'playerone',
       },

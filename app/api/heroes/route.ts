@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { enforceJsonMutationRequest, readJsonRequestBody } from '@/lib/api-guards'
 import { toApiErrorResponse } from '@/lib/api-errors'
-import { getEditableCustomHero, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
+import { getEditableCustomHero, listBookmarkedCustomHeroPage, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
 import type { CustomHeroSort, CustomHeroStatus } from '@/lib/custom-hero-types'
 
 function getStatus(value: string | null): CustomHeroStatus {
@@ -35,6 +35,16 @@ export async function GET(request: NextRequest) {
       const hero = await getEditableCustomHero(id)
 
       return Response.json({ hero })
+    }
+
+    if (request.nextUrl.searchParams.get('bookmarked') === 'true') {
+      const result = await listBookmarkedCustomHeroPage({
+        search: request.nextUrl.searchParams.get('search') ?? '',
+        limit: getBoundedInteger(request.nextUrl.searchParams.get('limit'), 24, 60),
+        offset: getBoundedInteger(request.nextUrl.searchParams.get('offset'), 0, 10000),
+      })
+
+      return Response.json(result)
     }
 
     const result = await listCustomHeroPage({

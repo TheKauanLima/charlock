@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 const serviceMocks = vi.hoisted(() => ({
   getEditableCustomHero: vi.fn(),
   likeCustomHero: vi.fn(),
+  listBookmarkedCustomHeroPage: vi.fn(),
   listCustomHeroPage: vi.fn(),
   recordCustomHeroCopy: vi.fn(),
   saveCustomHero: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/custom-heroes', () => ({
   },
   getEditableCustomHero: serviceMocks.getEditableCustomHero,
   likeCustomHero: serviceMocks.likeCustomHero,
+  listBookmarkedCustomHeroPage: serviceMocks.listBookmarkedCustomHeroPage,
   listCustomHeroPage: serviceMocks.listCustomHeroPage,
   recordCustomHeroCopy: serviceMocks.recordCustomHeroCopy,
   saveCustomHero: serviceMocks.saveCustomHero,
@@ -79,6 +81,26 @@ describe('heroes API route', () => {
       hero: { id: 'hero_2', displayName: 'Night Ledger' },
     })
     expect(serviceMocks.getEditableCustomHero).toHaveBeenCalledWith('hero_2')
+  })
+
+  it('lists bookmarked heroes for the current user', async () => {
+    serviceMocks.listBookmarkedCustomHeroPage.mockResolvedValueOnce({
+      heroes: [{ id: 'hero_3', displayName: 'Saved Hero', bookmarkedByCurrentUser: true }],
+      pagination: { limit: 10, offset: 5, total: 11, hasMore: true },
+    })
+
+    const response = await GET(buildNextRequest('http://localhost/api/heroes?bookmarked=true&search=saved&limit=10&offset=5'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      heroes: [{ id: 'hero_3', displayName: 'Saved Hero', bookmarkedByCurrentUser: true }],
+      pagination: { limit: 10, offset: 5, total: 11, hasMore: true },
+    })
+    expect(serviceMocks.listBookmarkedCustomHeroPage).toHaveBeenCalledWith({
+      search: 'saved',
+      limit: 10,
+      offset: 5,
+    })
   })
 
   it('saves new and existing hero payloads', async () => {

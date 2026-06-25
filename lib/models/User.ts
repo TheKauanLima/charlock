@@ -8,6 +8,7 @@ export interface IUser {
   firstName: string | null
   lastName: string | null
   preferredHero: string
+  profileBackground?: string | null
   isPublic: boolean
   anonymousEdits: boolean
   customBio?: string | null
@@ -49,6 +50,10 @@ const userSchema = new Schema<IUser>(
     preferredHero: {
       type: String,
       default: 'abrams',
+    },
+    profileBackground: {
+      type: String,
+      default: null,
     },
     isPublic: {
       type: Boolean,

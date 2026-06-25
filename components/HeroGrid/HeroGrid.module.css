@@ -505,6 +505,63 @@
   z-index: 30;
 }
 
+.heroNameBadge {
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 8px);
+  z-index: 80;
+  min-width: max-content;
+  max-width: 170px;
+  transform: translate(-8px, -50%);
+  border: 1px solid rgba(255, 239, 214, 0.18);
+  border-left: 3px solid #2fc890;
+  border-radius: 4px;
+  background: rgba(5, 10, 8, 0.88);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.46), 0 0 24px rgba(47, 200, 144, 0.16);
+  color: #ffefd6;
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: clamp(0.86rem, 1.4vw, 1.2rem);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 0.95;
+  opacity: 0;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+  text-align: left;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+  text-transform: uppercase;
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms ease-out;
+}
+
+.heroCard:hover .heroNameBadge,
+.heroCard:focus-visible .heroNameBadge,
+.heroCardActive .heroNameBadge {
+  opacity: 1;
+  transform: translate(0, -50%);
+}
+
+.grid > .heroCard:nth-child(8n) .heroNameBadge,
+.grid > .browseCard:nth-child(8n) .heroNameBadge {
+  right: calc(100% + 8px);
+  left: auto;
+  border-right: 3px solid #2fc890;
+  border-left-width: 1px;
+  text-align: right;
+  transform: translate(8px, -50%);
+}
+
+.grid > .heroCard:nth-child(8n):hover .heroNameBadge,
+.grid > .heroCard:nth-child(8n):focus-visible .heroNameBadge,
+.grid > .heroCardActive:nth-child(8n) .heroNameBadge,
+.grid > .browseCard:nth-child(8n) .heroCard:hover .heroNameBadge,
+.grid > .browseCard:nth-child(8n) .heroCard:focus-visible .heroNameBadge,
+.grid > .browseCard:nth-child(8n) .heroCardActive .heroNameBadge {
+  transform: translate(0, -50%);
+}
+
 .heroCardActive .heroTint {
   background: transparent;
 }
@@ -522,6 +579,55 @@
 .browseCard .heroCard {
   position: absolute;
   inset: 0;
+}
+
+@media (max-width: 1023px) {
+  .grid > .heroCard:nth-child(4n) .heroNameBadge,
+  .grid > .browseCard:nth-child(4n) .heroNameBadge {
+    right: calc(100% + 8px);
+    left: auto;
+    border-right: 3px solid #2fc890;
+    border-left-width: 1px;
+    text-align: right;
+    transform: translate(8px, -50%);
+  }
+
+  .grid > .heroCard:nth-child(4n):hover .heroNameBadge,
+  .grid > .heroCard:nth-child(4n):focus-visible .heroNameBadge,
+  .grid > .heroCardActive:nth-child(4n) .heroNameBadge,
+  .grid > .browseCard:nth-child(4n) .heroCard:hover .heroNameBadge,
+  .grid > .browseCard:nth-child(4n) .heroCard:focus-visible .heroNameBadge,
+  .grid > .browseCard:nth-child(4n) .heroCardActive .heroNameBadge {
+    transform: translate(0, -50%);
+  }
+}
+
+@media (max-width: 639px) {
+  .heroNameBadge,
+  .grid > .heroCard:nth-child(2n) .heroNameBadge,
+  .grid > .browseCard:nth-child(2n) .heroNameBadge {
+    right: auto;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    top: auto;
+    max-width: 140px;
+    transform: translate(-50%, 8px);
+    border-right-width: 1px;
+    border-left: 3px solid #2fc890;
+    text-align: center;
+  }
+
+  .heroCard:hover .heroNameBadge,
+  .heroCard:focus-visible .heroNameBadge,
+  .heroCardActive .heroNameBadge,
+  .grid > .heroCard:nth-child(2n):hover .heroNameBadge,
+  .grid > .heroCard:nth-child(2n):focus-visible .heroNameBadge,
+  .grid > .heroCardActive:nth-child(2n) .heroNameBadge,
+  .grid > .browseCard:nth-child(2n) .heroCard:hover .heroNameBadge,
+  .grid > .browseCard:nth-child(2n) .heroCard:focus-visible .heroNameBadge,
+  .grid > .browseCard:nth-child(2n) .heroCardActive .heroNameBadge {
+    transform: translate(-50%, 0);
+  }
 }
 
 .likeButton {

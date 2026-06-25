@@ -711,11 +711,108 @@
 }
 
 .heroNamePrompt,
+.portraitUploadPanel,
 .copyToggle,
 .saveError,
 .actionStatus,
 .exportActionButton {
   grid-column: 1 / -1;
+}
+
+.portraitUploadPanel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 239, 214, 0.1);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+  padding: 10px;
+}
+
+.portraitUploadTitle {
+  color: rgba(255, 239, 214, 0.75);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.portraitUploadContent {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.portraitPreviewCard {
+  position: relative;
+  aspect-ratio: 130 / 210;
+  width: 86px;
+  overflow: hidden;
+  background: #211a1a;
+}
+
+.portraitPreviewBacker,
+.portraitPreviewImage,
+.portraitPreviewBorder,
+.portraitPreviewTint {
+  position: absolute;
+  inset: 0;
+}
+
+.portraitPreviewBacker {
+  z-index: 1;
+  background: #433836;
+}
+
+.portraitPreviewImage {
+  z-index: 2;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.portraitPreviewBorder {
+  z-index: 3;
+  background-color: #474446;
+  -webkit-mask: url('/panorama/images/main_menu/pick_screen/card_border_psd.png') center / cover no-repeat;
+  mask: url('/panorama/images/main_menu/pick_screen/card_border_psd.png') center / cover no-repeat;
+}
+
+.portraitPreviewTint {
+  z-index: 4;
+  background: linear-gradient(to top, rgba(17, 19, 14, 0.82) 0%, rgba(17, 19, 14, 0) 52%);
+}
+
+.portraitUploadControls {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.resetPortraitButton {
+  border: 1px solid rgba(255, 239, 214, 0.14);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 8px 12px;
+  color: rgba(255, 239, 214, 0.62);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.resetPortraitButton:hover,
+.resetPortraitButton:focus-visible {
+  border-color: rgba(47, 200, 144, 0.7);
+  color: #bafbe0;
+}
+
+.resetPortraitButton:focus-visible {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
 }
 
 .heroNamePrompt {

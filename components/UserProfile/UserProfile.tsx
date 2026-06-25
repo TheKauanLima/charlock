@@ -2,14 +2,16 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { BarChart3, FileText, ShieldCheck, UserCheck, UserPlus } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useMemo, useState, useTransition } from 'react'
-import type { CSSProperties, ChangeEvent } from 'react'
+import { Bell, Bookmark, Heart, MessageSquare, Settings, UserCheck, UserPlus, UsersRound } from 'lucide-react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import type { CSSProperties } from 'react'
+import { useClerk } from '@clerk/nextjs'
 
-import { updatePreferredHero } from '@/app/profile/actions'
+import { updateProfileBackground } from '@/app/profile/actions'
+import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroDefinition } from '@/lib/hero-data'
-import type { UserProfileData } from '@/lib/profile'
+import type { ProfileBackgroundVisual, UserProfileData } from '@/lib/profile'
+import heroGridStyles from '@/components/HeroGrid/HeroGrid.module.css'
 
 import styles from './UserProfile.module.css'
 
@@ -21,24 +23,36 @@ interface UserProfileProps {
 interface ProfileStyle extends CSSProperties {
   '--profile-accent': string
   '--profile-name': string
-  '--profile-level': string
 }
 
-const LEVEL_COLORS = {
-  rookie: '#6fb8ff',
-  investigator: '#77d474',
-  lead: '#e7bd59',
-  chief: '#ff5a55',
+interface ProfileGridHero {
+  id: string
+  name: string
+  portrait: string
+  background: string
+  href: string
 }
 
-function formatTimestamp(value: string) {
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value))
+interface ProfileBackgroundOption extends ProfileBackgroundVisual {
+  portrait: string
+  source: 'Official' | 'Created'
+}
+
+type ProfilePanel = 'saved' | 'bookmarks' | 'likes' | 'comments' | 'notifications' | 'settings'
+const PROFILE_PANELS: ProfilePanel[] = ['saved', 'bookmarks', 'likes', 'comments', 'notifications', 'settings']
+
+function getPanelFromHash(): ProfilePanel {
+  if (typeof window === 'undefined') {
+    return 'saved'
+  }
+
+  const hash = window.location.hash.replace(/^#/, '')
+
+  if (hash === 'characters-created') {
+    return 'saved'
+  }
+
+  return PROFILE_PANELS.includes(hash as ProfilePanel) ? hash as ProfilePanel : 'saved'
 }
 
 function getInitials(username: string) {
@@ -50,30 +64,267 @@ function getInitials(username: string) {
     .join('') || 'C'
 }
 
+function getCreatedHeroes(data: UserProfileData): ProfileGridHero[] {
+  const summariesById = new Map(data.savedHeroes.map(hero => [hero.id, hero]))
+
+  return data.authoredHeroes.map(hero => {
+    const summary = summariesById.get(hero.id)
+
+    return {
+      id: hero.id,
+      name: summary?.displayName ?? hero.name,
+      portrait: summary?.portrait ?? hero.portrait,
+      background: summary?.background ?? hero.render,
+      href: data.viewerIsOwner ? `/?tab=create&heroId=${encodeURIComponent(hero.id)}` : `/characters/${encodeURIComponent(hero.id)}`,
+    }
+  })
+}
+
+function getBookmarkedHeroes(heroes: CustomHeroSummary[]): ProfileGridHero[] {
+  return heroes.map(hero => ({
+    id: hero.id,
+    name: hero.displayName,
+    portrait: hero.portrait,
+    background: hero.background,
+    href: `/?tab=bookmarks&heroId=${encodeURIComponent(hero.id)}`,
+  }))
+}
+
+function getBackgroundOptions(officialHeroes: HeroDefinition[], createdHeroes: CustomHeroSummary[]): ProfileBackgroundOption[] {
+  return [
+    ...officialHeroes.map(hero => ({
+      id: `official:${hero.slug}`,
+      label: hero.displayName,
+      render: hero.render,
+      portrait: hero.portrait,
+      accent: hero.heroInfo.tagColor,
+      nameColor: hero.heroInfo.nameColor,
+      source: 'Official' as const,
+    })),
+    ...createdHeroes.map(hero => ({
+      id: `custom:${hero.id}`,
+      label: hero.displayName,
+      render: hero.render,
+      portrait: hero.portrait,
+      accent: hero.heroInfo.tagColor,
+      nameColor: hero.heroInfo.nameColor,
+      source: 'Created' as const,
+    })),
+  ]
+}
+
+function ProfileHeroGrid({ heroes, emptyMessage }: { heroes: ProfileGridHero[]; emptyMessage: string }) {
+  if (!heroes.length) {
+    return <p className={styles.emptyLedger}>{emptyMessage}</p>
+  }
+
+  return (
+    <div className={`${heroGridStyles.grid} ${styles.cardGrid}`}>
+      {heroes.map(hero => (
+        <article key={hero.id} className={heroGridStyles.browseCard}>
+          <Link
+            href={hero.href}
+            className={heroGridStyles.heroCard}
+            aria-label={`Open character ${hero.name}`}
+          >
+            <span className={heroGridStyles.heroBacker} />
+            <span className={heroGridStyles.browseBackground} style={{ backgroundImage: `url('${hero.background}')` }} aria-hidden="true" />
+            <span className={heroGridStyles.heroPortraitWrap}>
+              <Image
+                src={hero.portrait}
+                alt={hero.name}
+                fill
+                className={heroGridStyles.heroPortrait}
+                sizes="(max-width: 1024px) 25vw, 12vw"
+              />
+            </span>
+            <span className={heroGridStyles.heroBorder} />
+            <span className={heroGridStyles.heroTint} />
+            <span className={heroGridStyles.heroNameBadge} aria-hidden="true">
+              {hero.name}
+            </span>
+          </Link>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function EmptyProfilePanel({ title, count, message }: { title: string; count: string; message: string }) {
+  return (
+    <section className={styles.ledgerPanel}>
+      <div className={styles.sectionHeader}>
+        <div>
+          <p>{title}</p>
+          <span>{count}</span>
+        </div>
+      </div>
+      <p className={styles.emptyLedger}>{message}</p>
+    </section>
+  )
+}
+
+function ProfileBackgroundModal({
+  options,
+  activeId,
+  isPending,
+  onClose,
+  onSelect,
+}: {
+  options: ProfileBackgroundOption[]
+  activeId: string
+  isPending: boolean
+  onClose: () => void
+  onSelect: (option: ProfileBackgroundOption) => void
+}) {
+  const officialOptions = options.filter(option => option.source === 'Official')
+  const createdOptions = options.filter(option => option.source === 'Created')
+
+  return (
+    <div className={styles.modalBackdrop} role="presentation" onClick={onClose}>
+      <section
+        className={styles.backgroundModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-background-title"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className={styles.backgroundModalHeader}>
+          <div>
+            <p id="profile-background-title">Profile Background</p>
+            <span>{isPending ? 'Saving selection' : 'Choose a character render'}</span>
+          </div>
+          <button type="button" className={styles.modalCloseButton} onClick={onClose} aria-label="Close background picker">
+            x
+          </button>
+        </div>
+
+        <div className={styles.backgroundOptionGroups}>
+          <div className={styles.backgroundOptionGroup}>
+            <span>Main Characters</span>
+            <div className={styles.backgroundOptions}>
+              {officialOptions.map(option => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className={`${styles.backgroundOption} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
+                  onClick={() => onSelect(option)}
+                  aria-pressed={activeId === option.id}
+                  disabled={isPending}
+                >
+                  <Image src={option.portrait} alt="" fill sizes="112px" className={styles.backgroundOptionImage} />
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.backgroundOptionGroup}>
+            <span>Created Characters</span>
+            {createdOptions.length ? (
+              <div className={styles.backgroundOptions}>
+                {createdOptions.map(option => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`${styles.backgroundOption} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
+                    onClick={() => onSelect(option)}
+                    aria-pressed={activeId === option.id}
+                    disabled={isPending}
+                  >
+                    <Image src={option.portrait} alt="" fill sizes="112px" className={styles.backgroundOptionImage} />
+                    <span>{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className={styles.backgroundEmpty}>No created characters yet.</p>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export default function UserProfile({ data, heroes }: UserProfileProps) {
-  const router = useRouter()
-  const [selectedHeroSlug, setSelectedHeroSlug] = useState(data.preferredHero.slug)
+  const { openUserProfile } = useClerk()
+  const [activePanel, setActivePanel] = useState<ProfilePanel>(() => getPanelFromHash())
+  const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false)
+  const [isBackgroundPending, startBackgroundTransition] = useTransition()
+  const [profileBackground, setProfileBackground] = useState<ProfileBackgroundVisual>(data.profileBackground)
   const [isFollowing, setIsFollowing] = useState(data.viewerFollowsUser)
   const [followerCount, setFollowerCount] = useState(data.followerCount)
   const [followStatus, setFollowStatus] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-  const selectedHero = useMemo(
-    () => heroes.find(hero => hero.slug === selectedHeroSlug) ?? data.preferredHero,
-    [data.preferredHero, heroes, selectedHeroSlug],
+  const createdHeroes = useMemo(
+    () => getCreatedHeroes(data),
+    [data],
+  )
+  const bookmarkedHeroes = useMemo(
+    () => getBookmarkedHeroes(data.bookmarkedHeroes),
+    [data.bookmarkedHeroes],
+  )
+  const backgroundOptions = useMemo(
+    () => getBackgroundOptions(heroes, data.savedHeroes),
+    [data.savedHeroes, heroes],
   )
   const themeStyle: ProfileStyle = {
-    '--profile-accent': selectedHero.heroInfo.tagColor,
-    '--profile-name': selectedHero.heroInfo.nameColor,
-    '--profile-level': LEVEL_COLORS[data.level.tone],
+    '--profile-accent': profileBackground.accent,
+    '--profile-name': profileBackground.nameColor,
+  }
+  const followerLabel = `${followerCount} ${followerCount === 1 ? 'follower' : 'followers'}`
+  const navItems: Array<{ id: ProfilePanel; label: string; icon: typeof UsersRound }> = [
+    { id: 'saved', label: 'Saved Characters', icon: UsersRound },
+    { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
+    { id: 'likes', label: 'Likes', icon: Heart },
+    { id: 'comments', label: 'Comments', icon: MessageSquare },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ]
+
+  useEffect(() => {
+    function handleHashChange() {
+      setActivePanel(getPanelFromHash())
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  useEffect(() => {
+    if (!isBackgroundModalOpen) {
+      return undefined
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsBackgroundModalOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isBackgroundModalOpen])
+
+  function handlePanelSelect(panel: ProfilePanel) {
+    setActivePanel(panel)
+
+    const hash = panel === 'saved' ? 'characters-created' : panel
+    window.history.replaceState(null, '', `#${hash}`)
   }
 
-  function handleHeroChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextHero = event.target.value
+  function handleProfileBackgroundSelect(option: ProfileBackgroundOption) {
+    setProfileBackground(option)
+    setIsBackgroundModalOpen(false)
 
-    setSelectedHeroSlug(nextHero)
-    startTransition(async () => {
-      await updatePreferredHero(nextHero)
-      router.refresh()
+    startBackgroundTransition(async () => {
+      try {
+        await updateProfileBackground(option.id)
+      } catch {
+        setProfileBackground(data.profileBackground)
+      }
     })
   }
 
@@ -103,7 +354,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   return (
     <main className={styles.shell} style={themeStyle}>
       <Image
-        src={selectedHero.render}
+        src={profileBackground.render}
         alt=""
         fill
         priority
@@ -114,43 +365,39 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
       <div className={styles.washLayer} aria-hidden="true" />
 
       <section className={styles.content} aria-label={`${data.user.username} profile`}>
-        <div className={styles.profileHeader}>
-          <div className={styles.avatar}>
-            {data.avatarUrl ? (
-              <Image src={data.avatarUrl} alt="" fill unoptimized sizes="156px" className={styles.avatarImage} />
-            ) : (
-              <span className={styles.avatarFallback}>{getInitials(data.user.username)}</span>
-            )}
-          </div>
-          <div className={styles.profileCopy}>
-            <p className={styles.eyebrow}>User Profile</p>
-            <h1>{data.user.username}</h1>
-            <div className={styles.levelLine}>
-              <ShieldCheck aria-hidden="true" size={19} />
-              <span>{data.level.label}</span>
+        <aside className={styles.sidePanel} aria-label="Profile sections">
+          <div className={styles.railIdentity}>
+            <div className={styles.railTopline}>
+              <Link href="/" className={styles.backButton} aria-label="Back to site">
+                <span aria-hidden="true">&lt;</span>
+              </Link>
+              <div>
+                <span>Profile</span>
+                <strong>{data.user.username}</strong>
+              </div>
             </div>
-            <time className={styles.timestamp} dateTime={data.user.updatedAt}>
-              Last updated {formatTimestamp(data.user.updatedAt)}
-            </time>
-          </div>
-
-          <div className={styles.profileActions}>
-            {data.viewerIsOwner ? (
-              <label className={styles.heroSelect}>
-                <span>Main Hero</span>
-                <select value={selectedHeroSlug} onChange={handleHeroChange} disabled={isPending}>
-                  {heroes.map(hero => (
-                    <option key={hero.slug} value={hero.slug}>
-                      {hero.displayName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
+            <div className={styles.avatar}>
+              {data.avatarUrl ? (
+                <Image src={data.avatarUrl} alt="" fill unoptimized sizes="132px" className={styles.avatarImage} />
+              ) : (
+                <span className={styles.avatarFallback}>{getInitials(data.user.username)}</span>
+              )}
+            </div>
+            <div className={styles.sideProfileCopy}>
+              <p className={styles.eyebrow}>Welcome Back</p>
+              <h1>{data.user.username}</h1>
+              <span className={styles.followMeta}>{followerLabel}</span>
+              {followStatus ? <span className={styles.followError} role="status">{followStatus}</span> : null}
+              {data.viewerIsOwner ? (
+                <button type="button" className={styles.avatarEditButton} onClick={() => openUserProfile()}>
+                  Edit Picture
+                </button>
+              ) : null}
+            </div>
             {!data.viewerIsOwner ? (
               <button
                 type="button"
-                className={`${styles.homeLink} ${styles.actionButton}`}
+                className={styles.followButton}
                 onClick={handleFollowToggle}
                 aria-pressed={isFollowing}
               >
@@ -158,132 +405,103 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                 {isFollowing ? 'Following User' : 'Follow User'}
               </button>
             ) : null}
-            <Link className={styles.homeLink} href="/">
-              Main Website
-            </Link>
-            <span className={styles.followMeta}>{followerCount} followers</span>
-            {followStatus ? <span className={styles.followError} role="status">{followStatus}</span> : null}
+          </div>
+          <div className={styles.sidePanelList}>
+            {navItems.map(item => {
+              const Icon = item.icon
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`${styles.sidePanelItem} ${activePanel === item.id ? styles.sidePanelItemActive : ''}`}
+                  aria-pressed={activePanel === item.id}
+                  onClick={() => handlePanelSelect(item.id)}
+                >
+                  <Icon aria-hidden="true" size={17} />
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+        </aside>
+
+        <div className={styles.profileMain}>
+          <div className={styles.panelFrame}>
+            {activePanel === 'saved' ? (
+              <section id="characters-created" className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Characters Created</p>
+                    <span>{createdHeroes.length} total</span>
+                  </div>
+                </div>
+                {data.viewerIsOwner ? (
+                  <section className={styles.backgroundSummary} aria-label="Profile background">
+                    <div>
+                      <p>Profile Background</p>
+                      <span>{profileBackground.label}</span>
+                    </div>
+                    <button type="button" onClick={() => setIsBackgroundModalOpen(true)}>
+                      Change Background
+                    </button>
+                  </section>
+                ) : null}
+                <ProfileHeroGrid heroes={createdHeroes} emptyMessage="No characters have been created yet." />
+              </section>
+            ) : null}
+
+            {activePanel === 'bookmarks' ? (
+              <section id="bookmarks" className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Bookmarks</p>
+                    <span>{bookmarkedHeroes.length} total</span>
+                  </div>
+                </div>
+                <ProfileHeroGrid heroes={bookmarkedHeroes} emptyMessage="No community heroes have been bookmarked yet." />
+              </section>
+            ) : null}
+
+            {activePanel === 'likes' ? (
+              <EmptyProfilePanel title="Likes" count="0 total" message="Liked characters will appear here." />
+            ) : null}
+
+            {activePanel === 'comments' ? (
+              <EmptyProfilePanel title="Comments" count="0 total" message="Recent comment activity will appear here." />
+            ) : null}
+
+            {activePanel === 'notifications' ? (
+              <EmptyProfilePanel title="Notifications" count="0 new" message="Profile notifications will appear here." />
+            ) : null}
+
+            {activePanel === 'settings' ? (
+              <section className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Settings</p>
+                    <span>Profile controls</span>
+                  </div>
+                </div>
+                <div className={styles.settingsPanel}>
+                  <p>Edit your main hero, bio, privacy controls, security options, and account settings.</p>
+                  <Link href="/profile/settings">Open Settings</Link>
+                </div>
+              </section>
+            ) : null}
           </div>
         </div>
-
-        <section className={styles.statsGrid} aria-label="Profile metrics">
-          <article className={styles.statBox}>
-            <BarChart3 aria-hidden="true" />
-            <span>Characters Created</span>
-            <strong>{data.charactersCreated}</strong>
-          </article>
-          <article className={styles.statBox}>
-            <FileText aria-hidden="true" />
-            <span>User Contributions</span>
-            <strong>{data.userContributions}</strong>
-          </article>
-          <article className={styles.statBox}>
-            <ShieldCheck aria-hidden="true" />
-            <span>User Progress</span>
-            <strong>{data.level.nextAt ? `${data.level.progress}%` : 'MAX'}</strong>
-            <div className={styles.progressTrack} aria-hidden="true">
-              <span style={{ width: `${data.level.progress}%` }} />
-            </div>
-          </article>
-        </section>
-
-        <section className={styles.reportPanel}>
-          <div className={styles.sectionHeader}>
-            <p>Profile</p>
-            {data.viewerIsOwner ? <Link href="/profile/settings">Edit File</Link> : null}
-          </div>
-          <div className={styles.reportText}>
-            {data.user.customBio.split('\n').map((line, index) => (
-              <p key={`${line}-${index}`}>{line || '\u00a0'}</p>
-            ))}
-          </div>
-        </section>
-
-        {data.viewerIsOwner ? (
-          <section className={styles.ledgerPanel}>
-            <div className={styles.sectionHeader}>
-              <p>Saved Heroes</p>
-              <span>{data.savedHeroes.length} records</span>
-            </div>
-            {data.savedHeroes.length ? (
-              <div className={styles.ledgerGrid}>
-                {data.savedHeroes.map(hero => (
-                  <Link className={styles.heroCard} key={hero.id} href={`/?tab=create&heroId=${encodeURIComponent(hero.id)}`}>
-                    <div className={styles.heroPortrait}>
-                      <Image src={hero.portrait} alt="" fill sizes="160px" />
-                    </div>
-                    <div>
-                      <h2>{hero.displayName}</h2>
-                      <time className={styles.timestamp} dateTime={hero.updatedAt}>
-                        {formatTimestamp(hero.updatedAt)}
-                      </time>
-                      <span className={styles.statusBadge}>Edit {hero.status}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className={styles.emptyLedger}>No private character drafts have been saved yet.</p>
-            )}
-          </section>
-        ) : null}
-
-        {data.viewerIsOwner ? (
-          <section className={styles.ledgerPanel}>
-            <div className={styles.sectionHeader}>
-              <p>Bookmarks</p>
-              <span>{data.bookmarkedHeroes.length} records</span>
-            </div>
-            {data.bookmarkedHeroes.length ? (
-              <div className={styles.ledgerGrid}>
-                {data.bookmarkedHeroes.map(hero => (
-                  <Link className={styles.heroCard} key={hero.id} href={`/?tab=browse&heroId=${encodeURIComponent(hero.id)}`}>
-                    <div className={styles.heroPortrait}>
-                      <Image src={hero.portrait} alt="" fill sizes="160px" />
-                    </div>
-                    <div>
-                      <h2>{hero.displayName}</h2>
-                      <time className={styles.timestamp} dateTime={hero.updatedAt}>
-                        {formatTimestamp(hero.updatedAt)}
-                      </time>
-                      <span className={styles.statusBadge}>Bookmark</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className={styles.emptyLedger}>No community heroes have been bookmarked yet.</p>
-            )}
-          </section>
-        ) : null}
-
-        <section className={styles.ledgerPanel}>
-          <div className={styles.sectionHeader}>
-            <p>My Characters</p>
-            <span>{data.authoredHeroes.length} records</span>
-          </div>
-          {data.authoredHeroes.length ? (
-            <div className={styles.ledgerGrid}>
-              {data.authoredHeroes.map(hero => (
-                <article className={styles.heroCard} key={hero.id}>
-                  <div className={styles.heroPortrait}>
-                    <Image src={hero.portrait} alt="" fill sizes="160px" />
-                  </div>
-                  <div>
-                    <h2>{hero.name}</h2>
-                    <time className={styles.timestamp} dateTime={hero.updatedAt}>
-                      {formatTimestamp(hero.updatedAt)}
-                    </time>
-                    <span className={styles.statusBadge}>{hero.status}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className={styles.emptyLedger}>No modified hero records have been created by this user.</p>
-          )}
-        </section>
       </section>
+
+      {isBackgroundModalOpen ? (
+        <ProfileBackgroundModal
+          options={backgroundOptions}
+          activeId={profileBackground.id}
+          isPending={isBackgroundPending}
+          onClose={() => setIsBackgroundModalOpen(false)}
+          onSelect={handleProfileBackgroundSelect}
+        />
+      ) : null}
     </main>
   )
 }
