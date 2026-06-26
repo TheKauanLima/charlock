@@ -212,17 +212,29 @@
 }
 
 .bookmarkButton:hover,
+.bookmarkButton:focus-visible {
+  border-color: #d4af37;
+  color: #ffe6a3;
+  outline: none;
+  box-shadow: 0 0 18px rgba(212, 175, 55, 0.3);
+}
+
 .commentsToggle:hover,
+.commentsToggle:focus-visible,
 .commentForm button:hover,
-.commentItem button:hover {
+.commentForm button:focus-visible,
+.commentItem button:hover,
+.commentItem button:focus-visible {
   border-color: rgba(47, 200, 144, 0.66);
   color: #bafbe0;
+  outline: none;
 }
 
 .bookmarkButtonActive {
-  border-color: rgba(47, 200, 144, 0.78);
-  background: rgba(47, 200, 144, 0.14);
-  color: #bafbe0;
+  border-color: #d4af37;
+  background: rgba(212, 175, 55, 0.15);
+  color: #ffe6a3;
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.24);
 }
 
 .createFromHeroButton {

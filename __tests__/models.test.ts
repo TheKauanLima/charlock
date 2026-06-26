@@ -8,6 +8,7 @@ import User from '@/lib/models/User'
 import Comment from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import Like from '@/lib/models/Like'
+import Notification from '@/lib/models/Notification'
 import { statSchema } from '@/lib/models/WeaponStats'
 
 describe('Mongoose model schemas', () => {
@@ -100,5 +101,11 @@ describe('Mongoose model schemas', () => {
     expect(Follow.schema.path('followingId')).toBeDefined()
     expect(Like.schema.path('heroId')).toBeDefined()
     expect(Like.schema.path('userId')).toBeDefined()
+    expect(Notification.schema.path('recipientId')).toBeDefined()
+    expect(Notification.schema.path('actorId')).toBeDefined()
+    expect(Notification.schema.path('targetId')).toBeDefined()
+    expect(Notification.schema.path('relatedHeroId')).toBeDefined()
+    expect(Notification.schema.path('read')).toBeDefined()
+    expect(Notification.schema.path('type')).toHaveProperty('enumValues', ['like', 'comment', 'follow', 'publish'])
   })
 })

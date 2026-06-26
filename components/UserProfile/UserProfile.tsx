@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { Bell, Bookmark, BookmarkX, ExternalLink, Heart, MessageCircleReply, MessageSquare, RefreshCw, Settings, Trash2, UserCheck, UserPlus, UsersRound } from 'lucide-react'
+import { Bell, Bookmark, BookmarkX, Check, Cog, ExternalLink, Heart, MessageCircleReply, MessageSquare, RefreshCw, Settings, Trash2, UserCheck, UserPlus, UsersRound, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type { CSSProperties } from 'react'
 import { useClerk } from '@clerk/nextjs'
@@ -27,12 +27,21 @@ interface ProfileStyle extends CSSProperties {
   '--profile-name': string
 }
 
+interface BackgroundOptionStyle extends CSSProperties {
+  '--option-accent': string
+  '--option-name': string
+}
+
 interface ProfileGridHero {
   id: string
   name: string
   portrait: string
   background: string
   href: string
+  likesCount: number
+  bookmarkIndex: number
+  creatorType: 'Official' | 'Community'
+  roleTags: string[]
 }
 
 interface ProfileBackgroundOption extends ProfileBackgroundVisual {
@@ -40,21 +49,33 @@ interface ProfileBackgroundOption extends ProfileBackgroundVisual {
   source: 'Official' | 'Created'
 }
 
-interface ActivityFeedItem {
+interface ProfileNotificationItem {
   id: string
-  type: 'published_hero' | 'comment'
+  type: 'like' | 'comment' | 'follow' | 'publish'
+  read: boolean
   createdAt: string
-  heroId: string
-  heroName: string
+  relativeTime: string
   actorId: string
   actorName: string
-  content?: string
+  actorInitials: string
+  action: string
+  targetId: string
+  relatedHeroId: string | null
+  heroName: string | null
+  heroAccent: string
+  href: string
 }
 
 type ProfilePanel = 'saved' | 'bookmarks' | 'likes' | 'comments' | 'notifications' | 'settings'
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 type CommentsView = 'made' | 'received'
+type BackgroundPickerTab = ProfileBackgroundOption['source']
+type BookmarkSort = 'newest' | 'oldest' | 'rating' | 'name'
+type BookmarkRoleFilter = 'all' | 'weapon' | 'vitality' | 'spirit'
+type BookmarkCreatorFilter = 'all' | 'official' | 'community'
+type NotificationFilter = 'all' | 'comment' | 'like' | 'follow'
 const PROFILE_PANELS: ProfilePanel[] = ['saved', 'bookmarks', 'likes', 'comments', 'notifications', 'settings']
+const BACKGROUND_SYNC_MESSAGE = 'SYSTEM: Profile configuration synchronized successfully.'
 
 function getPanelFromHash(): ProfilePanel {
   if (typeof window === 'undefined') {
@@ -91,17 +112,33 @@ function getCreatedHeroes(data: UserProfileData): ProfileGridHero[] {
       portrait: summary?.portrait ?? hero.portrait,
       background: summary?.background ?? hero.render,
       href: data.viewerIsOwner ? `/?tab=create&heroId=${encodeURIComponent(hero.id)}` : `/?tab=browse&heroId=${encodeURIComponent(hero.id)}`,
+      likesCount: summary?.likesCount ?? 0,
+      bookmarkIndex: 0,
+      creatorType: 'Community' as const,
+      roleTags: [
+        summary?.heroInfo.tag1Text,
+        summary?.heroInfo.tag2Text,
+        summary?.heroInfo.tag3Text,
+      ].filter((tag): tag is string => Boolean(tag)),
     }
   })
 }
 
 function getBookmarkedHeroes(heroes: CustomHeroSummary[]): ProfileGridHero[] {
-  return heroes.map(hero => ({
+  return heroes.map((hero, index) => ({
     id: hero.id,
     name: hero.displayName,
     portrait: hero.portrait,
     background: hero.background,
     href: `/?tab=bookmarks&heroId=${encodeURIComponent(hero.id)}`,
+    likesCount: hero.likesCount,
+    bookmarkIndex: index,
+    creatorType: 'Community' as const,
+    roleTags: [
+      hero.heroInfo.tag1Text,
+      hero.heroInfo.tag2Text,
+      hero.heroInfo.tag3Text,
+    ].filter(Boolean),
   }))
 }
 
@@ -138,6 +175,40 @@ function getBackgroundOptions(officialHeroes: HeroDefinition[], createdHeroes: C
       source: 'Created' as const,
     })),
   ]
+}
+
+function getBackgroundOptionById(options: ProfileBackgroundOption[], id: string) {
+  return options.find(option => option.id === id)
+}
+
+function getSortedBookmarkCards(
+  cards: ProfileGridHero[],
+  sort: BookmarkSort,
+  roleFilter: BookmarkRoleFilter,
+  creatorFilter: BookmarkCreatorFilter,
+) {
+  const filteredCards = cards.filter(card => {
+    const matchesCreator = creatorFilter === 'all' || card.creatorType.toLowerCase() === creatorFilter
+    const matchesRole = roleFilter === 'all' || card.roleTags.some(tag => tag.toLowerCase().includes(roleFilter))
+
+    return matchesCreator && matchesRole
+  })
+
+  return [...filteredCards].sort((left, right) => {
+    if (sort === 'oldest') {
+      return right.bookmarkIndex - left.bookmarkIndex
+    }
+
+    if (sort === 'rating') {
+      return right.likesCount - left.likesCount || left.name.localeCompare(right.name)
+    }
+
+    if (sort === 'name') {
+      return left.name.localeCompare(right.name)
+    }
+
+    return left.bookmarkIndex - right.bookmarkIndex
+  })
 }
 
 function ProfileHeroGrid({
@@ -382,11 +453,66 @@ function CommentsPanel({
 function NotificationsPanel({
   status,
   items,
+  filter,
+  pendingReadId,
+  isMarkingAllRead,
   onRetry,
+  onFilterChange,
+  onMarkAllRead,
+  onMarkRead,
 }: {
   status: LoadStatus
-  items: ActivityFeedItem[]
+  items: ProfileNotificationItem[]
+  filter: NotificationFilter
+  pendingReadId: string | null
+  isMarkingAllRead: boolean
   onRetry: () => void
+  onFilterChange: (filter: NotificationFilter) => void
+  onMarkAllRead: () => void
+  onMarkRead: (notification: ProfileNotificationItem) => void
+}) {
+  const unreadCount = items.filter(item => !item.read).length
+
+  return (
+    <div className={styles.notificationsPanel}>
+      <div className={styles.notificationToolbar}>
+        <label>
+          <span>Filter</span>
+          <select value={filter} onChange={event => onFilterChange(event.target.value as NotificationFilter)}>
+            <option value="all">All</option>
+            <option value="comment">Comments</option>
+            <option value="like">Likes</option>
+            <option value="follow">Follows</option>
+          </select>
+        </label>
+        <button type="button" onClick={onMarkAllRead} disabled={!unreadCount || isMarkingAllRead || status !== 'ready'}>
+          {isMarkingAllRead ? 'Marking...' : 'Mark all as read'}
+        </button>
+      </div>
+
+      <NotificationPanelContent
+        status={status}
+        items={items}
+        pendingReadId={pendingReadId}
+        onRetry={onRetry}
+        onMarkRead={onMarkRead}
+      />
+    </div>
+  )
+}
+
+function NotificationPanelContent({
+  status,
+  items,
+  pendingReadId,
+  onRetry,
+  onMarkRead,
+}: {
+  status: LoadStatus
+  items: ProfileNotificationItem[]
+  pendingReadId: string | null
+  onRetry: () => void
+  onMarkRead: (notification: ProfileNotificationItem) => void
 }) {
   if (status === 'loading' || status === 'idle') {
     return <LedgerSkeleton />
@@ -411,13 +537,28 @@ function NotificationsPanel({
   return (
     <div className={styles.ledgerList}>
       {items.map(item => (
-        <article key={item.id} className={styles.notificationRow}>
+        <article
+          key={item.id}
+          className={`${styles.notificationRow} ${item.read ? styles.notificationRowRead : ''}`}
+          style={{ '--notification-accent': item.heroAccent } as CSSProperties}
+        >
           <span className={styles.unreadDot} aria-hidden="true" />
+          <span className={styles.notificationAvatar} aria-hidden="true">{item.actorInitials}</span>
           <div>
             <p>{item.actorName}</p>
-            <span>{item.type === 'comment' ? `commented on ${item.heroName}` : `published ${item.heroName}`}</span>
+            <span>{item.action}</span>
           </div>
-          <time dateTime={item.createdAt}>{formatLedgerDate(item.createdAt)}</time>
+          <time dateTime={item.createdAt}>{item.relativeTime}</time>
+          {!item.read ? (
+            <button
+              type="button"
+              onClick={() => onMarkRead(item)}
+              disabled={pendingReadId === item.id}
+              aria-label={`Mark notification from ${item.actorName} as read`}
+            >
+              Mark read
+            </button>
+          ) : null}
         </article>
       ))}
     </div>
@@ -427,18 +568,33 @@ function NotificationsPanel({
 function ProfileBackgroundModal({
   options,
   activeId,
+  draftId,
+  activeTab,
   isPending,
+  error,
   onClose,
-  onSelect,
+  onConfirm,
+  onPreview,
+  onPreviewEnd,
+  onSelectDraft,
+  onTabChange,
 }: {
   options: ProfileBackgroundOption[]
   activeId: string
+  draftId: string
+  activeTab: BackgroundPickerTab
   isPending: boolean
+  error: string | null
   onClose: () => void
-  onSelect: (option: ProfileBackgroundOption) => void
+  onConfirm: () => void
+  onPreview: (option: ProfileBackgroundOption) => void
+  onPreviewEnd: () => void
+  onSelectDraft: (option: ProfileBackgroundOption) => void
+  onTabChange: (tab: BackgroundPickerTab) => void
 }) {
   const officialOptions = options.filter(option => option.source === 'Official')
   const createdOptions = options.filter(option => option.source === 'Created')
+  const visibleOptions = activeTab === 'Official' ? officialOptions : createdOptions
 
   return (
     <div className={styles.modalBackdrop} role="presentation" onClick={onClose}>
@@ -455,52 +611,76 @@ function ProfileBackgroundModal({
             <span>{isPending ? 'Saving selection' : 'Choose a character render'}</span>
           </div>
           <button type="button" className={styles.modalCloseButton} onClick={onClose} aria-label="Close background picker">
-            x
+            <X aria-hidden="true" size={16} />
           </button>
         </div>
 
-        <div className={styles.backgroundOptionGroups}>
-          <div className={styles.backgroundOptionGroup}>
-            <span>Main Characters</span>
-            <div className={styles.backgroundOptions}>
-              {officialOptions.map(option => (
+        <div className={styles.backgroundTabs} role="tablist" aria-label="Background source">
+          <button type="button" role="tab" aria-selected={activeTab === 'Official'} onClick={() => onTabChange('Official')} disabled={isPending}>
+            Official Characters
+          </button>
+          <button type="button" role="tab" aria-selected={activeTab === 'Created'} onClick={() => onTabChange('Created')} disabled={isPending}>
+            My Custom Characters
+          </button>
+        </div>
+
+        {visibleOptions.length ? (
+          <div className={styles.backgroundOptions}>
+            {visibleOptions.map(option => {
+              const optionStyle: BackgroundOptionStyle = {
+                '--option-accent': option.accent,
+                '--option-name': option.nameColor,
+              }
+
+              return (
                 <button
                   key={option.id}
                   type="button"
-                  className={`${styles.backgroundOption} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
-                  onClick={() => onSelect(option)}
-                  aria-pressed={activeId === option.id}
+                  className={`${styles.backgroundOption} ${draftId === option.id ? styles.backgroundOptionDraft : ''} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
+                  style={optionStyle}
+                  onClick={() => onSelectDraft(option)}
+                  onFocus={() => onPreview(option)}
+                  onBlur={onPreviewEnd}
+                  onMouseEnter={() => onPreview(option)}
+                  onMouseLeave={onPreviewEnd}
+                  aria-pressed={draftId === option.id}
                   disabled={isPending}
                 >
-                  <Image src={option.portrait} alt="" fill sizes="112px" className={styles.backgroundOptionImage} />
-                  <span>{option.label}</span>
+                  <span className={styles.backgroundOptionRender}>
+                    <Image src={option.render} alt="" fill sizes="(max-width: 760px) 84vw, 280px" className={styles.backgroundOptionRenderImage} />
+                    <span className={styles.backgroundOptionWash} aria-hidden="true" />
+                  </span>
+                  <span className={styles.backgroundOptionPortrait}>
+                    <Image src={option.portrait} alt="" fill sizes="76px" className={styles.backgroundOptionPortraitImage} />
+                  </span>
+                  <span className={styles.backgroundOptionLabel}>{option.label}</span>
                 </button>
-              ))}
-            </div>
+              )
+            })}
           </div>
+        ) : (
+          <p className={styles.backgroundEmpty}>No created characters yet.</p>
+        )}
 
-          <div className={styles.backgroundOptionGroup}>
-            <span>Created Characters</span>
-            {createdOptions.length ? (
-              <div className={styles.backgroundOptions}>
-                {createdOptions.map(option => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`${styles.backgroundOption} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
-                    onClick={() => onSelect(option)}
-                    aria-pressed={activeId === option.id}
-                    disabled={isPending}
-                  >
-                    <Image src={option.portrait} alt="" fill sizes="112px" className={styles.backgroundOptionImage} />
-                    <span>{option.label}</span>
-                  </button>
-                ))}
-              </div>
+        {error ? <p className={styles.backgroundError} role="alert">{error}</p> : null}
+
+        <div className={styles.backgroundModalActions}>
+          <button type="button" className={styles.backgroundCancelButton} onClick={onClose} disabled={isPending}>
+            Cancel
+          </button>
+          <button type="button" className={styles.backgroundConfirmButton} onClick={onConfirm} disabled={isPending}>
+            {isPending ? (
+              <>
+                <Cog aria-hidden="true" size={15} className={styles.syncGear} />
+                COMMITTING MEMORY CORE...
+              </>
             ) : (
-              <p className={styles.backgroundEmpty}>No created characters yet.</p>
+              <>
+                <Check aria-hidden="true" size={15} />
+                Confirm Background
+              </>
             )}
-          </div>
+          </button>
         </div>
       </section>
     </div>
@@ -513,8 +693,17 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const [isPanelPending, startPanelTransition] = useTransition()
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false)
   const [isBackgroundPending, startBackgroundTransition] = useTransition()
+  const [savedProfileBackground, setSavedProfileBackground] = useState<ProfileBackgroundVisual>(data.profileBackground)
   const [profileBackground, setProfileBackground] = useState<ProfileBackgroundVisual>(data.profileBackground)
+  const [draftProfileBackground, setDraftProfileBackground] = useState<ProfileBackgroundOption | null>(null)
+  const [backgroundPickerTab, setBackgroundPickerTab] = useState<BackgroundPickerTab>('Official')
+  const [backgroundError, setBackgroundError] = useState<string | null>(null)
+  const [backgroundToast, setBackgroundToast] = useState<string | null>(null)
+  const [backgroundSynced, setBackgroundSynced] = useState(false)
   const [bookmarkCards, setBookmarkCards] = useState<ProfileGridHero[]>(() => getBookmarkedHeroes(data.bookmarkedHeroes))
+  const [bookmarkSort, setBookmarkSort] = useState<BookmarkSort>('newest')
+  const [bookmarkRoleFilter, setBookmarkRoleFilter] = useState<BookmarkRoleFilter>('all')
+  const [bookmarkCreatorFilter, setBookmarkCreatorFilter] = useState<BookmarkCreatorFilter>('all')
   const [removingBookmarkIds, setRemovingBookmarkIds] = useState<Set<string>>(new Set())
   const [likesStatus, setLikesStatus] = useState<LoadStatus>('idle')
   const [likesLedger, setLikesLedger] = useState<ProfileLikeItem[]>([])
@@ -523,7 +712,10 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const [commentsView, setCommentsView] = useState<CommentsView>('made')
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null)
   const [notificationsStatus, setNotificationsStatus] = useState<LoadStatus>('idle')
-  const [notificationItems, setNotificationItems] = useState<ActivityFeedItem[]>([])
+  const [notificationItems, setNotificationItems] = useState<ProfileNotificationItem[]>([])
+  const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all')
+  const [pendingReadNotificationId, setPendingReadNotificationId] = useState<string | null>(null)
+  const [isMarkingAllNotificationsRead, setIsMarkingAllNotificationsRead] = useState(false)
   const [isFollowing, setIsFollowing] = useState(data.viewerFollowsUser)
   const [followerCount, setFollowerCount] = useState(data.followerCount)
   const [followStatus, setFollowStatus] = useState<string | null>(null)
@@ -534,6 +726,10 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const backgroundOptions = useMemo(
     () => getBackgroundOptions(heroes, data.savedHeroes),
     [data.savedHeroes, heroes],
+  )
+  const visibleBookmarkCards = useMemo(
+    () => getSortedBookmarkCards(bookmarkCards, bookmarkSort, bookmarkRoleFilter, bookmarkCreatorFilter),
+    [bookmarkCards, bookmarkCreatorFilter, bookmarkRoleFilter, bookmarkSort],
   )
   const themeStyle: ProfileStyle = {
     '--profile-accent': profileBackground.accent,
@@ -589,25 +785,33 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     }
   }, [data.user.clerkId])
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (filter: NotificationFilter = notificationFilter) => {
     try {
-      const response = await fetch('/api/feed', {
+      const searchParams = new URLSearchParams({
+        limit: '40',
+      })
+
+      if (filter !== 'all') {
+        searchParams.set('type', filter)
+      }
+
+      const response = await fetch(`/api/notifications?${searchParams.toString()}`, {
         headers: {
           Accept: 'application/json',
         },
       })
-      const body = await response.json() as { items?: ActivityFeedItem[] }
+      const body = await response.json() as { notifications?: { items?: ProfileNotificationItem[] } }
 
-      if (!response.ok || !body.items) {
+      if (!response.ok || !body.notifications?.items) {
         throw new Error(`Notifications request failed with ${response.status}`)
       }
 
-      setNotificationItems(body.items)
+      setNotificationItems(body.notifications.items)
       setNotificationsStatus('ready')
     } catch {
       setNotificationsStatus('error')
     }
-  }, [])
+  }, [notificationFilter])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -632,7 +836,9 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     }
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !isBackgroundPending) {
+        setProfileBackground(savedProfileBackground)
+        setDraftProfileBackground(null)
         setIsBackgroundModalOpen(false)
       }
     }
@@ -640,7 +846,31 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     document.addEventListener('keydown', handleKeyDown)
 
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isBackgroundModalOpen])
+  }, [isBackgroundModalOpen, isBackgroundPending, savedProfileBackground])
+
+  useEffect(() => {
+    if (!backgroundToast) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      setBackgroundToast(null)
+    }, 3600)
+
+    return () => window.clearTimeout(timer)
+  }, [backgroundToast])
+
+  useEffect(() => {
+    if (!backgroundSynced) {
+      return undefined
+    }
+
+    const timer = window.setTimeout(() => {
+      setBackgroundSynced(false)
+    }, 900)
+
+    return () => window.clearTimeout(timer)
+  }, [backgroundSynced])
 
   useEffect(() => {
     if (activePanel !== 'likes' || likesStatus !== 'idle') {
@@ -700,15 +930,132 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     void fetchNotifications()
   }
 
-  function handleProfileBackgroundSelect(option: ProfileBackgroundOption) {
-    setProfileBackground(option)
+  function handleNotificationFilterChange(filter: NotificationFilter) {
+    setNotificationFilter(filter)
+    setNotificationsStatus('loading')
+    void fetchNotifications(filter)
+  }
+
+  async function handleMarkNotificationRead(notification: ProfileNotificationItem) {
+    setPendingReadNotificationId(notification.id)
+
+    try {
+      const response = await fetch(`/api/notifications/${encodeURIComponent(notification.id)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ read: true }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Notification update failed with ${response.status}`)
+      }
+
+      setNotificationItems(previous => previous.map(item => (
+        item.id === notification.id ? { ...item, read: true } : item
+      )))
+    } finally {
+      setPendingReadNotificationId(null)
+    }
+  }
+
+  async function handleMarkAllNotificationsRead() {
+    setIsMarkingAllNotificationsRead(true)
+
+    try {
+      const response = await fetch('/api/notifications/mark-all-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Notification update failed with ${response.status}`)
+      }
+
+      setNotificationItems(previous => previous.map(item => ({ ...item, read: true })))
+    } finally {
+      setIsMarkingAllNotificationsRead(false)
+    }
+  }
+
+  function handleBackgroundPickerOpen() {
+    const activeOption = getBackgroundOptionById(backgroundOptions, savedProfileBackground.id) ?? backgroundOptions[0]
+
+    if (!activeOption) {
+      return
+    }
+
+    setDraftProfileBackground(activeOption)
+    setBackgroundPickerTab(activeOption.source)
+    setProfileBackground(activeOption)
+    setBackgroundError(null)
+    setIsBackgroundModalOpen(true)
+  }
+
+  function handleBackgroundPickerCancel() {
+    if (isBackgroundPending) {
+      return
+    }
+
+    setProfileBackground(savedProfileBackground)
+    setDraftProfileBackground(null)
+    setBackgroundError(null)
     setIsBackgroundModalOpen(false)
+  }
+
+  function handleBackgroundPreview(option: ProfileBackgroundOption) {
+    if (!isBackgroundPending) {
+      setProfileBackground(option)
+    }
+  }
+
+  function handleBackgroundPreviewEnd() {
+    if (!isBackgroundPending) {
+      setProfileBackground(draftProfileBackground ?? savedProfileBackground)
+    }
+  }
+
+  function handleBackgroundDraftSelect(option: ProfileBackgroundOption) {
+    setDraftProfileBackground(option)
+    setProfileBackground(option)
+    setBackgroundError(null)
+  }
+
+  function handleProfileBackgroundConfirm() {
+    const option = draftProfileBackground
+
+    if (!option) {
+      return
+    }
+
+    setProfileBackground(option)
 
     startBackgroundTransition(async () => {
       try {
-        await updateProfileBackground(option.id)
+        const result = await updateProfileBackground(option.id)
+
+        if ('success' in result) {
+          const committedOption = getBackgroundOptionById(backgroundOptions, result.backgroundId) ?? option
+
+          setSavedProfileBackground(committedOption)
+          setProfileBackground(committedOption)
+          setDraftProfileBackground(null)
+          setIsBackgroundModalOpen(false)
+          setBackgroundError(null)
+          setBackgroundToast(BACKGROUND_SYNC_MESSAGE)
+          setBackgroundSynced(true)
+
+          return
+        }
+
+        setProfileBackground(savedProfileBackground)
+        setBackgroundError(result.error)
       } catch {
-        setProfileBackground(data.profileBackground)
+        setProfileBackground(savedProfileBackground)
+        setBackgroundError('Unable to synchronize profile background.')
       }
     })
   }
@@ -795,9 +1142,11 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
         priority
         sizes="100vw"
         className={styles.backgroundRender}
+        data-testid="profile-background-render"
       />
       <div className={styles.noiseLayer} aria-hidden="true" />
       <div className={styles.washLayer} aria-hidden="true" />
+      {isBackgroundPending ? <div className={styles.backgroundSyncOverlay} aria-hidden="true" /> : null}
 
       <section className={styles.content} aria-label={`${data.user.username} profile`}>
         <aside className={styles.sidePanel} aria-label="Profile sections">
@@ -862,7 +1211,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
         </aside>
 
         <div className={styles.profileMain}>
-          <div className={styles.panelFrame}>
+          <div className={`${styles.panelFrame} ${backgroundSynced ? styles.panelFrameSynced : ''}`}>
             {!isPanelPending && activePanel === 'saved' ? (
               <section id="characters-created" className={styles.ledgerPanel}>
                 <div className={styles.sectionHeader}>
@@ -877,8 +1226,15 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                       <p>Profile Background</p>
                       <span>{profileBackground.label}</span>
                     </div>
-                    <button type="button" onClick={() => setIsBackgroundModalOpen(true)}>
-                      Change Background
+                    <button type="button" onClick={handleBackgroundPickerOpen} disabled={isBackgroundPending}>
+                      {isBackgroundPending ? (
+                        <>
+                          <Cog aria-hidden="true" size={15} className={styles.syncGear} />
+                          <span>COMMITTING MEMORY CORE...</span>
+                        </>
+                      ) : (
+                        'Change Background'
+                      )}
                     </button>
                   </section>
                 ) : null}
@@ -895,11 +1251,39 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                 <div className={styles.sectionHeader}>
                   <div>
                     <p>Bookmarks</p>
-                    <span>{bookmarkCards.length} total</span>
+                    <span>{visibleBookmarkCards.length} shown / {bookmarkCards.length} total</span>
                   </div>
                 </div>
+                <div className={styles.bookmarkToolbar} aria-label="Bookmark sorting and filters">
+                  <label>
+                    <span>Sort by</span>
+                    <select value={bookmarkSort} onChange={event => setBookmarkSort(event.target.value as BookmarkSort)}>
+                      <option value="newest">Date Added: Newest</option>
+                      <option value="oldest">Date Added: Oldest</option>
+                      <option value="rating">Rating</option>
+                      <option value="name">Character Name</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Role</span>
+                    <select value={bookmarkRoleFilter} onChange={event => setBookmarkRoleFilter(event.target.value as BookmarkRoleFilter)}>
+                      <option value="all">All Roles</option>
+                      <option value="weapon">Weapon</option>
+                      <option value="vitality">Vitality</option>
+                      <option value="spirit">Spirit</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Creator</span>
+                    <select value={bookmarkCreatorFilter} onChange={event => setBookmarkCreatorFilter(event.target.value as BookmarkCreatorFilter)}>
+                      <option value="all">All Creators</option>
+                      <option value="official">Official</option>
+                      <option value="community">Community</option>
+                    </select>
+                  </label>
+                </div>
                 <ProfileHeroGrid
-                  heroes={bookmarkCards}
+                  heroes={visibleBookmarkCards}
                   emptyMessage="You have not bookmarked any characters yet."
                   onUnbookmark={handleUnbookmark}
                   pendingRemovalIds={removingBookmarkIds}
@@ -944,10 +1328,20 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                 <div className={styles.sectionHeader}>
                   <div>
                     <p>Notifications</p>
-                    <span>{notificationsStatus === 'ready' ? `${notificationItems.length} recent` : 'Retrieving entries'}</span>
+                    <span>{notificationsStatus === 'ready' ? `${notificationItems.filter(item => !item.read).length} unread / ${notificationItems.length} total` : 'Retrieving entries'}</span>
                   </div>
                 </div>
-                <NotificationsPanel status={notificationsStatus} items={notificationItems} onRetry={retryNotifications} />
+                <NotificationsPanel
+                  status={notificationsStatus}
+                  items={notificationItems}
+                  filter={notificationFilter}
+                  pendingReadId={pendingReadNotificationId}
+                  isMarkingAllRead={isMarkingAllNotificationsRead}
+                  onRetry={retryNotifications}
+                  onFilterChange={handleNotificationFilterChange}
+                  onMarkAllRead={handleMarkAllNotificationsRead}
+                  onMarkRead={handleMarkNotificationRead}
+                />
               </section>
             ) : null}
 
@@ -971,12 +1365,20 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
       {isBackgroundModalOpen ? (
         <ProfileBackgroundModal
           options={backgroundOptions}
-          activeId={profileBackground.id}
+          activeId={savedProfileBackground.id}
+          draftId={draftProfileBackground?.id ?? savedProfileBackground.id}
+          activeTab={backgroundPickerTab}
           isPending={isBackgroundPending}
-          onClose={() => setIsBackgroundModalOpen(false)}
-          onSelect={handleProfileBackgroundSelect}
+          error={backgroundError}
+          onClose={handleBackgroundPickerCancel}
+          onConfirm={handleProfileBackgroundConfirm}
+          onPreview={handleBackgroundPreview}
+          onPreviewEnd={handleBackgroundPreviewEnd}
+          onSelectDraft={handleBackgroundDraftSelect}
+          onTabChange={setBackgroundPickerTab}
         />
       ) : null}
+      {backgroundToast ? <div className={styles.profileToast} role="status">{backgroundToast}</div> : null}
     </main>
   )
 }

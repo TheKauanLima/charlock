@@ -197,6 +197,11 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       return
     }
 
+    const previousValue = isBookmarked
+    const optimisticValue = !previousValue
+
+    setBookmarkOverride({ heroId, value: optimisticValue })
+
     try {
       const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/bookmark`, {
         method: 'POST',
@@ -212,6 +217,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
 
       setBookmarkOverride({ heroId, value: body.bookmark.bookmarked })
     } catch (error) {
+      setBookmarkOverride({ heroId, value: previousValue })
       setCommentsStatus(error instanceof Error ? error.message : 'Failed to update bookmark.')
     }
   }

@@ -53,6 +53,17 @@ async function getRequiredProfileUser() {
   return user
 }
 
+export interface ProfileBackgroundActionSuccess {
+  success: true
+  backgroundId: string
+}
+
+export interface ProfileBackgroundActionError {
+  error: string
+}
+
+export type ProfileBackgroundActionResult = ProfileBackgroundActionSuccess | ProfileBackgroundActionError
+
 export async function updatePreferredHero(preferredHero: string) {
   const user = await getRequiredProfileUser()
   const nextHero = getValidHeroSlug(preferredHero)
@@ -71,24 +82,32 @@ export async function updatePreferredHero(preferredHero: string) {
   revalidatePath('/profile/settings')
 }
 
-export async function updateProfileBackground(profileBackground: string) {
+export async function updateProfileBackground(profileBackground: string): Promise<ProfileBackgroundActionResult> {
   const user = await getRequiredProfileUser()
 
-  await dbConnect()
+  try {
+    await dbConnect()
 
-  const nextBackground = await getValidProfileBackground(profileBackground, user)
+    const nextBackground = await getValidProfileBackground(profileBackground, user)
 
-  await User.updateOne(
-    { clerkId: user.clerkId },
-    {
-      $set: {
-        profileBackground: nextBackground,
+    await User.updateOne(
+      { clerkId: user.clerkId },
+      {
+        $set: {
+          profileBackground: nextBackground,
+        },
       },
-    },
-  )
+    )
 
-  revalidatePath(`/profile/${getProfilePathSegment(user)}`)
-  revalidatePath('/profile/settings')
+    revalidatePath(`/profile/${getProfilePathSegment(user)}`)
+    revalidatePath('/profile/settings')
+
+    return { success: true, backgroundId: nextBackground }
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Unable to synchronize profile background.',
+    }
+  }
 }
 
 export async function updateProfileSettings(formData: FormData) {

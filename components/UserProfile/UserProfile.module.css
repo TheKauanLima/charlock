@@ -36,6 +36,24 @@
     linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.9) 44%, rgba(0, 0, 0, 0.5) 100%);
 }
 
+.backgroundSyncOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(120, 255, 185, 0.16) 0 1px,
+      transparent 1px 8px
+    ),
+    linear-gradient(180deg, transparent, rgba(120, 255, 185, 0.16), transparent);
+  background-size: 100% 8px, 100% 180px;
+  mix-blend-mode: screen;
+  opacity: 0.74;
+  animation: profileScanline 1.08s linear infinite;
+}
+
 .content {
   position: relative;
   z-index: 3;
@@ -293,23 +311,26 @@
 
 .avatarEditButton {
   margin-top: 10px;
-  border: 1px solid rgba(255, 239, 214, 0.2);
-  background: rgba(0, 0, 0, 0.34);
-  color: rgba(255, 239, 214, 0.84);
+  border: 1px solid var(--profile-accent);
+  background: transparent;
+  color: var(--profile-accent);
   cursor: pointer;
-  padding: 8px 10px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  clip-path: polygon(0 0, 92% 0, 100% 25%, 100% 100%, 8% 100%, 0 75%);
+  padding: 9px 13px;
+  font-family: "VALVEPulp", var(--block, "Valve Pulp", Arial), sans-serif;
   font-size: 0.64rem;
   font-weight: 900;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  transition: background 0.2s ease, transform 0.1s ease;
 }
 
 .avatarEditButton:hover,
 .avatarEditButton:focus-visible {
-  border-color: var(--profile-name);
-  color: #ffefd6;
+  background: color-mix(in srgb, var(--profile-accent) 16%, transparent);
+  color: var(--profile-name);
   outline: none;
+  transform: translateY(-1px);
 }
 
 .ledgerPanel {
@@ -321,6 +342,10 @@
   position: relative;
   min-height: 380px;
   padding: 24px 0 34px;
+}
+
+.panelFrameSynced {
+  animation: profileSyncFlash 900ms ease-out;
 }
 
 .panelFrame::before,
@@ -390,6 +415,11 @@
 
 .backgroundSummary button {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
   border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
   background: color-mix(in srgb, var(--profile-accent) 16%, rgba(0, 0, 0, 0.58));
   color: #ffefd6;
@@ -402,10 +432,20 @@
   text-transform: uppercase;
 }
 
+.backgroundSummary button:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
 .backgroundSummary button:hover,
 .backgroundSummary button:focus-visible {
   border-color: var(--profile-name);
   outline: none;
+}
+
+.syncGear {
+  flex: 0 0 auto;
+  animation: profileGearSpin 1s linear infinite;
 }
 
 .modalBackdrop {
@@ -478,58 +518,122 @@
   outline: none;
 }
 
-.backgroundOptionGroups {
-  display: grid;
-  gap: 22px;
+.backgroundTabs {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 220px));
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid rgba(255, 239, 214, 0.16);
+  background: rgba(0, 0, 0, 0.34);
 }
 
-.backgroundOptionGroup {
-  display: grid;
-  gap: 10px;
+.backgroundTabs button {
+  min-height: 38px;
+  border: 0;
+  border-right: 1px solid rgba(255, 239, 214, 0.12);
+  background: transparent;
+  color: rgba(255, 239, 214, 0.68);
+  cursor: pointer;
+  padding: 8px 12px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.backgroundTabs button:last-child {
+  border-right: 0;
+}
+
+.backgroundTabs button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--profile-accent) 22%, rgba(0, 0, 0, 0.4));
+  color: #ffefd6;
 }
 
 .backgroundOptions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
 }
 
 .backgroundOption {
   position: relative;
+  display: block;
   width: 100%;
-  height: 126px;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border: 1px solid rgba(255, 239, 214, 0.16);
-  background: rgba(0, 0, 0, 0.38);
+  background: rgba(0, 0, 0, 0.42);
   color: #ffefd6;
   cursor: pointer;
   padding: 0;
 }
 
-.backgroundOption::after {
+.backgroundOption::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 44%, rgba(0, 0, 0, 0.88));
+  z-index: 3;
+  border-bottom: 3px solid var(--option-accent);
+  box-shadow: inset 0 -52px 68px rgba(0, 0, 0, 0.86);
   pointer-events: none;
 }
 
-.backgroundOptionImage {
-  object-fit: cover;
+.backgroundOptionRender,
+.backgroundOptionWash,
+.backgroundOptionPortrait,
+.backgroundOptionLabel {
+  position: absolute;
 }
 
-.backgroundOption span {
-  position: absolute;
-  right: 5px;
-  bottom: 5px;
-  left: 5px;
-  z-index: 1;
+.backgroundOptionRender {
+  inset: 0;
+}
+
+.backgroundOptionRenderImage {
+  object-fit: cover;
+  object-position: right center;
+  opacity: 0.86;
+}
+
+.backgroundOptionWash {
+  inset: 0;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--option-accent) 36%, rgba(0, 0, 0, 0.74)), transparent 64%),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 8px);
+  mix-blend-mode: screen;
+  opacity: 0.56;
+}
+
+.backgroundOptionPortrait {
+  bottom: 10px;
+  left: 10px;
+  z-index: 4;
+  width: 58px;
+  height: 58px;
   overflow: hidden;
-  color: #ffefd6;
+  border: 1px solid var(--option-accent);
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.backgroundOptionPortraitImage {
+  object-fit: cover;
+  object-position: top center;
+}
+
+.backgroundOptionLabel {
+  right: 10px;
+  bottom: 13px;
+  left: 78px;
+  z-index: 4;
+  overflow: hidden;
+  color: var(--option-name);
   font-family: var(--font-geist-mono), "Roboto Mono", monospace;
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 900;
-  line-height: 1.05;
+  line-height: 1.1;
+  text-align: left;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -537,10 +641,29 @@
 
 .backgroundOption:hover,
 .backgroundOption:focus-visible,
+.backgroundOptionDraft,
 .backgroundOptionActive {
-  border-color: var(--profile-name);
+  border-color: var(--option-name);
   outline: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--profile-accent) 60%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--option-accent) 70%, transparent),
+    0 0 22px color-mix(in srgb, var(--option-accent) 28%, transparent);
+}
+
+.backgroundOptionActive::after {
+  content: "ACTIVE";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  border: 1px solid var(--option-accent);
+  background: rgba(0, 0, 0, 0.7);
+  color: var(--option-name);
+  padding: 4px 6px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
 }
 
 .backgroundOption:disabled {
@@ -548,11 +671,162 @@
   opacity: 0.72;
 }
 
-.backgroundEmpty {
+.backgroundEmpty,
+.backgroundError {
   margin: 0;
   color: rgba(255, 239, 214, 0.62);
   font-family: var(--font-geist-mono), "Roboto Mono", monospace;
   font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.backgroundError {
+  border: 1px solid rgba(255, 98, 98, 0.48);
+  background: rgba(60, 8, 8, 0.44);
+  color: #ffaaa0;
+  padding: 10px 12px;
+}
+
+.backgroundModalActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 10px;
+}
+
+.backgroundCancelButton,
+.backgroundConfirmButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid rgba(255, 239, 214, 0.18);
+  background: rgba(0, 0, 0, 0.36);
+  color: rgba(255, 239, 214, 0.78);
+  cursor: pointer;
+  padding: 9px 14px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.backgroundConfirmButton {
+  border-color: color-mix(in srgb, var(--profile-accent) 76%, rgba(255, 239, 214, 0.2));
+  background: color-mix(in srgb, var(--profile-accent) 18%, rgba(0, 0, 0, 0.56));
+  color: #ffefd6;
+}
+
+.backgroundCancelButton:hover,
+.backgroundCancelButton:focus-visible,
+.backgroundConfirmButton:hover,
+.backgroundConfirmButton:focus-visible {
+  border-color: var(--profile-name);
+  outline: none;
+}
+
+.backgroundCancelButton:disabled,
+.backgroundConfirmButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.profileToast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 50;
+  max-width: min(420px, calc(100vw - 48px));
+  border: 1px solid rgba(101, 255, 155, 0.66);
+  background:
+    repeating-linear-gradient(180deg, rgba(101, 255, 155, 0.09) 0 1px, transparent 1px 7px),
+    rgba(3, 22, 13, 0.92);
+  color: #a8ffc5;
+  box-shadow: 0 0 34px rgba(101, 255, 155, 0.16);
+  padding: 12px 14px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bookmarkToolbar,
+.notificationToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  justify-content: space-between;
+  border: 1px solid rgba(255, 239, 214, 0.12);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 8px),
+    rgba(0, 0, 0, 0.3);
+  padding: 12px;
+}
+
+.bookmarkToolbar label,
+.notificationToolbar label {
+  display: grid;
+  gap: 5px;
+  min-width: min(100%, 180px);
+}
+
+.bookmarkToolbar span,
+.notificationToolbar span {
+  color: rgba(255, 239, 214, 0.54);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bookmarkToolbar select,
+.notificationToolbar select {
+  min-height: 34px;
+  border: 1px solid rgba(255, 239, 214, 0.16);
+  background: rgba(0, 0, 0, 0.56);
+  color: #ffefd6;
+  padding: 7px 10px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.notificationToolbar button {
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
+  background: color-mix(in srgb, var(--profile-accent) 14%, rgba(0, 0, 0, 0.56));
+  color: #ffefd6;
+  cursor: pointer;
+  padding: 8px 12px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bookmarkToolbar select:focus-visible,
+.notificationToolbar select:focus-visible,
+.notificationToolbar button:focus-visible,
+.notificationToolbar button:hover {
+  border-color: var(--profile-name);
+  outline: none;
+}
+
+.notificationToolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.notificationsPanel {
+  display: grid;
+  gap: 10px;
 }
 
 .emptyLedger {
@@ -697,6 +971,38 @@
   }
 }
 
+@keyframes profileScanline {
+  from {
+    background-position: 0 0, 0 -180px;
+  }
+
+  to {
+    background-position: 0 8px, 0 180px;
+  }
+}
+
+@keyframes profileGearSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes profileSyncFlash {
+  0% {
+    box-shadow: inset 0 0 0 1px rgba(101, 255, 155, 0);
+  }
+
+  28% {
+    box-shadow:
+      inset 0 0 0 2px rgba(101, 255, 155, 0.9),
+      0 0 30px rgba(101, 255, 155, 0.22);
+  }
+
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(101, 255, 155, 0);
+  }
+}
+
 .ledgerList,
 .commentsPanel {
   display: grid;
@@ -718,9 +1024,13 @@
 }
 
 .notificationRow {
-  grid-template-columns: 10px minmax(0, 1fr) auto;
+  grid-template-columns: 10px 38px minmax(0, 1fr) auto minmax(88px, auto);
   color: inherit;
   text-decoration: none;
+}
+
+.notificationRowRead {
+  opacity: 0.64;
 }
 
 .ledgerRow p,
@@ -748,6 +1058,45 @@
   font-size: 0.68rem;
   line-height: 1.35;
   text-transform: uppercase;
+}
+
+.notificationAvatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--notification-accent, var(--profile-name)) 72%, rgba(255, 239, 214, 0.18));
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.44);
+  color: var(--notification-accent, var(--profile-name));
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.notificationRow button {
+  min-height: 32px;
+  border: 1px solid rgba(255, 239, 214, 0.16);
+  background: rgba(0, 0, 0, 0.42);
+  color: rgba(255, 239, 214, 0.78);
+  cursor: pointer;
+  padding: 7px 10px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.notificationRow button:hover,
+.notificationRow button:focus-visible {
+  border-color: var(--notification-accent, var(--profile-name));
+  outline: none;
+}
+
+.notificationRow button:disabled {
+  cursor: wait;
+  opacity: 0.54;
 }
 
 .commentRow {
@@ -811,8 +1160,12 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: var(--profile-name);
-  box-shadow: 0 0 12px var(--profile-accent);
+  background: var(--notification-accent, var(--profile-name));
+  box-shadow: 0 0 12px var(--notification-accent, var(--profile-accent));
+}
+
+.notificationRowRead .unreadDot {
+  opacity: 0.18;
 }
 
 .cardIconButton {
@@ -909,5 +1262,15 @@
 
   .profileHeader {
     grid-template-columns: 1fr;
+  }
+
+  .notificationRow {
+    grid-template-columns: 10px 34px minmax(0, 1fr);
+  }
+
+  .notificationRow time,
+  .notificationRow button {
+    grid-column: 3;
+    justify-self: start;
   }
 }

@@ -12,6 +12,7 @@ import Comment from '@/lib/models/Comment'
 import type { IComment } from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import User from '@/lib/models/User'
+import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 
 const FALLBACK_HERO_PORTRAIT = HEROES[0]?.portrait ?? ''
 
@@ -182,6 +183,18 @@ export async function postHeroComment(heroId: string, content: unknown): Promise
     userId: actor.clerkId,
     content: trimmedContent,
   }) as CommentRecord
+  const recipientId = await resolveRecipientClerkId(hero.createdByUserId)
+
+  if (recipientId) {
+    await createNotification({
+      recipientId,
+      actorId: actor.clerkId,
+      type: 'comment',
+      targetId: comment._id,
+      relatedHeroId: hero._id,
+    })
+  }
+
   const usersByClerkId = await getUserMap([actor.clerkId])
 
   return serializeComment(comment, usersByClerkId, actor)
@@ -306,9 +319,16 @@ export async function toggleFollow(targetUserId: string) {
   if (existing) {
     await Follow.deleteOne({ _id: existing._id })
   } else {
-    await Follow.create({
+    const follow = await Follow.create({
       followerId: actor.clerkId,
       followingId: targetUser.clerkId,
+    })
+
+    await createNotification({
+      recipientId: targetUser.clerkId,
+      actorId: actor.clerkId,
+      type: 'follow',
+      targetId: follow._id,
     })
   }
 
@@ -400,39 +420,3 @@ export async function getActivityFeed(): Promise<ActivityFeedItem[]> {
   }
 }
 
-export async function getNotificationState() {
-  const actor = await getOptionalActor()
-
-  if (!actor) {
-    return { hasNotifications: false, count: 0 }
-  }
-
-  await dbConnect()
-
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  const follows = await Follow.find({ followerId: actor.clerkId }).lean<{ followingId: string }[]>()
-  const followedClerkIds = follows.map(follow => follow.followingId)
-  const followedUsers = followedClerkIds.length
-    ? await User.find({ clerkId: { $in: followedClerkIds } }).lean<UserRecord[]>()
-    : []
-  const followedOwnerIds = [
-    ...followedClerkIds,
-    ...followedUsers.map(user => user._id.toString()),
-  ]
-  const ownHeroes = await CustomHero.find({ createdByUserId: { $in: actor.ownerIds } }).select('_id').lean<HeroRecord[]>()
-
-  const [newHeroCount, commentCount] = await Promise.all([
-    followedOwnerIds.length
-      ? CustomHero.countDocuments({ status: 'published', createdByUserId: { $in: followedOwnerIds }, publishedAt: { $gte: since } })
-      : Promise.resolve(0),
-    ownHeroes.length
-      ? Comment.countDocuments({ heroId: { $in: ownHeroes.map(hero => hero._id) }, userId: { $ne: actor.clerkId }, createdAt: { $gte: since } })
-      : Promise.resolve(0),
-  ])
-  const count = newHeroCount + commentCount
-
-  return {
-    hasNotifications: count > 0,
-    count,
-  }
-}

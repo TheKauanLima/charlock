@@ -5,6 +5,9 @@ const serviceMocks = vi.hoisted(() => ({
   deleteHeroComment: vi.fn(),
   getActivityFeed: vi.fn(),
   getNotificationState: vi.fn(),
+  listNotifications: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  markNotificationRead: vi.fn(),
   listProfileComments: vi.fn(),
   listProfileLikes: vi.fn(),
   listHeroComments: vi.fn(),
@@ -27,11 +30,17 @@ vi.mock('@/lib/custom-heroes', () => ({
 vi.mock('@/lib/social-engagement', () => ({
   deleteHeroComment: serviceMocks.deleteHeroComment,
   getActivityFeed: serviceMocks.getActivityFeed,
-  getNotificationState: serviceMocks.getNotificationState,
   listHeroComments: serviceMocks.listHeroComments,
   postHeroComment: serviceMocks.postHeroComment,
   toggleFollow: serviceMocks.toggleFollow,
   toggleHeroBookmark: serviceMocks.toggleHeroBookmark,
+}))
+
+vi.mock('@/lib/notifications', () => ({
+  getNotificationState: serviceMocks.getNotificationState,
+  listNotifications: serviceMocks.listNotifications,
+  markAllNotificationsRead: serviceMocks.markAllNotificationsRead,
+  markNotificationRead: serviceMocks.markNotificationRead,
 }))
 
 vi.mock('@/lib/profile-ledger', () => ({
@@ -43,6 +52,8 @@ import { DELETE, GET as GET_COMMENTS, POST as POST_COMMENT } from '@/app/api/her
 import { POST as POST_BOOKMARK } from '@/app/api/heroes/[slug]/bookmark/route'
 import { GET as GET_FEED } from '@/app/api/feed/route'
 import { GET as GET_NOTIFICATIONS } from '@/app/api/notifications/route'
+import { PATCH as PATCH_NOTIFICATION } from '@/app/api/notifications/[id]/route'
+import { POST as POST_MARK_ALL_READ } from '@/app/api/notifications/mark-all-read/route'
 import { GET as GET_PROFILE_COMMENTS } from '@/app/api/users/[id]/comments/route'
 import { GET as GET_PROFILE_LIKES } from '@/app/api/users/[id]/likes/route'
 import { POST as POST_FOLLOW } from '@/app/api/users/[id]/follow/route'
@@ -100,13 +111,44 @@ describe('social engagement API routes', () => {
 
   it('returns activity feed and notification state', async () => {
     serviceMocks.getActivityFeed.mockResolvedValueOnce([{ id: 'comment:1', heroName: 'Arc Light' }])
-    serviceMocks.getNotificationState.mockResolvedValueOnce({ hasNotifications: true, count: 2 })
+    serviceMocks.getNotificationState.mockResolvedValueOnce({ hasNotifications: true, count: 2, items: [] })
 
     const feedResponse = await GET_FEED()
-    const notificationsResponse = await GET_NOTIFICATIONS()
+    const notificationsResponse = await GET_NOTIFICATIONS({ nextUrl: new URL('http://localhost/api/notifications') } as unknown as NextRequest)
 
     await expect(feedResponse.json()).resolves.toEqual({ items: [{ id: 'comment:1', heroName: 'Arc Light' }] })
-    await expect(notificationsResponse.json()).resolves.toEqual({ notifications: { hasNotifications: true, count: 2 } })
+    await expect(notificationsResponse.json()).resolves.toEqual({ notifications: { hasNotifications: true, count: 2, items: [] } })
+  })
+
+  it('lists and updates persisted notifications', async () => {
+    serviceMocks.listNotifications.mockResolvedValueOnce({
+      hasNotifications: true,
+      count: 1,
+      items: [{ id: 'notification_1', type: 'comment', read: false }],
+    })
+    serviceMocks.markNotificationRead.mockResolvedValueOnce({ id: 'notification_1', read: true })
+    serviceMocks.markAllNotificationsRead.mockResolvedValueOnce({ modifiedCount: 3 })
+
+    const listResponse = await GET_NOTIFICATIONS({ nextUrl: new URL('http://localhost/api/notifications?type=comment&unreadOnly=true&limit=10') } as unknown as NextRequest)
+    const patchResponse = await PATCH_NOTIFICATION(buildMutationRequest('http://localhost/api/notifications/notification_1', {
+      method: 'PATCH',
+      body: JSON.stringify({ read: true }),
+    }), {
+      params: Promise.resolve({ id: 'notification_1' }),
+    })
+    const markAllResponse = await POST_MARK_ALL_READ(buildMutationRequest('http://localhost/api/notifications/mark-all-read', { method: 'POST' }))
+
+    await expect(listResponse.json()).resolves.toEqual({
+      notifications: {
+        hasNotifications: true,
+        count: 1,
+        items: [{ id: 'notification_1', type: 'comment', read: false }],
+      },
+    })
+    await expect(patchResponse.json()).resolves.toEqual({ notification: { id: 'notification_1', read: true } })
+    await expect(markAllResponse.json()).resolves.toEqual({ notifications: { modifiedCount: 3 } })
+    expect(serviceMocks.listNotifications).toHaveBeenCalledWith({ type: 'comment', unreadOnly: true, limit: 10 })
+    expect(serviceMocks.markNotificationRead).toHaveBeenCalledWith('notification_1', true)
   })
 
   it('returns profile likes and comment ledgers', async () => {

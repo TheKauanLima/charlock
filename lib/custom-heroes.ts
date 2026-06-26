@@ -13,6 +13,7 @@ import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, Cus
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
 import CustomHero from '@/lib/models/CustomHero'
+import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import Like from '@/lib/models/Like'
 import SpiritStats from '@/lib/models/SpiritStats'
@@ -21,6 +22,7 @@ import VitalityStats from '@/lib/models/VitalityStats'
 import WeaponStats from '@/lib/models/WeaponStats'
 import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
+import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 import { enforceRateLimit } from '@/lib/rate-limit'
 
 interface Actor {
@@ -843,6 +845,7 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
   }
 
   const publishedAt = isPublishing ? existingHero?.publishedAt ?? new Date() : null
+  const shouldNotifyPublish = isPublishing && existingHero?.status !== 'published'
   const heroId = existingHero?._id ?? new Types.ObjectId()
   const slug = existingHero?.slug ?? await getUniqueSlug(payload.name)
   const hero = await CustomHero.findOneAndUpdate(
@@ -939,6 +942,18 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
     ),
   ])
 
+  if (shouldNotifyPublish) {
+    const followers = await Follow.find({ followingId: actor.clerkId }).select('followerId').lean<{ followerId: string }[]>()
+
+    await Promise.all(followers.map(follower => createNotification({
+      recipientId: follower.followerId,
+      actorId: actor.clerkId,
+      type: 'publish',
+      targetId: hero._id,
+      relatedHeroId: hero._id,
+    })))
+  }
+
   return serializeDetail(await getHeroBundle(hero), actor)
 }
 
@@ -1002,6 +1017,17 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
       },
       { upsert: true, runValidators: true },
     )
+    const recipientId = await resolveRecipientClerkId(hero.createdByUserId)
+
+    if (recipientId) {
+      await createNotification({
+        recipientId,
+        actorId: actor.clerkId,
+        type: 'like',
+        targetId: hero._id,
+        relatedHeroId: hero._id,
+      })
+    }
   }
 
   const [heroInfo, abilityStats] = await Promise.all([

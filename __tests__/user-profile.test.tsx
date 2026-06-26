@@ -25,7 +25,7 @@ vi.mock('next/image', () => ({
 
 vi.mock('@/app/profile/actions', () => ({
   deleteAccount: vi.fn(async () => undefined),
-  updateProfileBackground: vi.fn(async () => undefined),
+  updateProfileBackground: vi.fn(async (backgroundId: string) => ({ success: true, backgroundId })),
   updateProfileSettings: vi.fn(async () => undefined),
 }))
 
@@ -133,6 +133,9 @@ const profileData: UserProfileData = {
 describe('UserProfile', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/profile/TRIL')
+    openUserProfileMock.mockClear()
+    vi.mocked(updateProfileBackground).mockImplementation(async backgroundId => ({ success: true, backgroundId }))
+    vi.mocked(updateProfileBackground).mockClear()
   })
 
   it('renders the streamlined profile layout with persistent tab navigation', async () => {
@@ -189,20 +192,30 @@ describe('UserProfile', () => {
         })
       }
 
-      if (url.includes('/feed')) {
+      if (url.includes('/api/notifications')) {
         return Response.json({
-          items: [
-            {
-              id: 'comment:comment_2',
-              type: 'comment',
-              createdAt: now,
-              heroId: 'hero_1',
-              heroName: 'Asasvc',
-              actorId: 'clerk_2',
-              actorName: 'RIFT',
-              content: 'Needs a sharper ultimate.',
-            },
-          ],
+          notifications: {
+            hasNotifications: true,
+            count: 1,
+            items: [
+              {
+                id: 'notification_1',
+                type: 'comment',
+                read: false,
+                createdAt: now,
+                relativeTime: '5m ago',
+                actorId: 'clerk_2',
+                actorName: 'RIFT',
+                actorInitials: 'R',
+                action: 'commented on Asasvc',
+                targetId: 'comment_2',
+                relatedHeroId: 'hero_1',
+                heroName: 'Asasvc',
+                heroAccent: '#d4af37',
+                href: '/?tab=browse&heroId=hero_1#comment-comment_2',
+              },
+            ],
+          },
         })
       }
 
@@ -234,20 +247,25 @@ describe('UserProfile', () => {
     await user.click(screen.getByRole('button', { name: /edit picture/i }))
     expect(openUserProfileMock).toHaveBeenCalled()
 
-    expect(screen.queryByText('Main Characters')).not.toBeInTheDocument()
+    expect(screen.queryByText('Official Characters')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /change background/i }))
-    expect(screen.getByText('Main Characters')).toBeInTheDocument()
-    expect(screen.getByText('Created Characters')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /official characters/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /my custom characters/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /open character asasvc/i })).toHaveAttribute('href', '/?tab=create&heroId=hero_1')
 
+    await user.click(screen.getByRole('tab', { name: /my custom characters/i }))
     await user.click(screen.getByRole('button', { name: /asasvc/i }))
+    await user.click(screen.getByRole('button', { name: /confirm background/i }))
 
-    expect(updateProfileBackground).toHaveBeenCalledWith('custom:hero_1')
+    await waitFor(() => expect(updateProfileBackground).toHaveBeenCalledWith('custom:hero_1'))
 
     await user.click(screen.getByRole('button', { name: /bookmarks/i }))
 
     expect(screen.getByRole('button', { name: /bookmarks/i })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getAllByText('Bookmarks')).toHaveLength(2)
+    expect(screen.getByLabelText(/sort by/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/role/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/creator/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /open character bookmark hero/i })).toHaveAttribute('href', '/?tab=bookmarks&heroId=hero_2')
 
     await user.click(screen.getByRole('button', { name: /likes/i }))
@@ -263,6 +281,9 @@ describe('UserProfile', () => {
     const notificationText = await screen.findByText(/commented on Asasvc/i)
 
     expect(notificationText).toBeInTheDocument()
+    expect(screen.getByLabelText(/filter/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /mark all as read/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /mark notification from RIFT as read/i })).toBeInTheDocument()
     expect(notificationText.closest('a')).toBeNull()
 
     await user.click(screen.getByRole('button', { name: /settings/i }))
@@ -295,17 +316,28 @@ describe('UserProfile', () => {
     window.history.replaceState(null, '', '/profile/TRIL#notifications')
 
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({
-      items: [
-        {
-          id: 'hero:hero_1',
-          type: 'published_hero',
-          createdAt: now,
-          heroId: 'hero_1',
-          heroName: 'Asasvc',
-          actorId: 'clerk_1',
-          actorName: 'TRIL',
-        },
-      ],
+      notifications: {
+        hasNotifications: true,
+        count: 1,
+        items: [
+          {
+            id: 'notification_1',
+            type: 'publish',
+            read: false,
+            createdAt: now,
+            relativeTime: '1h ago',
+            actorId: 'clerk_1',
+            actorName: 'TRIL',
+            actorInitials: 'T',
+            action: 'published Asasvc',
+            targetId: 'hero_1',
+            relatedHeroId: 'hero_1',
+            heroName: 'Asasvc',
+            heroAccent: '#d4af37',
+            href: '/?tab=browse&heroId=hero_1',
+          },
+        ],
+      },
     }))
 
     render(<UserProfile data={profileData} heroes={HEROES} />)
@@ -315,5 +347,53 @@ describe('UserProfile', () => {
     expect(await screen.findByText(/published Asasvc/i)).toBeInTheDocument()
 
     fetchMock.mockRestore()
+  })
+
+  it('previews profile backgrounds on hover and restores the saved background on cancel', async () => {
+    const user = userEvent.setup()
+    const previewHero = HEROES[1]
+
+    render(<UserProfile data={profileData} heroes={HEROES} />)
+
+    const backgroundImage = screen.getByTestId('profile-background-render')
+
+    expect(backgroundImage).toHaveAttribute('src', abrams.render)
+
+    await user.click(screen.getByRole('button', { name: /change background/i }))
+    await user.hover(screen.getByRole('button', { name: new RegExp(previewHero.displayName, 'i') }))
+
+    expect(backgroundImage).toHaveAttribute('src', previewHero.render)
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(backgroundImage).toHaveAttribute('src', abrams.render)
+    expect(updateProfileBackground).not.toHaveBeenCalled()
+  })
+
+  it('shows synchronization feedback while saving a confirmed profile background', async () => {
+    const user = userEvent.setup()
+    let resolveBackgroundUpdate: (value: { success: true; backgroundId: string }) => void = () => undefined
+
+    vi.mocked(updateProfileBackground).mockImplementationOnce(backgroundId => {
+      void backgroundId
+
+      return new Promise<{ success: true; backgroundId: string }>(resolve => {
+        resolveBackgroundUpdate = resolve
+      })
+    })
+
+    render(<UserProfile data={profileData} heroes={HEROES} />)
+
+    await user.click(screen.getByRole('button', { name: /change background/i }))
+    await user.click(screen.getByRole('tab', { name: /my custom characters/i }))
+    await user.click(screen.getByRole('button', { name: /asasvc/i }))
+    await user.click(screen.getByRole('button', { name: /confirm background/i }))
+
+    expect(screen.getAllByText(/committing memory core/i).length).toBeGreaterThan(0)
+
+    resolveBackgroundUpdate({ success: true, backgroundId: 'custom:hero_1' })
+
+    expect(await screen.findByText('SYSTEM: Profile configuration synchronized successfully.')).toBeInTheDocument()
+    expect(updateProfileBackground).toHaveBeenCalledWith('custom:hero_1')
   })
 })
