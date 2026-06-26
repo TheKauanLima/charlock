@@ -2,17 +2,19 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { Bell, Bookmark, Heart, MessageSquare, Settings, UserCheck, UserPlus, UsersRound } from 'lucide-react'
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { Bell, Bookmark, BookmarkX, ExternalLink, Heart, MessageCircleReply, MessageSquare, RefreshCw, Settings, Trash2, UserCheck, UserPlus, UsersRound } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import type { CSSProperties } from 'react'
 import { useClerk } from '@clerk/nextjs'
 
 import { updateProfileBackground } from '@/app/profile/actions'
 import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroDefinition } from '@/lib/hero-data'
+import type { ProfileCommentsLedger, ProfileCommentItem, ProfileLikeItem } from '@/lib/profile-ledger-types'
 import type { ProfileBackgroundVisual, UserProfileData } from '@/lib/profile'
 import heroGridStyles from '@/components/HeroGrid/HeroGrid.module.css'
 
+import { ProfileSettingsPanel } from './ProfileSettings'
 import styles from './UserProfile.module.css'
 
 interface UserProfileProps {
@@ -38,7 +40,20 @@ interface ProfileBackgroundOption extends ProfileBackgroundVisual {
   source: 'Official' | 'Created'
 }
 
+interface ActivityFeedItem {
+  id: string
+  type: 'published_hero' | 'comment'
+  createdAt: string
+  heroId: string
+  heroName: string
+  actorId: string
+  actorName: string
+  content?: string
+}
+
 type ProfilePanel = 'saved' | 'bookmarks' | 'likes' | 'comments' | 'notifications' | 'settings'
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
+type CommentsView = 'made' | 'received'
 const PROFILE_PANELS: ProfilePanel[] = ['saved', 'bookmarks', 'likes', 'comments', 'notifications', 'settings']
 
 function getPanelFromHash(): ProfilePanel {
@@ -75,7 +90,7 @@ function getCreatedHeroes(data: UserProfileData): ProfileGridHero[] {
       name: summary?.displayName ?? hero.name,
       portrait: summary?.portrait ?? hero.portrait,
       background: summary?.background ?? hero.render,
-      href: data.viewerIsOwner ? `/?tab=create&heroId=${encodeURIComponent(hero.id)}` : `/characters/${encodeURIComponent(hero.id)}`,
+      href: data.viewerIsOwner ? `/?tab=create&heroId=${encodeURIComponent(hero.id)}` : `/?tab=browse&heroId=${encodeURIComponent(hero.id)}`,
     }
   })
 }
@@ -88,6 +103,18 @@ function getBookmarkedHeroes(heroes: CustomHeroSummary[]): ProfileGridHero[] {
     background: hero.background,
     href: `/?tab=bookmarks&heroId=${encodeURIComponent(hero.id)}`,
   }))
+}
+
+function formatLedgerDate(value: string) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
+function getCommentSnippet(value: string) {
+  return value.length > 150 ? `${value.slice(0, 147)}...` : value
 }
 
 function getBackgroundOptions(officialHeroes: HeroDefinition[], createdHeroes: CustomHeroSummary[]): ProfileBackgroundOption[] {
@@ -113,15 +140,36 @@ function getBackgroundOptions(officialHeroes: HeroDefinition[], createdHeroes: C
   ]
 }
 
-function ProfileHeroGrid({ heroes, emptyMessage }: { heroes: ProfileGridHero[]; emptyMessage: string }) {
+function ProfileHeroGrid({
+  heroes,
+  emptyMessage,
+  onUnbookmark,
+  pendingRemovalIds = new Set<string>(),
+}: {
+  heroes: ProfileGridHero[]
+  emptyMessage: string
+  onUnbookmark?: (heroId: string) => void
+  pendingRemovalIds?: Set<string>
+}) {
   if (!heroes.length) {
-    return <p className={styles.emptyLedger}>{emptyMessage}</p>
+    return (
+      <EmptyState
+        icon={BookmarkX}
+        title={emptyMessage}
+        message="The ledger is quiet for now."
+        ctaHref="/"
+        ctaLabel="Browse Community Characters"
+      />
+    )
   }
 
   return (
     <div className={`${heroGridStyles.grid} ${styles.cardGrid}`}>
       {heroes.map(hero => (
-        <article key={hero.id} className={heroGridStyles.browseCard}>
+        <article
+          key={hero.id}
+          className={`${heroGridStyles.browseCard} ${pendingRemovalIds.has(hero.id) ? styles.removingCard : ''}`}
+        >
           <Link
             href={hero.href}
             className={heroGridStyles.heroCard}
@@ -144,23 +192,235 @@ function ProfileHeroGrid({ heroes, emptyMessage }: { heroes: ProfileGridHero[]; 
               {hero.name}
             </span>
           </Link>
+          {onUnbookmark ? (
+            <button
+              type="button"
+              className={styles.cardIconButton}
+              onClick={() => onUnbookmark(hero.id)}
+              aria-label={`Remove bookmark for ${hero.name}`}
+              disabled={pendingRemovalIds.has(hero.id)}
+            >
+              <BookmarkX aria-hidden="true" size={16} />
+            </button>
+          ) : null}
         </article>
       ))}
     </div>
   )
 }
 
-function EmptyProfilePanel({ title, count, message }: { title: string; count: string; message: string }) {
+function EmptyState({
+  icon: Icon,
+  title,
+  message,
+  ctaHref,
+  ctaLabel,
+}: {
+  icon: typeof BookmarkX
+  title: string
+  message: string
+  ctaHref: string
+  ctaLabel: string
+}) {
   return (
-    <section className={styles.ledgerPanel}>
-      <div className={styles.sectionHeader}>
-        <div>
-          <p>{title}</p>
-          <span>{count}</span>
-        </div>
+    <div className={styles.emptyState}>
+      <Icon aria-hidden="true" size={34} />
+      <p>{title}</p>
+      <span>{message}</span>
+      <Link href={ctaHref}>{ctaLabel}</Link>
+    </div>
+  )
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className={styles.errorState} role="alert">
+      <p>Unable to retrieve grid entries. Server link severed.</p>
+      <button type="button" onClick={onRetry}>
+        <RefreshCw aria-hidden="true" size={15} />
+        Retry Connection
+      </button>
+    </div>
+  )
+}
+
+function LedgerSkeleton({ variant = 'list' }: { variant?: 'list' | 'grid' }) {
+  const rows = variant === 'grid' ? 8 : 4
+
+  return (
+    <div className={variant === 'grid' ? styles.gridSkeleton : styles.listSkeleton} aria-label="Loading profile entries">
+      {Array.from({ length: rows }, (_, index) => (
+        <span key={index} />
+      ))}
+    </div>
+  )
+}
+
+function LikesPanel({
+  status,
+  likes,
+  onRetry,
+}: {
+  status: LoadStatus
+  likes: ProfileLikeItem[]
+  onRetry: () => void
+}) {
+  if (status === 'loading' || status === 'idle') {
+    return <LedgerSkeleton />
+  }
+
+  if (status === 'error') {
+    return <ErrorState onRetry={onRetry} />
+  }
+
+  if (!likes.length) {
+    return (
+      <EmptyState
+        icon={Heart}
+        title="You have not liked any characters yet."
+        message="Liked community characters will appear here."
+        ctaHref="/"
+        ctaLabel="Browse Community Characters"
+      />
+    )
+  }
+
+  return (
+    <div className={styles.ledgerList}>
+      {likes.map(like => (
+        <article key={like.id} className={styles.ledgerRow}>
+          <div>
+            <p>{like.heroName}</p>
+            <span>By {like.creatorName}</span>
+          </div>
+          <time dateTime={like.likedAt}>{formatLedgerDate(like.likedAt)}</time>
+          <Link href={like.href} aria-label={`View ${like.heroName}`}>
+            <ExternalLink aria-hidden="true" size={15} />
+            View
+          </Link>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function CommentsPanel({
+  status,
+  comments,
+  activeView,
+  onViewChange,
+  onRetry,
+  onDelete,
+  pendingDeleteId,
+}: {
+  status: LoadStatus
+  comments: ProfileCommentsLedger
+  activeView: CommentsView
+  onViewChange: (view: CommentsView) => void
+  onRetry: () => void
+  onDelete: (comment: ProfileCommentItem) => void
+  pendingDeleteId: string | null
+}) {
+  const activeComments = comments[activeView]
+
+  return (
+    <div className={styles.commentsPanel}>
+      <div className={styles.segmentedControl} role="tablist" aria-label="Comment views">
+        <button type="button" role="tab" aria-selected={activeView === 'made'} onClick={() => onViewChange('made')}>
+          Comments Made
+        </button>
+        <button type="button" role="tab" aria-selected={activeView === 'received'} onClick={() => onViewChange('received')}>
+          Comments Received
+        </button>
       </div>
-      <p className={styles.emptyLedger}>{message}</p>
-    </section>
+
+      {status === 'loading' || status === 'idle' ? <LedgerSkeleton /> : null}
+      {status === 'error' ? <ErrorState onRetry={onRetry} /> : null}
+      {status === 'ready' && !activeComments.length ? (
+        <EmptyState
+          icon={MessageSquare}
+          title={activeView === 'made' ? 'You have not commented yet.' : 'No comments received yet.'}
+          message="Character discussions will be collected here."
+          ctaHref="/"
+          ctaLabel="Browse Community Characters"
+        />
+      ) : null}
+      {status === 'ready' && activeComments.length ? (
+        <div className={styles.ledgerList}>
+          {activeComments.map(comment => (
+            <article key={comment.id} className={styles.commentRow}>
+              <div>
+                <p>{comment.heroName}</p>
+                <span>{activeView === 'made' ? getCommentSnippet(comment.content) : `${comment.authorName}: ${getCommentSnippet(comment.content)}`}</span>
+              </div>
+              <time dateTime={comment.createdAt}>{formatLedgerDate(comment.createdAt)}</time>
+              <div className={styles.rowActions}>
+                <Link href={comment.href} aria-label={`Open comment on ${comment.heroName}`}>
+                  <MessageCircleReply aria-hidden="true" size={15} />
+                  {activeView === 'made' ? 'Open' : 'Reply'}
+                </Link>
+                {comment.viewerCanDelete ? (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(comment)}
+                    disabled={pendingDeleteId === comment.id}
+                    aria-label={`Delete comment on ${comment.heroName}`}
+                  >
+                    <Trash2 aria-hidden="true" size={15} />
+                    Delete
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function NotificationsPanel({
+  status,
+  items,
+  onRetry,
+}: {
+  status: LoadStatus
+  items: ActivityFeedItem[]
+  onRetry: () => void
+}) {
+  if (status === 'loading' || status === 'idle') {
+    return <LedgerSkeleton />
+  }
+
+  if (status === 'error') {
+    return <ErrorState onRetry={onRetry} />
+  }
+
+  if (!items.length) {
+    return (
+      <EmptyState
+        icon={Bell}
+        title="No notifications are waiting."
+        message="Followed-character activity and comments on your characters will appear here."
+        ctaHref="/"
+        ctaLabel="Browse Community Characters"
+      />
+    )
+  }
+
+  return (
+    <div className={styles.ledgerList}>
+      {items.map(item => (
+        <article key={item.id} className={styles.notificationRow}>
+          <span className={styles.unreadDot} aria-hidden="true" />
+          <div>
+            <p>{item.actorName}</p>
+            <span>{item.type === 'comment' ? `commented on ${item.heroName}` : `published ${item.heroName}`}</span>
+          </div>
+          <time dateTime={item.createdAt}>{formatLedgerDate(item.createdAt)}</time>
+        </article>
+      ))}
+    </div>
   )
 }
 
@@ -249,20 +509,27 @@ function ProfileBackgroundModal({
 
 export default function UserProfile({ data, heroes }: UserProfileProps) {
   const { openUserProfile } = useClerk()
-  const [activePanel, setActivePanel] = useState<ProfilePanel>(() => getPanelFromHash())
+  const [activePanel, setActivePanel] = useState<ProfilePanel>('saved')
+  const [isPanelPending, startPanelTransition] = useTransition()
   const [isBackgroundModalOpen, setIsBackgroundModalOpen] = useState(false)
   const [isBackgroundPending, startBackgroundTransition] = useTransition()
   const [profileBackground, setProfileBackground] = useState<ProfileBackgroundVisual>(data.profileBackground)
+  const [bookmarkCards, setBookmarkCards] = useState<ProfileGridHero[]>(() => getBookmarkedHeroes(data.bookmarkedHeroes))
+  const [removingBookmarkIds, setRemovingBookmarkIds] = useState<Set<string>>(new Set())
+  const [likesStatus, setLikesStatus] = useState<LoadStatus>('idle')
+  const [likesLedger, setLikesLedger] = useState<ProfileLikeItem[]>([])
+  const [commentsStatus, setCommentsStatus] = useState<LoadStatus>('idle')
+  const [commentsLedger, setCommentsLedger] = useState<ProfileCommentsLedger>({ made: [], received: [] })
+  const [commentsView, setCommentsView] = useState<CommentsView>('made')
+  const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<string | null>(null)
+  const [notificationsStatus, setNotificationsStatus] = useState<LoadStatus>('idle')
+  const [notificationItems, setNotificationItems] = useState<ActivityFeedItem[]>([])
   const [isFollowing, setIsFollowing] = useState(data.viewerFollowsUser)
   const [followerCount, setFollowerCount] = useState(data.followerCount)
   const [followStatus, setFollowStatus] = useState<string | null>(null)
   const createdHeroes = useMemo(
     () => getCreatedHeroes(data),
     [data],
-  )
-  const bookmarkedHeroes = useMemo(
-    () => getBookmarkedHeroes(data.bookmarkedHeroes),
-    [data.bookmarkedHeroes],
   )
   const backgroundOptions = useMemo(
     () => getBackgroundOptions(heroes, data.savedHeroes),
@@ -282,14 +549,81 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     { id: 'settings', label: 'Settings', icon: Settings },
   ]
 
+  const fetchLikes = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(data.user.clerkId)}/likes`, {
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+      const body = await response.json() as { likes?: ProfileLikeItem[] }
+
+      if (!response.ok || !body.likes) {
+        throw new Error(`Likes request failed with ${response.status}`)
+      }
+
+      setLikesLedger(body.likes)
+      setLikesStatus('ready')
+    } catch {
+      setLikesStatus('error')
+    }
+  }, [data.user.clerkId])
+
+  const fetchComments = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/users/${encodeURIComponent(data.user.clerkId)}/comments`, {
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+      const body = await response.json() as { comments?: ProfileCommentsLedger }
+
+      if (!response.ok || !body.comments) {
+        throw new Error(`Comments request failed with ${response.status}`)
+      }
+
+      setCommentsLedger(body.comments)
+      setCommentsStatus('ready')
+    } catch {
+      setCommentsStatus('error')
+    }
+  }, [data.user.clerkId])
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const response = await fetch('/api/feed', {
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+      const body = await response.json() as { items?: ActivityFeedItem[] }
+
+      if (!response.ok || !body.items) {
+        throw new Error(`Notifications request failed with ${response.status}`)
+      }
+
+      setNotificationItems(body.items)
+      setNotificationsStatus('ready')
+    } catch {
+      setNotificationsStatus('error')
+    }
+  }, [])
+
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setActivePanel(getPanelFromHash())
+    }, 0)
+
     function handleHashChange() {
       setActivePanel(getPanelFromHash())
     }
 
     window.addEventListener('hashchange', handleHashChange)
 
-    return () => window.removeEventListener('hashchange', handleHashChange)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('hashchange', handleHashChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -308,11 +642,62 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isBackgroundModalOpen])
 
+  useEffect(() => {
+    if (activePanel !== 'likes' || likesStatus !== 'idle') {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchLikes()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [activePanel, fetchLikes, likesStatus])
+
+  useEffect(() => {
+    if (activePanel !== 'comments' || commentsStatus !== 'idle') {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchComments()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [activePanel, commentsStatus, fetchComments])
+
+  useEffect(() => {
+    if (activePanel !== 'notifications' || notificationsStatus !== 'idle') {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      void fetchNotifications()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [activePanel, fetchNotifications, notificationsStatus])
+
   function handlePanelSelect(panel: ProfilePanel) {
-    setActivePanel(panel)
+    startPanelTransition(() => setActivePanel(panel))
 
     const hash = panel === 'saved' ? 'characters-created' : panel
     window.history.replaceState(null, '', `#${hash}`)
+  }
+
+  function retryLikes() {
+    setLikesStatus('loading')
+    void fetchLikes()
+  }
+
+  function retryComments() {
+    setCommentsStatus('loading')
+    void fetchComments()
+  }
+
+  function retryNotifications() {
+    setNotificationsStatus('loading')
+    void fetchNotifications()
   }
 
   function handleProfileBackgroundSelect(option: ProfileBackgroundOption) {
@@ -348,6 +733,56 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
       setFollowerCount(body.follow.followerCount)
     } catch (error) {
       setFollowStatus(error instanceof Error ? error.message : 'Failed to update follow status.')
+    }
+  }
+
+  async function handleUnbookmark(heroId: string) {
+    setRemovingBookmarkIds(previous => new Set(previous).add(heroId))
+
+    try {
+      const response = await fetch(`/api/heroes/${encodeURIComponent(heroId)}/bookmark`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Bookmark request failed with ${response.status}`)
+      }
+
+      setBookmarkCards(previous => previous.filter(hero => hero.id !== heroId))
+    } catch {
+      setRemovingBookmarkIds(previous => {
+        const next = new Set(previous)
+        next.delete(heroId)
+
+        return next
+      })
+    }
+  }
+
+  async function handleDeleteComment(comment: ProfileCommentItem) {
+    setPendingDeleteCommentId(comment.id)
+
+    try {
+      const response = await fetch(`/api/heroes/${encodeURIComponent(comment.heroId)}/comments?commentId=${encodeURIComponent(comment.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Comment delete failed with ${response.status}`)
+      }
+
+      setCommentsLedger(previous => ({
+        made: previous.made.filter(item => item.id !== comment.id),
+        received: previous.received.filter(item => item.id !== comment.id),
+      }))
+    } finally {
+      setPendingDeleteCommentId(null)
     }
   }
 
@@ -428,7 +863,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
 
         <div className={styles.profileMain}>
           <div className={styles.panelFrame}>
-            {activePanel === 'saved' ? (
+            {!isPanelPending && activePanel === 'saved' ? (
               <section id="characters-created" className={styles.ledgerPanel}>
                 <div className={styles.sectionHeader}>
                   <div>
@@ -451,41 +886,81 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
               </section>
             ) : null}
 
-            {activePanel === 'bookmarks' ? (
+            {isPanelPending ? (
+              <LedgerSkeleton variant={activePanel === 'saved' || activePanel === 'bookmarks' ? 'grid' : 'list'} />
+            ) : null}
+
+            {!isPanelPending && activePanel === 'bookmarks' ? (
               <section id="bookmarks" className={styles.ledgerPanel}>
                 <div className={styles.sectionHeader}>
                   <div>
                     <p>Bookmarks</p>
-                    <span>{bookmarkedHeroes.length} total</span>
+                    <span>{bookmarkCards.length} total</span>
                   </div>
                 </div>
-                <ProfileHeroGrid heroes={bookmarkedHeroes} emptyMessage="No community heroes have been bookmarked yet." />
+                <ProfileHeroGrid
+                  heroes={bookmarkCards}
+                  emptyMessage="You have not bookmarked any characters yet."
+                  onUnbookmark={handleUnbookmark}
+                  pendingRemovalIds={removingBookmarkIds}
+                />
               </section>
             ) : null}
 
-            {activePanel === 'likes' ? (
-              <EmptyProfilePanel title="Likes" count="0 total" message="Liked characters will appear here." />
+            {!isPanelPending && activePanel === 'likes' ? (
+              <section id="likes" className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Likes</p>
+                    <span>{likesStatus === 'ready' ? `${likesLedger.length} total` : 'Retrieving entries'}</span>
+                  </div>
+                </div>
+                <LikesPanel status={likesStatus} likes={likesLedger} onRetry={retryLikes} />
+              </section>
             ) : null}
 
-            {activePanel === 'comments' ? (
-              <EmptyProfilePanel title="Comments" count="0 total" message="Recent comment activity will appear here." />
+            {!isPanelPending && activePanel === 'comments' ? (
+              <section id="comments" className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Comments</p>
+                    <span>{commentsStatus === 'ready' ? `${commentsLedger.made.length + commentsLedger.received.length} total` : 'Retrieving entries'}</span>
+                  </div>
+                </div>
+                <CommentsPanel
+                  status={commentsStatus}
+                  comments={commentsLedger}
+                  activeView={commentsView}
+                  onViewChange={setCommentsView}
+                  onRetry={retryComments}
+                  onDelete={handleDeleteComment}
+                  pendingDeleteId={pendingDeleteCommentId}
+                />
+              </section>
             ) : null}
 
-            {activePanel === 'notifications' ? (
-              <EmptyProfilePanel title="Notifications" count="0 new" message="Profile notifications will appear here." />
+            {!isPanelPending && activePanel === 'notifications' ? (
+              <section id="notifications" className={styles.ledgerPanel}>
+                <div className={styles.sectionHeader}>
+                  <div>
+                    <p>Notifications</p>
+                    <span>{notificationsStatus === 'ready' ? `${notificationItems.length} recent` : 'Retrieving entries'}</span>
+                  </div>
+                </div>
+                <NotificationsPanel status={notificationsStatus} items={notificationItems} onRetry={retryNotifications} />
+              </section>
             ) : null}
 
-            {activePanel === 'settings' ? (
-              <section className={styles.ledgerPanel}>
+            {!isPanelPending && activePanel === 'settings' ? (
+              <section id="settings" className={styles.ledgerPanel}>
                 <div className={styles.sectionHeader}>
                   <div>
                     <p>Settings</p>
-                    <span>Profile controls</span>
+                    <span>Profile controls inline</span>
                   </div>
                 </div>
                 <div className={styles.settingsPanel}>
-                  <p>Edit your main hero, bio, privacy controls, security options, and account settings.</p>
-                  <Link href="/profile/settings">Open Settings</Link>
+                  <ProfileSettingsPanel user={data.user} heroes={heroes} embedded />
                 </div>
               </section>
             ) : null}

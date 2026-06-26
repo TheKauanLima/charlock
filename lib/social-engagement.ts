@@ -191,7 +191,7 @@ export async function deleteHeroComment(heroId: string, commentId: string): Prom
   const actor = await getActor()
 
   await dbConnect()
-  await getPublishedHero(heroId)
+  const hero = await getPublishedHero(heroId)
 
   const comment = await Comment.findOne({
     _id: getValidObjectId(commentId, 'Comment not found'),
@@ -202,8 +202,10 @@ export async function deleteHeroComment(heroId: string, commentId: string): Prom
     throw new CustomHeroError('Comment not found', 404)
   }
 
-  if (comment.userId !== actor.clerkId) {
-    throw new CustomHeroError('You can only delete your own comments', 403)
+  const actorOwnsHero = actor.ownerIds.includes(hero.createdByUserId)
+
+  if (comment.userId !== actor.clerkId && !actorOwnsHero) {
+    throw new CustomHeroError('You can only delete comments you authored or received', 403)
   }
 
   await Comment.deleteOne({ _id: comment._id })

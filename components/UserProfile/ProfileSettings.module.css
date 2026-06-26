@@ -149,6 +149,10 @@
   padding-top: 196px;
 }
 
+.embeddedPanel {
+  padding-top: 0;
+}
+
 .header,
 .section,
 .dangerZone {

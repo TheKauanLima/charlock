@@ -1,6 +1,6 @@
 'use client'
 
-import { Copy, Download, Share2, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { toPng } from 'html-to-image'
@@ -120,43 +120,6 @@ export default function CharacterExportButton({ payload, className }: CharacterE
     link.click()
   }
 
-  async function handleCopyLink() {
-    if (!payload.shareUrl) {
-      setMessage('Publish this character before copying a share link.')
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(payload.shareUrl)
-      setMessage('Share link copied.')
-    } catch {
-      setMessage('Unable to copy the share link.')
-    }
-  }
-
-  async function handleShare() {
-    if (!payload.shareUrl) {
-      setMessage('Publish this character before sharing a link.')
-      return
-    }
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `${payload.name} on Charlock`,
-          text: `View ${payload.name}'s character card on Charlock.`,
-          url: payload.shareUrl,
-        })
-        setMessage('Share sheet opened.')
-      } catch {
-        setMessage('Share was cancelled.')
-      }
-      return
-    }
-
-    await handleCopyLink()
-  }
-
   return (
     <>
       <button type="button" className={cn(styles.trigger, className)} onClick={openModal}>
@@ -195,14 +158,6 @@ export default function CharacterExportButton({ payload, className }: CharacterE
               <button type="button" onClick={handleDownload} disabled={status === 'generating'}>
                 <Download aria-hidden="true" />
                 Download PNG
-              </button>
-              <button type="button" onClick={handleShare} disabled={!payload.shareUrl}>
-                <Share2 aria-hidden="true" />
-                Share
-              </button>
-              <button type="button" onClick={handleCopyLink} disabled={!payload.shareUrl}>
-                <Copy aria-hidden="true" />
-                Copy Link
               </button>
             </div>
 

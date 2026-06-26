@@ -15,7 +15,7 @@ import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
-import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
+import { buildCharacterExportPayload } from '@/lib/character-export'
 import { buildDefaultAbilityStats, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
@@ -105,10 +105,8 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
     fontFamily: heroInfo.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY,
     fontWeight: heroInfo.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT,
   } as CSSProperties
-  const shareUrl = heroId && typeof window !== 'undefined' ? getCharacterShareUrl(heroId, window.location.origin) : null
   const exportPayload = buildCharacterExportPayload(displayHero, statsData, {
     heroInfo,
-    shareUrl,
   })
   const fallbackAbilityStats = useMemo(() => buildDefaultAbilityStats(displayHero), [displayHero])
   const isBookmarked = bookmarkOverride?.heroId === heroId

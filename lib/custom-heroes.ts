@@ -14,6 +14,7 @@ import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
 import CustomHero from '@/lib/models/CustomHero'
 import HeroInfo from '@/lib/models/HeroInfo'
+import Like from '@/lib/models/Like'
 import SpiritStats from '@/lib/models/SpiritStats'
 import User from '@/lib/models/User'
 import VitalityStats from '@/lib/models/VitalityStats'
@@ -986,6 +987,21 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
 
   if (!hero) {
     throw new CustomHeroError('Hero not found', 404)
+  }
+
+  if (isLiked) {
+    await Like.deleteMany({ heroId: objectId, userId: { $in: actor.ownerIds } })
+  } else {
+    await Like.findOneAndUpdate(
+      { heroId: objectId, userId: actor.clerkId },
+      {
+        $setOnInsert: {
+          heroId: objectId,
+          userId: actor.clerkId,
+        },
+      },
+      { upsert: true, runValidators: true },
+    )
   }
 
   const [heroInfo, abilityStats] = await Promise.all([

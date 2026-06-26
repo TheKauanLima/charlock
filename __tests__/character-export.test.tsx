@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,7 +9,6 @@ import {
   CHARACTER_CARD_HEIGHT,
   CHARACTER_CARD_WIDTH,
   buildCharacterExportPayload,
-  getCharacterShareUrl,
 } from '@/lib/character-export'
 import { HEROES } from '@/lib/hero-data'
 import { buildHeroStatsSeed } from '@/lib/hero-stats-shared'
@@ -32,9 +31,7 @@ describe('character export cards', () => {
   it('builds a shareable character card payload with key stats', () => {
     const hero = HEROES[0]
     const stats = buildHeroStatsSeed(hero)
-    const payload = buildCharacterExportPayload(hero, stats, {
-      shareUrl: getCharacterShareUrl('hero_1', 'https://charlock.test'),
-    })
+    const payload = buildCharacterExportPayload(hero, stats)
 
     expect(payload.name).toBe(hero.displayName)
     expect(payload.portrait).toBe(hero.portrait)
@@ -44,23 +41,19 @@ describe('character export cards', () => {
       hero.heroInfo.tag3Text,
     ])
     expect(payload.stats.map(stat => stat.label)).toEqual(['DPS', 'Health', 'Spirit', 'Bullet'])
-    expect(payload.shareUrl).toBe('https://charlock.test/characters/hero_1')
     expect(payload.watermark).toBe('charlock.app')
   })
 
   it('shows a generated preview and downloads the PNG card', async () => {
     const user = userEvent.setup()
     const hero = HEROES[0]
-    const payload = buildCharacterExportPayload(hero, buildHeroStatsSeed(hero), {
-      shareUrl: 'https://charlock.test/characters/hero_1',
-    })
+    const payload = buildCharacterExportPayload(hero, buildHeroStatsSeed(hero))
     const clickMock = vi.fn()
     const anchor = {
       href: '',
       download: '',
       click: clickMock,
     } as unknown as HTMLAnchorElement
-    const writeTextMock = vi.fn().mockResolvedValue(undefined)
 
     imageMocks.toPng.mockResolvedValue('data:image/png;base64,card')
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -68,13 +61,6 @@ describe('character export cards', () => {
       return 1
     })
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: {
-        writeText: writeTextMock,
-      },
-    })
-
     render(<CharacterExportButton payload={payload} />)
 
     await user.click(screen.getByRole('button', { name: /export character/i }))
@@ -92,9 +78,7 @@ describe('character export cards', () => {
 
     expect(clickMock).toHaveBeenCalled()
     expect(anchor.download).toBe('abrams-charlock-card.png')
-
-    await user.click(screen.getByRole('button', { name: /copy link/i }))
-
-    await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith('https://charlock.test/characters/hero_1'))
+    expect(screen.queryByRole('button', { name: /copy link/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^share$/i })).not.toBeInTheDocument()
   })
 })

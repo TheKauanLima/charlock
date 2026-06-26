@@ -20,7 +20,6 @@ export interface CharacterExportPayload {
   accentColor: string
   tagColor: string
   tagTextColor: string
-  shareUrl?: string | null
   watermark: string
 }
 
@@ -45,17 +44,6 @@ function formatExportStatValue(value: string | number | null | undefined, unit =
   const normalizedValue = String(value ?? '').trim()
 
   return normalizedValue ? `${normalizedValue}${unit}` : '0'
-}
-
-export function getCharacterSharePath(id: string) {
-  return `/characters/${encodeURIComponent(id)}`
-}
-
-export function getCharacterShareUrl(id: string, origin?: string | null) {
-  const path = getCharacterSharePath(id)
-  const trimmedOrigin = origin?.replace(/\/$/, '')
-
-  return trimmedOrigin ? `${trimmedOrigin}${path}` : path
 }
 
 export function getSiteOrigin() {
@@ -87,7 +75,6 @@ export function buildCharacterExportPayload(
     name?: string | null
     render?: string | null
     heroInfo?: HeroInfoDefinition | null
-    shareUrl?: string | null
     watermark?: string
   } = {},
 ): CharacterExportPayload {
@@ -113,7 +100,6 @@ export function buildCharacterExportPayload(
     accentColor: heroInfo.nameColor,
     tagColor: heroInfo.tagColor,
     tagTextColor: heroInfo.tagTextColor,
-    shareUrl: options.shareUrl ?? null,
     watermark: options.watermark ?? CHARACTER_CARD_WATERMARK,
   }
 }

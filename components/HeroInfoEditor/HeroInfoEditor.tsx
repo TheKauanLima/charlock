@@ -30,7 +30,7 @@ import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { UploadButton } from '@/lib/uploadthing'
-import { buildCharacterExportPayload, getCharacterShareUrl } from '@/lib/character-export'
+import { buildCharacterExportPayload } from '@/lib/character-export'
 import cn from '@/lib/utilsd'
 
 import styles from './HeroInfoEditor.module.css'
@@ -375,7 +375,6 @@ export default function HeroInfoEditor({
   const nameSizeControlValue = getNameSizeControlValue(draft.nameFontSize)
   const selectedBackgroundOption = backgroundOptions.find(option => option.path === selectedBackground) ?? backgroundOptions[0]
   const exportHeroName = getDraftName() || heroNamePreview
-  const exportShareUrl = savedHeroId && typeof window !== 'undefined' ? getCharacterShareUrl(savedHeroId, window.location.origin) : null
   const exportPayload = buildCharacterExportPayload(
     {
       ...hero,
@@ -399,7 +398,6 @@ export default function HeroInfoEditor({
       name: exportHeroName,
       render: getRenderPath(),
       heroInfo: draft,
-      shareUrl: exportShareUrl,
     },
   )
 

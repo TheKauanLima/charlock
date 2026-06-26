@@ -7,6 +7,7 @@ import AbilityStats from '@/lib/models/AbilityStats'
 import User from '@/lib/models/User'
 import Comment from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
+import Like from '@/lib/models/Like'
 import { statSchema } from '@/lib/models/WeaponStats'
 
 describe('Mongoose model schemas', () => {
@@ -97,5 +98,7 @@ describe('Mongoose model schemas', () => {
     expect(Comment.schema.path('content')).toBeDefined()
     expect(Follow.schema.path('followerId')).toBeDefined()
     expect(Follow.schema.path('followingId')).toBeDefined()
+    expect(Like.schema.path('heroId')).toBeDefined()
+    expect(Like.schema.path('userId')).toBeDefined()
   })
 })

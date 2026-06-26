@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { NextRequest } from 'next/server'
 
 const serviceMocks = vi.hoisted(() => ({
   deleteHeroComment: vi.fn(),
   getActivityFeed: vi.fn(),
   getNotificationState: vi.fn(),
+  listProfileComments: vi.fn(),
+  listProfileLikes: vi.fn(),
   listHeroComments: vi.fn(),
   postHeroComment: vi.fn(),
   toggleFollow: vi.fn(),
@@ -31,10 +34,17 @@ vi.mock('@/lib/social-engagement', () => ({
   toggleHeroBookmark: serviceMocks.toggleHeroBookmark,
 }))
 
+vi.mock('@/lib/profile-ledger', () => ({
+  listProfileComments: serviceMocks.listProfileComments,
+  listProfileLikes: serviceMocks.listProfileLikes,
+}))
+
 import { DELETE, GET as GET_COMMENTS, POST as POST_COMMENT } from '@/app/api/heroes/[slug]/comments/route'
 import { POST as POST_BOOKMARK } from '@/app/api/heroes/[slug]/bookmark/route'
 import { GET as GET_FEED } from '@/app/api/feed/route'
 import { GET as GET_NOTIFICATIONS } from '@/app/api/notifications/route'
+import { GET as GET_PROFILE_COMMENTS } from '@/app/api/users/[id]/comments/route'
+import { GET as GET_PROFILE_LIKES } from '@/app/api/users/[id]/likes/route'
 import { POST as POST_FOLLOW } from '@/app/api/users/[id]/follow/route'
 
 function buildMutationRequest(url: string, init: RequestInit = {}) {
@@ -97,5 +107,30 @@ describe('social engagement API routes', () => {
 
     await expect(feedResponse.json()).resolves.toEqual({ items: [{ id: 'comment:1', heroName: 'Arc Light' }] })
     await expect(notificationsResponse.json()).resolves.toEqual({ notifications: { hasNotifications: true, count: 2 } })
+  })
+
+  it('returns profile likes and comment ledgers', async () => {
+    serviceMocks.listProfileLikes.mockResolvedValueOnce([{ id: 'like_1', heroName: 'Arc Light' }])
+    serviceMocks.listProfileComments.mockResolvedValueOnce({
+      made: [{ id: 'comment_1', content: 'Made.' }],
+      received: [{ id: 'comment_2', content: 'Received.' }],
+    })
+
+    const likesResponse = await GET_PROFILE_LIKES({ nextUrl: new URL('http://localhost/api/users/user_1/likes?limit=7') } as unknown as NextRequest, {
+      params: Promise.resolve({ id: 'user_1' }),
+    })
+    const commentsResponse = await GET_PROFILE_COMMENTS({ nextUrl: new URL('http://localhost/api/users/user_1/comments') } as unknown as NextRequest, {
+      params: Promise.resolve({ id: 'user_1' }),
+    })
+
+    await expect(likesResponse.json()).resolves.toEqual({ likes: [{ id: 'like_1', heroName: 'Arc Light' }] })
+    await expect(commentsResponse.json()).resolves.toEqual({
+      comments: {
+        made: [{ id: 'comment_1', content: 'Made.' }],
+        received: [{ id: 'comment_2', content: 'Received.' }],
+      },
+    })
+    expect(serviceMocks.listProfileLikes).toHaveBeenCalledWith('user_1', 7)
+    expect(serviceMocks.listProfileComments).toHaveBeenCalledWith('user_1', 40)
   })
 })

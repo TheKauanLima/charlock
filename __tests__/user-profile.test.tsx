@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import UserProfile from '@/components/UserProfile/UserProfile'
 import type { UserProfileData } from '@/lib/profile'
@@ -24,7 +24,9 @@ vi.mock('next/image', () => ({
 }))
 
 vi.mock('@/app/profile/actions', () => ({
+  deleteAccount: vi.fn(async () => undefined),
   updateProfileBackground: vi.fn(async () => undefined),
+  updateProfileSettings: vi.fn(async () => undefined),
 }))
 
 vi.mock('@clerk/nextjs', () => ({
@@ -129,8 +131,83 @@ const profileData: UserProfileData = {
 }
 
 describe('UserProfile', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/profile/TRIL')
+  })
+
   it('renders the streamlined profile layout with persistent tab navigation', async () => {
     const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = input.toString()
+
+      if (url.includes('/likes')) {
+        return Response.json({
+          likes: [
+            {
+              id: 'like_1',
+              heroId: 'hero_2',
+              heroName: 'Bookmark Hero',
+              creatorId: 'clerk_2',
+              creatorName: 'RIFT',
+              likedAt: now,
+              href: '/?tab=browse&heroId=hero_2',
+            },
+          ],
+        })
+      }
+
+      if (url.includes('/comments')) {
+        return Response.json({
+          comments: {
+            made: [
+              {
+                id: 'comment_1',
+                heroId: 'hero_2',
+                heroName: 'Bookmark Hero',
+                authorId: 'clerk_1',
+                authorName: 'TRIL',
+                content: 'Clean kit.',
+                createdAt: now,
+                href: '/?tab=browse&heroId=hero_2',
+                viewerCanDelete: true,
+              },
+            ],
+            received: [
+              {
+                id: 'comment_2',
+                heroId: 'hero_1',
+                heroName: 'Asasvc',
+                authorId: 'clerk_2',
+                authorName: 'RIFT',
+                content: 'Needs a sharper ultimate.',
+                createdAt: now,
+                href: '/?tab=browse&heroId=hero_1',
+                viewerCanDelete: true,
+              },
+            ],
+          },
+        })
+      }
+
+      if (url.includes('/feed')) {
+        return Response.json({
+          items: [
+            {
+              id: 'comment:comment_2',
+              type: 'comment',
+              createdAt: now,
+              heroId: 'hero_1',
+              heroName: 'Asasvc',
+              actorId: 'clerk_2',
+              actorName: 'RIFT',
+              content: 'Needs a sharper ultimate.',
+            },
+          ],
+        })
+      }
+
+      return Response.json({})
+    })
 
     render(<UserProfile data={profileData} heroes={HEROES} />)
 
@@ -173,8 +250,70 @@ describe('UserProfile', () => {
     expect(screen.getAllByText('Bookmarks')).toHaveLength(2)
     expect(screen.getByRole('link', { name: /open character bookmark hero/i })).toHaveAttribute('href', '/?tab=bookmarks&heroId=hero_2')
 
+    await user.click(screen.getByRole('button', { name: /likes/i }))
+    expect(await screen.findByText(/RIFT/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /view bookmark hero/i })).toHaveAttribute('href', '/?tab=browse&heroId=hero_2')
+
+    await user.click(screen.getByRole('button', { name: /comments/i }))
+    expect(await screen.findByText('Clean kit.')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: /comments received/i }))
+    expect(screen.getByText(/needs a sharper ultimate/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /notifications/i }))
+    const notificationText = await screen.findByText(/commented on Asasvc/i)
+
+    expect(notificationText).toBeInTheDocument()
+    expect(notificationText.closest('a')).toBeNull()
+
     await user.click(screen.getByRole('button', { name: /settings/i }))
 
-    expect(screen.getByRole('link', { name: /open settings/i })).toHaveAttribute('href', '/profile/settings')
+    await waitFor(() => expect(screen.getByRole('heading', { name: /settings/i })).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /save profile/i })).toBeInTheDocument()
+
+    fetchMock.mockRestore()
+  })
+
+  it('shows themed empty and error states for profile ledgers', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(Response.json({ likes: [] }))
+      .mockResolvedValueOnce(Response.json({ error: 'down' }, { status: 500 }))
+
+    render(<UserProfile data={profileData} heroes={HEROES} />)
+
+    await user.click(screen.getByRole('button', { name: /likes/i }))
+    expect(await screen.findByText('You have not liked any characters yet.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /comments/i }))
+    expect(await screen.findByText('Unable to retrieve grid entries. Server link severed.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /retry connection/i })).toBeInTheDocument()
+
+    fetchMock.mockRestore()
+  })
+
+  it('restores a hash-linked profile tab after mount without changing the initial render', async () => {
+    window.history.replaceState(null, '', '/profile/TRIL#notifications')
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(Response.json({
+      items: [
+        {
+          id: 'hero:hero_1',
+          type: 'published_hero',
+          createdAt: now,
+          heroId: 'hero_1',
+          heroName: 'Asasvc',
+          actorId: 'clerk_1',
+          actorName: 'TRIL',
+        },
+      ],
+    }))
+
+    render(<UserProfile data={profileData} heroes={HEROES} />)
+
+    expect(screen.getByRole('button', { name: /saved characters/i })).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(screen.getByRole('button', { name: /notifications/i })).toHaveAttribute('aria-pressed', 'true'))
+    expect(await screen.findByText(/published Asasvc/i)).toBeInTheDocument()
+
+    fetchMock.mockRestore()
   })
 })
