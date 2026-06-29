@@ -556,6 +556,58 @@ describe('AbilityEditor', () => {
     expectCooldown('31')
   })
 
+  it('cascades ability text edits from lower tiers into higher tiers', async () => {
+    const user = userEvent.setup()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const onSave = vi.fn()
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    function setAbilityText(text: string) {
+      const editor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+      editor.textContent = text
+      fireEvent.input(editor)
+    }
+
+    function expectAbilityText(text: string) {
+      expect(screen.getByRole('textbox', { name: 'Description rich text' })).toHaveTextContent(text)
+    }
+
+    setAbilityText('Base inherited text')
+    await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
+    expectAbilityText('Base inherited text')
+
+    setAbilityText('Tier one inherited text')
+    await user.click(screen.getByRole('button', { name: 'Tier 2 upgrade' }))
+    expectAbilityText('Tier one inherited text')
+
+    await user.click(screen.getByRole('button', { name: 'Tier 3 upgrade' }))
+    expectAbilityText('Tier one inherited text')
+
+    await user.click(screen.getByRole('button', { name: '0' }))
+    expectAbilityText('Base inherited text')
+
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedTierTexts = savedAbility?.tiers.map(tier => {
+      const richText = tier.variant.sections.find(section => section.type === 'richText')
+
+      return richText?.text
+    })
+
+    expect(savedAbility?.sections.find(section => section.type === 'richText')?.text).toBe('Base inherited text')
+    expect(savedTierTexts).toEqual(['Tier one inherited text', 'Tier one inherited text', 'Tier one inherited text'])
+  })
+
   it('does not duplicate inline icons when styling a selection that contains one', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()

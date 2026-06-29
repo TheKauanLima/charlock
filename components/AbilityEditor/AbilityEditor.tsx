@@ -885,7 +885,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           ...section,
           text: section.text.includes(markerToken) ? section.text.replace(markerToken, iconToken) : `${section.text}${section.text ? ' ' : ''}${iconToken}`,
         }
-      })
+      }, { cascadeToHigher: true })
     }
 
     setIconTarget(null)
@@ -935,7 +935,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           ...section,
           text: section.text.replace(markerToken, ''),
         }
-      })
+      }, { cascadeToHigher: true })
     }
 
     setIconTarget(null)
@@ -1225,7 +1225,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
                   {section.type === 'richText' ? (
                     <>
-                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }))} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
+                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }), { cascadeToHigher: true })} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
                     </>
                   ) : (
                     <GridSection
