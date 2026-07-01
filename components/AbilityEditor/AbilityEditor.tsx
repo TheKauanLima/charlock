@@ -19,7 +19,13 @@ import type {
   AbilityVariant,
 } from '@/lib/ability-editor-types'
 import type { AbilityIconGroup, EditorAssetGroup } from '@/lib/editor-assets'
-import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
+import {
+  DEFAULT_HERO_NAME_FONT_FAMILY,
+  DEFAULT_HERO_NAME_FONT_SIZE,
+  DEFAULT_HERO_NAME_FONT_WEIGHT,
+  type HeroDefinition,
+  type HeroInfoDefinition,
+} from '@/lib/hero-data'
 import cn from '@/lib/utilsd'
 
 import styles from './AbilityEditor.module.css'
@@ -70,6 +76,7 @@ interface AbilityEditorProps {
   ability: AbilityDefinition
   propertyIconGroups: EditorAssetGroup[]
   mode?: AbilityEditorMode
+  previewLayout?: 'browse' | 'editor'
   className?: string
   hero?: HeroDefinition
   heroInfo?: HeroInfoDefinition
@@ -84,6 +91,7 @@ interface AbilityEditorProps {
   onAbilityIconChange?: (target: AbilityEditorTarget, iconPath: string) => void
   onAbilitySelect?: (target: AbilityEditorTarget, currentAbility: AbilityDefinition) => void
   onSecondAbilitySetToggle?: (enabled: boolean, currentAbility: AbilityDefinition) => void
+  onModeToggle?: (currentAbility: AbilityDefinition) => void
   onSave?: (ability: AbilityDefinition) => void
   onCancel?: () => void
 }
@@ -115,13 +123,14 @@ const RICH_TEXT_COLORS: Array<{ id: string; label: string; token: string }> = [
   { id: 'orange', label: 'Orange', token: 'orange' },
 ]
 
+const COOLDOWN_ICON_COLOR = '#7e61a1'
 const ICON_COLOR_SWATCHES = [
   { id: 'default', label: 'Default', value: '' },
   { id: 'green', label: 'Green', value: '#2e9860' },
   { id: 'freshGreen', label: 'Fresh Green', value: '#84c955' },
   { id: 'olive', label: 'Olive', value: '#919814' },
   { id: 'amber', label: 'Amber', value: '#e5a535' },
-  { id: 'violet', label: 'Violet', value: '#594561' },
+  { id: 'spirit', label: 'Spirit', value: COOLDOWN_ICON_COLOR },
   { id: 'cream', label: 'Cream', value: '#f5eadb' },
 ] as const
 
@@ -217,6 +226,66 @@ function tokenTextToHtml(text: string) {
   return html.replaceAll('\n', '<br>')
 }
 
+function hasSerializableContent(node: Node): boolean {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return Boolean((node.textContent ?? '').replaceAll(INLINE_ICON_CARET_STOP, '').trim())
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return false
+  }
+
+  const element = node as HTMLElement
+
+  if (element.tagName === 'BR') {
+    return false
+  }
+
+  if (element.dataset.inlineIcon || element.dataset.inlineIconMarker) {
+    return true
+  }
+
+  return Array.from(element.childNodes).some(hasSerializableContent)
+}
+
+function stripLeadingSerializedLineBreaks(text: string) {
+  let nextText = text
+  let previousText = ''
+  const openingTokenPattern = String.raw`\[(?:b|i|dark|c:(?:spirit|healing|damage|warning|green|orange))\]`
+  const leadingLineBreakPattern = new RegExp(`^((?:${openingTokenPattern})*)\\n+`)
+
+  while (nextText !== previousText) {
+    previousText = nextText
+    nextText = nextText.replace(leadingLineBreakPattern, '$1')
+  }
+
+  return nextText
+}
+
+function stripTrailingSerializedLineBreaks(text: string) {
+  let nextText = text
+  let previousText = ''
+  const closingTokenPattern = String.raw`\[\/(?:b|i|dark|c)\]`
+  const trailingLineBreakPattern = new RegExp(`\\n+((?:${closingTokenPattern})*)$`)
+
+  while (nextText !== previousText) {
+    previousText = nextText
+    nextText = nextText.replace(trailingLineBreakPattern, '$1')
+  }
+
+  return nextText
+}
+
+function serializeRichBlockElement(element: HTMLElement) {
+  const children = Array.from(element.childNodes).map(serializeRichNode).join('')
+
+  if (!Array.from(element.childNodes).some(hasSerializableContent)) {
+    return '\n'
+  }
+
+  return `${stripTrailingSerializedLineBreaks(stripLeadingSerializedLineBreaks(children))}\n`
+}
+
 function serializeRichNode(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
     return (node.textContent ?? '').replaceAll(INLINE_ICON_CARET_STOP, '')
@@ -282,7 +351,7 @@ function serializeRichNode(node: Node): string {
   }
 
   if (element.tagName === 'DIV' || element.tagName === 'P') {
-    return `${children}\n`
+    return serializeRichBlockElement(element)
   }
 
   return children
@@ -435,7 +504,101 @@ function unwrapRichTextElement(element: HTMLElement) {
   return children
 }
 
+function unwrapSingleContainingEffectFromRange(range: Range, root: HTMLElement, effect: RichTextEffect) {
+  const startEffectElement = findRichTextEffectElement(range.startContainer, effect, root)
+  const endEffectElement = findRichTextEffectElement(range.endContainer, effect, root)
+
+  if (!startEffectElement || startEffectElement !== endEffectElement) {
+    return null
+  }
+
+  const effectElement = startEffectElement
+  const parent = effectElement.parentNode
+
+  if (!parent) {
+    return null
+  }
+
+  const startMarker = document.createElement('span')
+  const endMarker = document.createElement('span')
+  const startRange = range.cloneRange()
+  const endRange = range.cloneRange()
+
+  startMarker.dataset.richTextBoundary = 'start'
+  endMarker.dataset.richTextBoundary = 'end'
+  endRange.collapse(false)
+  endRange.insertNode(endMarker)
+  startRange.collapse(true)
+  startRange.insertNode(startMarker)
+
+  if (startMarker.parentNode !== effectElement || endMarker.parentNode !== effectElement) {
+    startMarker.remove()
+    endMarker.remove()
+    return null
+  }
+
+  const children = Array.from(effectElement.childNodes)
+  const startIndex = children.indexOf(startMarker)
+  const endIndex = children.indexOf(endMarker)
+
+  if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
+    startMarker.remove()
+    endMarker.remove()
+    return null
+  }
+
+  const beforeNodes = children.slice(0, startIndex)
+  const selectedNodes = children.slice(startIndex + 1, endIndex)
+  const afterNodes = children.slice(endIndex + 1)
+
+  if (!selectedNodes.some(hasSerializableContent)) {
+    startMarker.remove()
+    endMarker.remove()
+    return null
+  }
+
+  if (beforeNodes.some(hasSerializableContent)) {
+    const beforeElement = effectElement.cloneNode(false) as HTMLElement
+
+    beforeNodes.forEach(node => beforeElement.append(node))
+    parent.insertBefore(beforeElement, effectElement)
+  }
+
+  selectedNodes.forEach(node => {
+    parent.insertBefore(node, effectElement)
+  })
+
+  if (afterNodes.some(hasSerializableContent)) {
+    const afterElement = effectElement.cloneNode(false) as HTMLElement
+
+    afterNodes.forEach(node => afterElement.append(node))
+    parent.insertBefore(afterElement, effectElement)
+  }
+
+  effectElement.remove()
+
+  const firstNode = selectedNodes[0]
+  const lastNode = selectedNodes.at(-1)
+
+  if (!firstNode?.parentNode || !lastNode?.parentNode) {
+    return null
+  }
+
+  const nextRange = document.createRange()
+
+  nextRange.setStartBefore(firstNode)
+  nextRange.setEndAfter(lastNode)
+
+  return nextRange
+}
+
 function unwrapEffectFromRange(range: Range, root: HTMLElement, effect: RichTextEffect) {
+  const partialEffectRange = unwrapSingleContainingEffectFromRange(range, root, effect)
+
+  if (partialEffectRange) {
+    return partialEffectRange
+  }
+
   const elements = Array.from(new Set(
     getRangeUnits(range, root)
       .map(unit => findRichTextEffectElement(unit, effect, root))
@@ -636,9 +799,10 @@ function getMainCellTitleInputValue(cell: AbilityGridCell) {
   return cell.label === 'Damage' || cell.label === 'Value' ? '' : cell.label
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onSave, onCancel }: AbilityEditorProps) {
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onModeToggle, onSave, onCancel }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
+  const isEditorPreview = isPreviewMode && previewLayout === 'editor'
   const [draftAbility, setDraftAbility] = useState(() => cloneAbility(ability))
   const [activeTier, setActiveTier] = useState<ActiveTier>(0)
   const [flashingTier, setFlashingTier] = useState<AbilityTierLevel | null>(null)
@@ -850,6 +1014,75 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     }), { cascadeToHigher: true })
   }
 
+  function getIconTargetStat(target: IconTarget): AbilityStat | null {
+    if (target.type === 'cooldown') {
+      return activeAbility.cooldown
+    }
+
+    if (target.type === 'charges') {
+      return activeAbility.charges
+    }
+
+    if (target.type === 'rechargeTime') {
+      return activeAbility.rechargeTime
+    }
+
+    if (target.type === 'subStat') {
+      return activeAbility.subStats[target.index] ?? null
+    }
+
+    if (target.type === 'mainCell' || target.type === 'lowerCell') {
+      const section = activeAbility.sections.find(candidate => candidate.id === target.sectionId)
+
+      if (section?.type !== 'grid') {
+        return null
+      }
+
+      return target.type === 'mainCell'
+        ? section.mainCells[target.index] ?? null
+        : section.lowerCells[target.index] ?? null
+    }
+
+    return null
+  }
+
+  function updateIconTarget(target: IconTarget, patch: Partial<AbilityStat>) {
+    if (target.type === 'cooldown') {
+      setActiveAbility(current => ({ ...current, cooldown: updateStat(current.cooldown, patch) }), { cascadeToHigher: true })
+    } else if (target.type === 'charges') {
+      setActiveAbility(current => ({ ...current, charges: updateStat(current.charges, patch) }), { cascadeToHigher: true })
+    } else if (target.type === 'rechargeTime') {
+      setActiveAbility(current => ({ ...current, rechargeTime: updateStat(current.rechargeTime, patch) }), { cascadeToHigher: true })
+    } else if (target.type === 'subStat') {
+      updateSubStat(target.index, patch)
+    } else if (target.type === 'mainCell') {
+      updateGridCell(target.sectionId, 'mainCells', target.index, patch)
+    } else if (target.type === 'lowerCell') {
+      updateGridCell(target.sectionId, 'lowerCells', target.index, patch)
+    }
+  }
+
+  function openIconModal(target: IconTarget) {
+    setSelectedIconColor(getIconTargetStat(target)?.iconColor ?? '')
+    setIconTarget(target)
+  }
+
+  function applyIconColor(color: string) {
+    setSelectedIconColor(color)
+
+    if (!iconTarget) {
+      return
+    }
+
+    const targetStat = getIconTargetStat(iconTarget)
+
+    if (!targetStat || isIntrinsicColorPropertyIcon(targetStat.icon)) {
+      return
+    }
+
+    updateIconTarget(iconTarget, { iconColor: color })
+  }
+
   function applyIcon(path: string) {
     if (!iconTarget) {
       return
@@ -859,18 +1092,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
     if (iconTarget.type === 'abilityIcon') {
       setActiveAbility(current => ({ ...current, icon: path }))
-    } else if (iconTarget.type === 'cooldown') {
-      setActiveAbility(current => ({ ...current, cooldown: updateStat(current.cooldown, { icon: path, iconColor }) }), { cascadeToHigher: true })
-    } else if (iconTarget.type === 'charges') {
-      setActiveAbility(current => ({ ...current, charges: updateStat(current.charges, { icon: path, iconColor }) }), { cascadeToHigher: true })
-    } else if (iconTarget.type === 'rechargeTime') {
-      setActiveAbility(current => ({ ...current, rechargeTime: updateStat(current.rechargeTime, { icon: path, iconColor }) }), { cascadeToHigher: true })
-    } else if (iconTarget.type === 'subStat') {
-      updateSubStat(iconTarget.index, { icon: path, iconColor })
-    } else if (iconTarget.type === 'mainCell') {
-      updateGridCell(iconTarget.sectionId, 'mainCells', iconTarget.index, { icon: path, iconColor })
-    } else if (iconTarget.type === 'lowerCell') {
-      updateGridCell(iconTarget.sectionId, 'lowerCells', iconTarget.index, { icon: path, iconColor })
+    } else if (iconTarget.type !== 'inlineIcon') {
+      updateIconTarget(iconTarget, { icon: path, iconColor })
     } else {
       updateSection(iconTarget.sectionId, section => {
         if (section.type !== 'richText') {
@@ -1107,7 +1330,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   return (
     <section className={cn(styles.focusShell, isPreviewMode && styles.focusShellPreview, className)} data-testid="ability-editor" aria-label={`${isPreviewMode ? 'Ability preview' : 'Ability editor'} for ${abilityName}`}>
       <div className={styles.focusBackdrop} />
-      {hero && heroInfo && capabilities.showHeroInfoCluster ? (
+      {hero && heroInfo && (capabilities.showHeroInfoCluster || isEditorPreview) ? (
         <>
           {capabilities.canToggleSecondSet ? (
             <button
@@ -1150,7 +1373,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           />
         </>
       ) : null}
-      <div className={cn(styles.editorLayout, isPreviewMode && styles.editorLayoutPreview)} data-ability-preview-panel={isPreviewMode ? 'true' : undefined}>
+      <div className={cn(styles.editorLayout, isPreviewMode && previewLayout === 'browse' && styles.editorLayoutPreview)} data-ability-preview-panel={isPreviewMode ? 'true' : undefined}>
         {capabilities.canAddSections ? (
           <aside className={styles.sideTabs} aria-label="Append ability sections">
           <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat(`ability-${draftAbility.slot}-tier-${activeTier}-sub-${Date.now()}`, 'Stat')] }), { cascadeToHigher: true })}>
@@ -1161,14 +1384,14 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           </aside>
         ) : null}
 
-        <div className={cn(styles.mainEditorColumn, isPreviewMode && styles.mainEditorColumnPreview)} ref={mainEditorColumnRef}>
+        <div className={cn(styles.mainEditorColumn, isPreviewMode && styles.mainEditorColumnPreview, isEditorPreview && styles.mainEditorColumnEditorPreview)} data-testid="ability-editor-scroll-container" ref={mainEditorColumnRef}>
           <div className={styles.tooltipSurface}>
             <div className={styles.scrollContent}>
               <div className={styles.tooltipTexture} />
               <header className={styles.header}>
               <div className={styles.titleGroup}>
                 {capabilities.canChangeIcons ? (
-                  <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => setIconTarget({ type: 'abilityIcon' })}>
+                  <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => openIconModal({ type: 'abilityIcon' })}>
                   <span aria-hidden="true" style={{ WebkitMaskImage: `url('${activeAbility.icon}')`, maskImage: `url('${activeAbility.icon}')` }} />
                   </button>
                 ) : null}
@@ -1193,11 +1416,11 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 ) : null}
                 {activeAbility.hasCharges ? (
                   <div className={styles.chargeGrid}>
-                    {renderInlineStat(activeAbility.charges, 'Charges', charges => setActiveAbility(current => ({ ...current, charges }), { cascadeToHigher: true }), () => setIconTarget({ type: 'charges' }), 'timing')}
-                    {renderInlineStat(activeAbility.rechargeTime, 'Recharge Time', rechargeTime => setActiveAbility(current => ({ ...current, rechargeTime }), { cascadeToHigher: true }), () => setIconTarget({ type: 'rechargeTime' }), 'timing')}
+                    {renderInlineStat(activeAbility.charges, 'Charges', charges => setActiveAbility(current => ({ ...current, charges }), { cascadeToHigher: true }), () => openIconModal({ type: 'charges' }), 'timing')}
+                    {renderInlineStat(activeAbility.rechargeTime, 'Recharge Time', rechargeTime => setActiveAbility(current => ({ ...current, rechargeTime }), { cascadeToHigher: true }), () => openIconModal({ type: 'rechargeTime' }), 'timing')}
                   </div>
                 ) : null}
-                {hasCooldownEnabled(activeAbility) ? renderInlineStat(activeAbility.cooldown, 'Cooldown', cooldown => setActiveAbility(current => ({ ...current, cooldown }), { cascadeToHigher: true }), () => setIconTarget({ type: 'cooldown' }), 'timing') : null}
+                {hasCooldownEnabled(activeAbility) ? renderInlineStat(activeAbility.cooldown, 'Cooldown', cooldown => setActiveAbility(current => ({ ...current, cooldown }), { cascadeToHigher: true }), () => openIconModal({ type: 'cooldown' }), 'timing') : null}
               </div>
               </header>
 
@@ -1209,7 +1432,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                     <X aria-hidden="true" />
                     </button>
                   ) : null}
-                  {renderInlineStat(stat, stat.label, nextStat => updateSubStat(index, nextStat), () => setIconTarget({ type: 'subStat', index }), 'sub')}
+                  {renderInlineStat(stat, stat.label, nextStat => updateSubStat(index, nextStat), () => openIconModal({ type: 'subStat', index }), 'sub')}
                 </div>
               ))}
               </section>
@@ -1225,7 +1448,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
                   {section.type === 'richText' ? (
                     <>
-                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }), { cascadeToHigher: true })} onInlineIcon={marker => setIconTarget({ type: 'inlineIcon', sectionId: section.id, marker })} />
+                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }), { cascadeToHigher: true })} onInlineIcon={marker => openIconModal({ type: 'inlineIcon', sectionId: section.id, marker })} />
                     </>
                   ) : (
                     <GridSection
@@ -1238,8 +1461,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                       onLowerCellChange={(index, cell) => updateGridCell(section.id, 'lowerCells', index, cell)}
                       onMainCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: current.mainCells.filter((_, cellIndex) => cellIndex !== index) } : current, { cascadeToHigher: true })}
                       onLowerCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: current.lowerCells.filter((_, cellIndex) => cellIndex !== index) } : current, { cascadeToHigher: true })}
-                      onMainIconClick={index => setIconTarget({ type: 'mainCell', sectionId: section.id, index })}
-                      onLowerIconClick={index => setIconTarget({ type: 'lowerCell', sectionId: section.id, index })}
+                      onMainIconClick={index => openIconModal({ type: 'mainCell', sectionId: section.id, index })}
+                      onLowerIconClick={index => openIconModal({ type: 'lowerCell', sectionId: section.id, index })}
                     />
                   )}
                 </article>
@@ -1258,6 +1481,19 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             onTierTextChange={updateTierText}
           />
         </div>
+
+        {onModeToggle ? (
+          <button
+            type="button"
+            className={cn(styles.modeToggleButton, isPreviewMode && styles.modeToggleButtonActive)}
+            data-testid="ability-mode-toggle"
+            data-placement="right"
+            aria-pressed={isPreviewMode}
+            onClick={() => onModeToggle(syncAbilityNames(draftAbility))}
+          >
+            {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
+          </button>
+        ) : null}
 
         <aside className={styles.returnPanel}>
           <p>{isPreviewMode ? 'Ability Preview' : 'Focused Ability Editor'}</p>
@@ -1284,7 +1520,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           groups={filteredIconGroups}
           search={iconSearch}
           selectedIconColor={selectedIconColor}
-          onIconColorChange={setSelectedIconColor}
+          onIconColorChange={applyIconColor}
           onSearch={setIconSearch}
           onSelect={applyIcon}
           onClose={closeIconModal}
@@ -1294,6 +1530,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       {abilityIconTarget ? (
         <IconSearchModal
           groups={abilityIconPickerGroups}
+          statGroups={filteredIconGroups}
           search={iconSearch}
           selectedIconColor=""
           title="Ability icon selector"
@@ -1621,7 +1858,15 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
             }}
           />
         ) : (
-          <span className={styles.heroInfoNameText} style={{ color: heroInfo.nameColor }}>
+          <span
+            className={styles.heroInfoNameText}
+            style={{
+              color: heroInfo.nameColor,
+              fontSize: heroInfo.nameFontSize || DEFAULT_HERO_NAME_FONT_SIZE,
+              fontFamily: heroInfo.nameFontFamily || DEFAULT_HERO_NAME_FONT_FAMILY,
+              fontWeight: heroInfo.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT,
+            }}
+          >
             {heroInfo.nameValue || hero.displayName}
           </span>
         )}
@@ -2194,7 +2439,7 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
       ) : null}
       <div
         className={styles.mainCellGrid}
-        style={{ gridTemplateColumns: `repeat(${Math.max(1, section.mainCells.length)}, minmax(min-content, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, section.mainCells.length)}, minmax(0, 1fr))` }}
       >
         {section.mainCells.map((cell, index) => (
           <div key={cell.id} className={styles.mainCell}>
@@ -2242,6 +2487,7 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
 
 interface IconSearchModalProps {
   groups: EditorAssetGroup[]
+  statGroups?: EditorAssetGroup[]
   search: string
   selectedIconColor: string
   title?: string
@@ -2256,33 +2502,36 @@ interface IconSearchModalProps {
   onClose: () => void
 }
 
-function IconSearchModal({ groups, search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
+function IconSearchModal({ groups, statGroups = [], search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
   const isAbilityPicker = previewMode === 'ability'
+  const [abilityIconTab, setAbilityIconTab] = useState<'abilities' | 'stats'>('abilities')
+  const showsAbilityIcons = isAbilityPicker && abilityIconTab === 'abilities'
+
   function handleBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.target === event.currentTarget) {
       onClose()
     }
   }
 
-  const renderIconButton = (asset: EditorAssetGroup['assets'][number]) => (
+  const renderIconButton = (asset: EditorAssetGroup['assets'][number], assetPreviewMode: 'property' | 'image' | 'ability' = previewMode) => (
     <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => onSelect(asset.path)}>
       <span
         className={cn(
           styles.iconPreview,
-          isAbilityPicker && styles.iconPreviewAbility,
-          previewMode === 'image' && styles.iconPreviewImage,
-          previewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor,
+          assetPreviewMode === 'ability' && styles.iconPreviewAbility,
+          assetPreviewMode === 'image' && styles.iconPreviewImage,
+          assetPreviewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor,
         )}
         aria-hidden="true"
         style={
-          previewMode === 'image'
+          assetPreviewMode === 'image'
             ? { backgroundImage: `url('${asset.path}')` }
-            : isAbilityPicker
+            : assetPreviewMode === 'ability'
               ? getWhiteAbilityIconVisualStyle(asset.path)
               : getPropertyIconVisualStyle(asset.path, selectedIconColor || '#ffffff')
         }
       />
-      {isAbilityPicker ? null : asset.label}
+      {assetPreviewMode === 'ability' ? null : asset.label}
     </button>
   )
 
@@ -2313,16 +2562,46 @@ function IconSearchModal({ groups, search, selectedIconColor, title = 'Property 
             ))}
           </section>
         ) : null}
-        {isAbilityPicker ? <p className={styles.iconGridTitle}>Hero abilities</p> : null}
-        <div className={cn(styles.iconGrid, isAbilityPicker && styles.iconGridAbility)}>
-          {isAbilityPicker
+        {isAbilityPicker ? (
+          <div className={styles.iconTabs} role="tablist" aria-label="Ability icon categories">
+            <button
+              type="button"
+              id="ability-icon-tab-abilities"
+              role="tab"
+              aria-controls="ability-icon-tabpanel"
+              aria-selected={abilityIconTab === 'abilities'}
+              className={cn(abilityIconTab === 'abilities' && styles.iconTabActive)}
+              onClick={() => setAbilityIconTab('abilities')}
+            >
+              Hero abilities
+            </button>
+            <button
+              type="button"
+              id="ability-icon-tab-stats"
+              role="tab"
+              aria-controls="ability-icon-tabpanel"
+              aria-selected={abilityIconTab === 'stats'}
+              className={cn(abilityIconTab === 'stats' && styles.iconTabActive)}
+              onClick={() => setAbilityIconTab('stats')}
+            >
+              Stat icons
+            </button>
+          </div>
+        ) : null}
+        <div
+          className={cn(styles.iconGrid, showsAbilityIcons && styles.iconGridAbility)}
+          id={isAbilityPicker ? 'ability-icon-tabpanel' : undefined}
+          role={isAbilityPicker ? 'tabpanel' : undefined}
+          aria-labelledby={isAbilityPicker ? `ability-icon-tab-${abilityIconTab}` : undefined}
+        >
+          {showsAbilityIcons
             ? groups.map(group => (
                 <div key={group.id} className={styles.iconAbilityGroup} role="group" aria-label={group.label}>
                   <p className={styles.iconAbilityGroupTitle}>{group.label}</p>
-                  {group.assets.slice(0, 4).map(renderIconButton)}
+                  {group.assets.slice(0, 4).map(asset => renderIconButton(asset, 'ability'))}
                 </div>
               ))
-            : groups.flatMap(group => group.assets).map(renderIconButton)}
+            : (isAbilityPicker ? statGroups : groups).flatMap(group => group.assets).map(asset => renderIconButton(asset, previewMode === 'ability' ? 'property' : previewMode))}
         </div>
       </div>
     </div>

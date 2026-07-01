@@ -78,6 +78,12 @@
   padding: 16px;
 }
 
+.uploadArea[data-upload-error] {
+  border: 1px solid rgba(229, 184, 71, 0.65);
+  border-left-width: 4px;
+  background: rgba(89, 57, 5, 0.14);
+}
+
 .uploadLabel,
 .uploadThingButton {
   display: flex;
@@ -114,6 +120,12 @@
 .uploadThingButton:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.uploadThingButtonError {
+  border-color: #e5b847;
+  color: #ffe7b0;
+  background: rgba(89, 57, 5, 0.24);
 }
 
 .uploadThingAllowed {

@@ -107,6 +107,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
           scaling={scaling}
           scalingValue={scalingValue}
           boundaryRef={boundaryRef}
+          menuPosition={isPower ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
           onChange={updates => onChange?.(updates)}
           onOpenPickerChange={onOpenScalingPickerChange}

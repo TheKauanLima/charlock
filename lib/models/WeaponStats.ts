@@ -40,7 +40,7 @@ export const statSchema = new Schema<IPanelStat>({
   },
   scalingValue: { type: String, default: '0' },
   description: { type: String },
-})
+}, { _id: false })
 
 const weaponStatsSchema = new Schema<IWeaponStats>(
   {

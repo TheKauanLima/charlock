@@ -105,6 +105,17 @@ export function isProfileUnavailableError(error: unknown) {
   return error instanceof ProfileUnavailableError
 }
 
+export class ProfilePrivateError extends Error {
+  constructor() {
+    super('Profile access is private')
+    this.name = 'ProfilePrivateError'
+  }
+}
+
+export function isProfilePrivateError(error: unknown) {
+  return error instanceof ProfilePrivateError
+}
+
 export function getUserLevel(contributionCount: number): UserLevel {
   if (contributionCount > 50) {
     return {
@@ -342,7 +353,7 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
   const viewerIsOwner = userId === user.clerkId
 
   if (!viewerIsOwner && user.isPublic === false) {
-    notFound()
+    throw new ProfilePrivateError()
   }
 
   const ownerIds = buildOwnerIds(user)

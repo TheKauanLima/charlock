@@ -18,6 +18,7 @@ describe('Mongoose model schemas', () => {
     expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
     expect(statSchema.path('iconColor')).toBeDefined()
     expect(statSchema.path('append')).toBeDefined()
+    expect(statSchema.options._id).toBe(false)
   })
 
   it('stores hero tag offsets and optional backstory', () => {
@@ -59,6 +60,7 @@ describe('Mongoose model schemas', () => {
     expect(secondaryAbilityNamePath).toBeDefined()
     expect(secondaryAbilitySlotsPath).toBeDefined()
     expect(secondaryAbilityAnchorPath).toBeDefined()
+    expect(abilitiesPath).toHaveProperty('schema.options._id', false)
   })
 
   it('stores profile preferences and privacy settings', () => {

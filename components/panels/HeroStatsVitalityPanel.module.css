@@ -218,6 +218,12 @@
   z-index: 1;
 }
 
+.topStats:has([data-scaling-picker-menu]),
+.bottomStats:has([data-scaling-picker-menu]),
+.bottomRow:has([data-scaling-picker-menu]) {
+  z-index: 10000;
+}
+
 @media (min-width: 900px) {
   .row,
   .bottomRow {

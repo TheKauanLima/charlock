@@ -340,6 +340,8 @@
 }
 
 .rows {
+  position: relative;
+  z-index: 1;
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -348,6 +350,8 @@
 
 .row,
 .bottomRow {
+  position: relative;
+  z-index: 1;
   display: grid;
   width: 100%;
   grid-template-columns: 1fr;
@@ -355,6 +359,8 @@
 }
 
 .bottomBand {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -363,6 +369,13 @@
   overflow: visible;
   background: rgba(0, 0, 0, 0.25);
   padding: 16px;
+}
+
+.rows:has([data-scaling-picker-menu]),
+.bottomBand:has([data-scaling-picker-menu]),
+.row:has([data-scaling-picker-menu]),
+.bottomRow:has([data-scaling-picker-menu]) {
+  z-index: 10000;
 }
 
 .statCell {

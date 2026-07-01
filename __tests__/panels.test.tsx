@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
+
 import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -38,6 +40,18 @@ describe('hero stat mappers', () => {
 })
 
 describe('migrated stat panels', () => {
+  it('raises any panel row that contains an open scaling menu', () => {
+    const stylesheets = [
+      'components/panels/HeroStatsVitalityPanel.module.css',
+      'components/panels/HeroStatsSpiritPanel.module.css',
+      'components/panels/WeaponPanel.module.css',
+    ].map(path => readFileSync(path, 'utf8'))
+
+    for (const stylesheet of stylesheets) {
+      expect(stylesheet).toMatch(/:has\(\[data-scaling-picker-menu\]\)[^{]*\{[^}]*z-index:\s*10000/)
+    }
+  })
+
   it('renders vitality and spirit defaults', () => {
     render(
       <>
@@ -72,6 +86,7 @@ describe('migrated stat panels', () => {
 
     await user.click(within(bulletDamageCell).getByRole('button', { name: 'Edit Bullet Damage scaling' }))
     expect(screen.getByRole('dialog', { name: 'Bullet Damage scaling controls' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set Bullet Damage scaling to gun' })).toHaveTextContent('Gun')
     await user.click(screen.getByRole('button', { name: 'Set Bullet Damage scaling to spirit' }))
     expect(bulletDamageCell).toHaveAttribute('data-scaling', 'spirit')
 
@@ -95,6 +110,23 @@ describe('migrated stat panels', () => {
     expect(screen.queryByRole('dialog', { name: 'Bullet Damage scaling controls' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('opens bottom weapon and spirit scaling menus above their buttons', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <>
+        <WeaponPanel isEditable />
+        <HeroStatsSpiritPanel isEditable />
+      </>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Edit Heavy Melee scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Heavy Melee scaling controls' }).parentElement).toHaveAttribute('data-menu-position', 'above')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Spirit Power scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Spirit Power scaling controls' }).parentElement).toHaveAttribute('data-menu-position', 'above')
   })
 
   it('edits vitality and spirit stat scaling from the same dropdown control', async () => {

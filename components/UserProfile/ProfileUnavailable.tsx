@@ -1,6 +1,11 @@
+'use client'
+
+import { Search } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
-import type { CSSProperties } from 'react'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 
 import { HEROES } from '@/lib/hero-data'
 
@@ -12,12 +17,26 @@ interface ProfileUnavailableStyle extends CSSProperties {
   '--profile-level': string
 }
 
-export default function ProfileUnavailable() {
+export default function ProfileUnavailable({ reason = 'temporary' }: { reason?: 'missing' | 'private' | 'temporary' }) {
+  const router = useRouter()
+  const [creatorSearch, setCreatorSearch] = useState('')
   const fallbackHero = HEROES[0]
   const themeStyle: ProfileUnavailableStyle = {
     '--profile-accent': fallbackHero.heroInfo.tagColor,
     '--profile-name': fallbackHero.heroInfo.nameColor,
     '--profile-level': '#6fb8ff',
+  }
+  const message = reason === 'private'
+    ? 'This creator has limited profile access.'
+    : reason === 'missing'
+      ? 'No creator profile matches this address.'
+      : 'Profile data could not be loaded right now. Check the connection and try again.'
+
+  function searchCreators(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const query = creatorSearch.trim()
+
+    if (query) router.push(`/profile/${encodeURIComponent(query)}`)
   }
 
   return (
@@ -38,9 +57,15 @@ export default function ProfileUnavailable() {
       <section className={styles.unavailablePanel}>
         <p className={styles.eyebrow}>Profile</p>
         <h1>Profile unavailable</h1>
-        <p>
-          Profile data could not be loaded right now. Check the database connection and try again.
-        </p>
+        <p>{message}</p>
+        <form className={styles.creatorSearch} onSubmit={searchCreators}>
+          <label htmlFor="creator-profile-search">Find another creator</label>
+          <span>
+            <Search aria-hidden="true" />
+            <input id="creator-profile-search" type="search" value={creatorSearch} onChange={event => setCreatorSearch(event.target.value)} placeholder="Creator username" />
+            <button type="submit">Search</button>
+          </span>
+        </form>
         <Link href="/" className={styles.homeLink}>
           Back to characters
         </Link>

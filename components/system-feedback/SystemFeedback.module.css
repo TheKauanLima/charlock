@@ -1,0 +1,85 @@
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingOverlay {
+  position: fixed;
+  z-index: 420;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  color: #fff0d8;
+  background: rgb(5 7 8 / 64%);
+  backdrop-filter: blur(7px);
+  pointer-events: all;
+}
+
+.loadingOverlay svg { width: 30px; height: 30px; color: #d4af37; animation: spin 800ms linear infinite; }
+.loadingOverlay strong { font-family: var(--block, "Valve Pulp", sans-serif); font-size: 1.05rem; text-transform: uppercase; }
+.loadingOverlay span { font-family: var(--font-geist-mono), monospace; font-size: 0.7rem; color: rgb(255 240 216 / 68%); }
+
+.failureBanner {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border-left: 4px solid #e5b847;
+  color: #ffe7b0;
+  background: rgb(50 35 7 / 74%);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+}
+
+.failureBanner p { min-width: 0; margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.failureBanner button { grid-column: 2; width: fit-content; white-space: nowrap; }
+.failureBanner button, .signInButton { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; border: 1px solid #e5b847; color: #fff0c7; background: rgb(229 184 71 / 12%); padding: 0 10px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; }
+.failureBanner button svg { width: 14px; height: 14px; }
+
+.sessionBackdrop { position: fixed; z-index: 450; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(0 0 0 / 82%); backdrop-filter: blur(7px); }
+.sessionModal { position: relative; display: grid; width: min(560px, 100%); gap: 14px; padding: 28px; border: 1px solid rgb(229 184 71 / 62%); border-left-width: 5px; color: #fff0d8; background: #111013; box-shadow: 0 28px 90px #000; }
+.sessionModal p, .sessionModal h2, .sessionModal span { margin: 0; }
+.sessionModal p { color: #e5b847; font: 800 0.66rem var(--font-geist-mono), monospace; text-transform: uppercase; }
+.sessionModal h2 { max-width: 16ch; font: 900 2rem/0.95 var(--block, "Valve Pulp", sans-serif); }
+.sessionModal span { color: rgb(255 240 216 / 72%); font: 0.76rem/1.55 var(--font-geist-mono), monospace; }
+.signInButton { width: fit-content; color: #17120a; background: #e5b847; }
+.dismissButton { position: absolute; top: 10px; right: 10px; display: grid; width: 34px; height: 34px; place-items: center; border: 0; color: #fff0d8; background: transparent; }
+.dismissButton svg { width: 18px; }
+
+.connectionWarning { position: fixed; z-index: 410; top: 14px; left: 50%; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 28px); transform: translateX(-50%); padding: 9px 12px; border: 1px solid #e5b847; color: #ffe7b0; background: rgb(24 18 7 / 94%); font: 700 0.68rem var(--font-geist-mono), monospace; }
+.connectionWarning svg { width: 16px; height: 16px; }
+.toast { position: fixed; z-index: 380; right: 24px; bottom: 24px; max-width: min(420px, calc(100% - 48px)); margin: 0; padding: 11px 14px; border-left: 3px solid #2fc890; color: #d8ffef; background: rgb(8 27 22 / 94%); box-shadow: 0 12px 38px #000; font: 0.7rem/1.4 var(--font-geist-mono), monospace; }
+
+.profileLoading { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; min-height: 100vh; padding: 88px max(32px, calc((100vw - 1380px) / 2)); color: #ffefd6; background: #050506; }
+.profileLoading aside, .profileLoading section { display: grid; align-content: start; gap: 14px; }
+.profileLoading span, .profileLoading i { display: block; min-height: 42px; background: #ffefd6; animation: pulseGlow 1.5s ease-in-out infinite; }
+.profileLoading .profileHeroSkeleton { width: 104px; height: 104px; border-radius: 999px; }
+.profileLoading section > span:nth-child(2) { width: min(420px, 70%); height: 64px; }
+.profileLoading section > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 30px; }
+.profileLoading i { aspect-ratio: 130 / 210; }
+
+.routeError { display: grid; min-height: 100vh; place-content: center; justify-items: start; gap: 12px; padding: 32px; color: #ffefd6; background: #080709; }
+.routeError > svg { width: 34px; height: 34px; color: #e5b847; }
+.routeError p, .routeError h1, .routeError span { margin: 0; }
+.routeError p { color: #e5b847; font: 800 0.68rem var(--font-geist-mono), monospace; text-transform: uppercase; }
+.routeError h1 { max-width: 16ch; font: 900 clamp(2.2rem, 7vw, 5rem)/0.9 var(--block, "Valve Pulp", sans-serif); text-transform: uppercase; }
+.routeError span { max-width: 56ch; color: rgb(255 239 214 / 68%); font: 0.8rem/1.5 var(--font-geist-mono), monospace; }
+.routeError code { color: rgb(255 239 214 / 45%); font-size: 0.66rem; }
+.routeError button { display: inline-flex; align-items: center; gap: 7px; min-height: 38px; margin-top: 8px; border: 1px solid #e5b847; color: #ffe7b0; background: rgb(229 184 71 / 12%); padding: 0 12px; font-size: 0.68rem; font-weight: 900; text-transform: uppercase; }
+.routeError button svg { width: 15px; }
+
+@media (max-width: 720px) {
+  .profileLoading { grid-template-columns: 1fr; padding: 70px 20px; }
+  .profileLoading aside { display: none; }
+  .profileLoading section > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

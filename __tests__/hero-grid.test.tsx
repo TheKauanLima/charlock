@@ -99,6 +99,54 @@ describe('HeroGrid', () => {
     expect(screen.getAllByText('Not available')).toHaveLength(6)
   })
 
+  it('toggles editor panels and abilities into the Browse preview appearance', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('tab', { name: 'Vitality stats' }))
+
+    const vitalityPanel = screen.getByTestId('hero-stats-vitality-panel')
+    const maxHealthCell = within(vitalityPanel).getByRole('group', { name: /Max Health/ })
+
+    await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
+    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to boon' }))
+    await user.click(screen.getByRole('button', { name: 'Preview Mode' }))
+
+    expect(screen.getByRole('button', { name: 'Edit Mode' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: 'Edit Max Health scaling' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Max Health value')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('boon scaling value x0').className).toContain('valueWrapVisible')
+
+    await user.click(screen.getByRole('button', { name: 'Preview Ability 1' }))
+
+    expect(screen.getByTestId('ability-editor')).toHaveAccessibleName(/Ability preview/)
+    expect(screen.getByLabelText('Ability Name')).toHaveAttribute('readonly')
+    expect(screen.getByTestId('ability-mode-toggle')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('ability-mode-toggle')).toHaveAttribute('data-placement', 'right')
+    expect(screen.getByTestId('ability-mode-toggle').parentElement).toHaveAttribute('data-ability-preview-panel', 'true')
+    expect(screen.getByLabelText(/ability editor hero info/)).toBeInTheDocument()
+    expect(screen.getByTestId('ability-mode-toggle').parentElement?.className).not.toContain('editorLayoutPreview')
+
+    await user.click(screen.getByTestId('ability-mode-toggle'))
+
+    expect(screen.getByTestId('ability-editor')).toHaveAccessibleName(/Ability editor/)
+    expect(screen.getByLabelText('Ability Name')).not.toHaveAttribute('readonly')
+
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Preserved Preview Name')
+    await user.click(screen.getByRole('button', { name: 'Preview Mode' }))
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Preserved Preview Name')
+    expect(screen.getByLabelText('Ability Name')).toHaveAttribute('readonly')
+
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Preview Ability 1' }))
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Preserved Preview Name')
+  })
+
   it('toggles scaling value details from the grid-side control', async () => {
     const user = userEvent.setup()
     const abrams = HEROES[0]
@@ -690,7 +738,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string; ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
@@ -705,6 +753,12 @@ describe('HeroGrid', () => {
       },
     })
     expect(requestBody.weapon.stats.length).toBeGreaterThan(0)
+    expect([
+      requestBody.heroInfo.ability1Icon,
+      requestBody.heroInfo.ability2Icon,
+      requestBody.heroInfo.ability3Icon,
+      requestBody.heroInfo.ability4Icon,
+    ]).not.toContain('')
     expect(requestBody.abilityStats.abilities).toHaveLength(4)
     expect(requestBody.abilityStats.abilities[0].name).toBe('Arc Pulse')
     expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(1)

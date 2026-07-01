@@ -14,7 +14,7 @@ import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-pane
 import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
-import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildCharacterExportPayload } from '@/lib/character-export'
 import { buildDefaultAbilityStats, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
@@ -89,7 +89,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
   const [bookmarkOverride, setBookmarkOverride] = useState<{ heroId: string; value: boolean } | null>(null)
   const [selectedAbilityTarget, setSelectedAbilityTarget] = useState<AbilityIconTarget | null>(null)
   const statsRequestKey = heroId ?? hero.slug
-  const fallbackStats = useMemo(() => buildHeroStatsSeed(hero), [hero])
+  const fallbackStats = useMemo(() => heroId ? buildEmptyHeroStats(hero) : buildHeroStatsSeed(hero), [hero, heroId])
   const [statsState, setStatsState] = useState<HeroStatsState>(() => ({
     heroKey: statsRequestKey,
     data: fallbackStats,

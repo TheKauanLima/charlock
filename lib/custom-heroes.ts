@@ -7,7 +7,7 @@ import dbConnect, { isDatabaseConnectionError } from '@/lib/dbConnect'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { normalizeAbilityStats } from '@/lib/ability-editor-types'
 import { ApiRequestError } from '@/lib/api-errors'
-import { customHeroSaveSchema } from '@/lib/custom-hero-schemas'
+import { customHeroSaveSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
@@ -138,6 +138,7 @@ function normalizeStats(value: unknown) {
 
 function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
   const record = isRecord(value) ? value : {}
+  const requiredIcon = (iconValue: unknown, fallback: string) => getString(iconValue) || fallback
 
   return {
     nameType: record.nameType === 'text' ? 'text' : 'image',
@@ -157,10 +158,10 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
     tag1OffsetY: getNumber(record.tag1OffsetY, DEFAULT_HERO_INFO.tag1OffsetY),
     tag2OffsetY: getNumber(record.tag2OffsetY, DEFAULT_HERO_INFO.tag2OffsetY),
     tag3OffsetY: getNumber(record.tag3OffsetY, DEFAULT_HERO_INFO.tag3OffsetY),
-    ability1Icon: getString(record.ability1Icon, DEFAULT_HERO_INFO.ability1Icon),
-    ability2Icon: getString(record.ability2Icon, DEFAULT_HERO_INFO.ability2Icon),
-    ability3Icon: getString(record.ability3Icon, DEFAULT_HERO_INFO.ability3Icon),
-    ability4Icon: getString(record.ability4Icon, DEFAULT_HERO_INFO.ability4Icon),
+    ability1Icon: requiredIcon(record.ability1Icon, DEFAULT_HERO_INFO.ability1Icon),
+    ability2Icon: requiredIcon(record.ability2Icon, DEFAULT_HERO_INFO.ability2Icon),
+    ability3Icon: requiredIcon(record.ability3Icon, DEFAULT_HERO_INFO.ability3Icon),
+    ability4Icon: requiredIcon(record.ability4Icon, DEFAULT_HERO_INFO.ability4Icon),
     abilityCircleColor: getString(record.abilityCircleColor, DEFAULT_HERO_INFO.abilityCircleColor),
     abilityIconColor: getString(record.abilityIconColor, DEFAULT_HERO_INFO.abilityIconColor),
     backstory: getString(record.backstory),
@@ -168,7 +169,7 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
 }
 
 function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
-  const value = customHeroSaveSchema.parse(rawValue)
+  const value = customHeroSaveSchema.parse(stripDatabaseMetadata(rawValue))
   const heroRecord = value.hero
   const weaponRecord = value.weapon
   const vitalityRecord = value.vitality
@@ -392,14 +393,14 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
       bulletDPS: bundle.weapon?.bulletDPS ?? 0,
       weaponMinRange: bundle.weapon?.weaponMinRange ?? 0,
       weaponMaxRange: bundle.weapon?.weaponMaxRange ?? 0,
-      stats: bundle.weapon?.stats ?? [],
+      stats: normalizeStats(bundle.weapon?.stats),
     },
     vitality: {
-      stats: bundle.vitality?.stats ?? [],
+      stats: normalizeStats(bundle.vitality?.stats),
     },
     spirit: {
-      topStats: bundle.spirit?.topStats ?? [],
-      spiritPowerStat: bundle.spirit?.spiritPowerStat ?? {
+      topStats: normalizeStats(bundle.spirit?.topStats),
+      spiritPowerStat: bundle.spirit?.spiritPowerStat ? normalizePanelStat(bundle.spirit.spiritPowerStat) : {
         label: 'Spirit Power',
         value: '0',
         unit: '',

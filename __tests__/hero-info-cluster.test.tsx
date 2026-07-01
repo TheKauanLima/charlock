@@ -17,6 +17,88 @@ afterEach(() => {
 })
 
 describe('HeroInfoCluster', () => {
+  it('does not use hero tags or generated stats as a custom hero weapon fallback', async () => {
+    const user = userEvent.setup()
+    const hero = {
+      id: '507f1f77bcf86cd799439011',
+      slug: 'petrichor',
+      assetSlug: 'petrichor',
+      displayName: 'Petrichor',
+      portrait: '/panorama/images/heroes/petrichor.png',
+      render: '/render/Petrichor_Render.png',
+      heroInfo: {
+        nameType: 'text',
+        nameValue: 'Petrichor',
+        nameColor: '#f1e7d2',
+        tag1Text: 'Risk of',
+        tag2Text: 'rain 2',
+        tag3Text: 'Storm',
+        tagColor: '#473424',
+        tagTextColor: '#fff4df',
+        tag1Tilt: -4.5,
+        tag2Tilt: 1.2,
+        tag3Tilt: 6.8,
+        tag1OffsetY: -10,
+        tag2OffsetY: 0,
+        tag3OffsetY: 10,
+        ability1Icon: '/panorama/images/hud/abilities/petrichor/1.png',
+        ability2Icon: '/panorama/images/hud/abilities/petrichor/2.png',
+        ability3Icon: '/panorama/images/hud/abilities/petrichor/3.png',
+        ability4Icon: '/panorama/images/hud/abilities/petrichor/4.png',
+        abilityCircleColor: '#f0ad5f',
+        abilityIconColor: '#ffe5b8',
+      },
+    } satisfies HeroDefinition & { id: string }
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise<Response>(() => undefined))
+
+    render(<HeroInfoCluster hero={hero} />)
+
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+
+    const weaponPanel = screen.getByTestId('weapon-panel')
+
+    expect(weaponPanel).toHaveTextContent('Petrichor Weapon')
+    expect(weaponPanel).not.toHaveTextContent('Risk of')
+    expect(weaponPanel).not.toHaveTextContent('rain 2')
+    expect(screen.getByRole('button', { name: /Bullet Damage: 0/ })).toBeInTheDocument()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/heroes/507f1f77bcf86cd799439011/stats', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  })
+
+  it('does not copy hero tags into generated weapon tags', () => {
+    const hero = {
+      slug: 'petrichor',
+      assetSlug: 'petrichor',
+      displayName: 'Petrichor',
+      portrait: '/panorama/images/heroes/petrichor.png',
+      render: '/render/Petrichor_Render.png',
+      heroInfo: {
+        nameType: 'text',
+        nameValue: 'Petrichor',
+        nameColor: '#f1e7d2',
+        tag1Text: 'Risk of',
+        tag2Text: 'rain 2',
+        tag3Text: 'Storm',
+        tagColor: '#473424',
+        tagTextColor: '#fff4df',
+        tag1Tilt: -4.5,
+        tag2Tilt: 1.2,
+        tag3Tilt: 6.8,
+        tag1OffsetY: -10,
+        tag2OffsetY: 0,
+        tag3OffsetY: 10,
+        ability1Icon: '/panorama/images/hud/abilities/petrichor/1.png',
+        ability2Icon: '/panorama/images/hud/abilities/petrichor/2.png',
+        ability3Icon: '/panorama/images/hud/abilities/petrichor/3.png',
+        ability4Icon: '/panorama/images/hud/abilities/petrichor/4.png',
+        abilityCircleColor: '#f0ad5f',
+        abilityIconColor: '#ffe5b8',
+      },
+    } satisfies HeroDefinition
+
+    expect(buildHeroStatsSeed(hero).weapon.weaponAttributes).toEqual([])
+  })
+
   it('renders the image, tag, and ability styles for a hero', () => {
     const hero = {
       slug: 'greytalon',

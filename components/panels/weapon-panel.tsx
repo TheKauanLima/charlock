@@ -47,6 +47,7 @@ interface CompactStatElementProps extends PanelStat {
   panelType: 'weapon' | 'armor' | 'tech'
   boundaryRef?: RefObject<HTMLElement | null>
   openScalingPickerId?: string | null
+  openScalingAbove?: boolean
   onChange?: (updates: Partial<PanelStat>) => void
   onOpenScalingPickerChange?: (pickerId: string | null) => void
 }
@@ -194,7 +195,7 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
   }
 }
 
-function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
+function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, openScalingAbove = false, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
@@ -230,6 +231,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
           scaling={scaling}
           scalingValue={scalingValue}
           boundaryRef={boundaryRef}
+          menuPosition={openScalingAbove ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
           onChange={updates => onChange?.(updates)}
           onOpenPickerChange={onOpenScalingPickerChange}
@@ -527,6 +529,7 @@ export default function WeaponPanel({
                     showDetails={showDetails}
                     boundaryRef={panelRef}
                     openScalingPickerId={openScalingPickerId}
+                    openScalingAbove
                     onOpenScalingPickerChange={setOpenScalingPickerId}
                     onChange={updates => handleStatChange(absoluteIndex, updates)}
                   />

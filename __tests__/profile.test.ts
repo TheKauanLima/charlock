@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getProfileHero, getProfilePathSegment, getProfileRedirectPath, getUserLevel, isProfilePathSegmentForUser, isProfileUnavailableError, ProfileUnavailableError } from '@/lib/profile'
+import { getProfileHero, getProfilePathSegment, getProfileRedirectPath, getUserLevel, isProfilePathSegmentForUser, isProfilePrivateError, isProfileUnavailableError, ProfilePrivateError, ProfileUnavailableError } from '@/lib/profile'
 
 describe('profile helpers', () => {
   it('calculates user level from contribution count', () => {
@@ -33,5 +33,10 @@ describe('profile helpers', () => {
   it('classifies temporary profile availability errors', () => {
     expect(isProfileUnavailableError(new ProfileUnavailableError())).toBe(true)
     expect(isProfileUnavailableError(new Error('missing'))).toBe(false)
+  })
+
+  it('classifies private profile errors separately from outages', () => {
+    expect(isProfilePrivateError(new ProfilePrivateError())).toBe(true)
+    expect(isProfilePrivateError(new ProfileUnavailableError())).toBe(false)
   })
 })

@@ -2,6 +2,14 @@ export const SCALING_TYPES = ['none', 'spirit', 'courage', 'melee', 'boon'] as c
 
 export type ScalingType = (typeof SCALING_TYPES)[number]
 
+export const SCALING_LABELS: Record<ScalingType, string> = {
+  none: 'None',
+  spirit: 'Spirit',
+  courage: 'Gun',
+  melee: 'Melee',
+  boon: 'Boon',
+}
+
 export interface ScalingState {
   scaling: ScalingType
   scalingValue: string

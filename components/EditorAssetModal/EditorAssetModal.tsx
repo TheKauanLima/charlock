@@ -7,6 +7,7 @@ import type { CSSProperties } from 'react'
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import type { EditorAssetGroup } from '@/lib/editor-assets'
 import { UploadButton } from '@/lib/uploadthing'
+import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import cn from '@/lib/utilsd'
 
 import styles from './EditorAssetModal.module.css'
@@ -57,6 +58,7 @@ function getUploadedAssetUrl(uploadedAssets: UploadedAsset[]) {
 export default function EditorAssetModal({ title, description, uploadLabel, uploadEndpoint, groups, previewMode, previewColor, testId, onClose, onSelect, onUpload }: EditorAssetModalProps) {
   const [uploadError, setUploadError] = useState<string | null>(null)
   const canUpload = Boolean(uploadLabel && uploadEndpoint && onUpload)
+  const uploadPolicy = uploadEndpoint ? UPLOAD_POLICIES[uploadEndpoint] : null
 
   return (
     <div className={cn(styles.backdrop, 'pointer-events-auto')} role="dialog" aria-modal="true" aria-label={`${title} selector`} data-testid={testId}>
@@ -77,19 +79,32 @@ export default function EditorAssetModal({ title, description, uploadLabel, uplo
         </div>
 
         {canUpload ? (
-          <div className={styles.uploadArea}>
+          <div className={styles.uploadArea} data-upload-error={Boolean(uploadError) || undefined}>
             <UploadButton
               endpoint={uploadEndpoint as UploadEndpoint}
               appearance={{
                 container: styles.uploadThingContainer,
-                button: styles.uploadThingButton,
+                button: cn(styles.uploadThingButton, uploadError && styles.uploadThingButtonError),
                 allowedContent: styles.uploadThingAllowed,
               }}
               content={{
-                button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadLabel ?? 'Upload'),
+                button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadError ? 'Select Different Asset' : uploadLabel ?? 'Upload'),
                 allowedContent: () => null,
               }}
               onUploadBegin={() => setUploadError(null)}
+              onBeforeUploadBegin={files => {
+                if (!uploadPolicy) return files
+
+                const validation = validateUploadFiles(files, uploadPolicy)
+
+                if (!validation.valid) {
+                  setUploadError(validation.message)
+                  return []
+                }
+
+                setUploadError(null)
+                return files
+              }}
               onClientUploadComplete={uploadedAssets => {
                 const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
 
@@ -98,6 +113,7 @@ export default function EditorAssetModal({ title, description, uploadLabel, uplo
                   return
                 }
 
+                setUploadError(null)
                 onUpload?.(uploadedUrl)
               }}
               onUploadError={error => setUploadError(error.message || 'Upload failed.')}

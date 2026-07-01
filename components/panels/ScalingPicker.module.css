@@ -103,6 +103,11 @@
   left: 0;
 }
 
+.root[data-menu-position="above"] .menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
 .typeRow {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

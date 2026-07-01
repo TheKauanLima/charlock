@@ -189,6 +189,11 @@
   background: rgba(0, 0, 0, 0.4);
 }
 
+.topStats:has([data-scaling-picker-menu]),
+.powerSection:has([data-scaling-picker-menu]) {
+  z-index: 10000;
+}
+
 .powerHeader {
   padding: 14px 16px 6px;
 }

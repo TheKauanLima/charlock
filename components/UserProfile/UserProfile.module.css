@@ -93,6 +93,13 @@
   line-height: 1.55;
 }
 
+.creatorSearch { display: grid; max-width: 520px; gap: 7px; }
+.creatorSearch > label { color: var(--profile-name); font: 800 0.66rem var(--font-geist-mono), monospace; text-transform: uppercase; }
+.creatorSearch > span { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; border: 1px solid rgba(255, 239, 214, 0.24); background: rgba(0, 0, 0, 0.45); }
+.creatorSearch svg { width: 16px; justify-self: center; }
+.creatorSearch input { min-width: 0; height: 42px; border: 0; outline: 0; color: #ffefd6; background: transparent; font-family: var(--font-geist-mono), monospace; }
+.creatorSearch button { height: 42px; border: 0; border-left: 1px solid rgba(255, 239, 214, 0.2); color: #151109; background: var(--profile-name); padding: 0 14px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; }
+
 .sidePanel {
   position: sticky;
   top: 76px;

@@ -59,6 +59,15 @@ function normalizeStat(stat: PanelStat): PanelStat {
   }
 }
 
+function normalizeEmptyStat(stat: PanelStat): PanelStat {
+  return {
+    ...normalizeStat(stat),
+    value: '0',
+    scaling: 'none',
+    scalingValue: '0',
+  }
+}
+
 export function buildHeroStatsSource(hero: HeroDefinition): StatsRow {
   const hash = hashHero(hero)
 
@@ -106,6 +115,35 @@ export function buildHeroStatsSource(hero: HeroDefinition): StatsRow {
   }
 }
 
+export function buildEmptyHeroStats(hero: HeroDefinition): HeroStatsPayload {
+  return {
+    hero: {
+      slug: hero.slug,
+      name: hero.displayName,
+      portrait: hero.portrait,
+      render: hero.render,
+    },
+    heroInfo: hero.heroInfo,
+    weapon: {
+      weaponName: `${hero.displayName} Weapon`,
+      weaponDesc: '',
+      gunImageSrc: '/panorama/images/hud/abilities/weapon_damage_psd.png',
+      weaponAttributes: [],
+      bulletDPS: 0,
+      weaponMinRange: 0,
+      weaponMaxRange: 0,
+      stats: buildWeaponStatsArray().map(normalizeEmptyStat),
+    },
+    vitality: {
+      stats: buildVitalityStatsArray().map(normalizeEmptyStat),
+    },
+    spirit: {
+      topStats: buildTopSpiritStatsArray().map(normalizeEmptyStat),
+      spiritPowerStat: normalizeEmptyStat(buildSpiritPowerStat()),
+    },
+  }
+}
+
 export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
   const statsSource = buildHeroStatsSource(hero)
   const bulletDamage = Number(statsSource.bullet_damage ?? 0)
@@ -123,7 +161,7 @@ export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: `${hero.displayName} pressure profile generated from the seeded hero stat table.`,
       gunImageSrc: '/panorama/images/hud/abilities/weapon_damage_psd.png',
-      weaponAttributes: [hero.heroInfo.tag1Text, hero.heroInfo.tag2Text],
+      weaponAttributes: [],
       bulletDPS: Math.round(bulletDamage * bulletsPerSecond),
       weaponMinRange: 12 + (Number(statsSource.ammo ?? 0) % 4),
       weaponMaxRange: 34 + (Number(statsSource.bullet_velocity ?? 0) % 18),

@@ -69,13 +69,15 @@
 
 .heroInfoCluster {
   position: absolute;
-  left: clamp(34px, 5vw, 92px);
-  top: 50%;
+  left: clamp(100px, 32vw, 300px);
+  bottom: clamp(280px, 12vh, 280px);
   z-index: 2;
-  display: grid;
-  width: min(42vw, 560px);
-  gap: 14px;
-  transform: translateY(-50%);
+  display: flex;
+  min-height: 230px;
+  width: min(52vw, 780px);
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
   pointer-events: auto;
   user-select: none;
 }
@@ -89,6 +91,7 @@
   display: block;
   aspect-ratio: 1701 / 564;
   width: 100%;
+  max-width: 360px;
   background: #ffefd6;
   mask-position: center;
   mask-repeat: no-repeat;
@@ -99,35 +102,47 @@
 }
 
 .heroInfoNameText {
+  max-width: 100%;
+  text-align: center;
   font-size: clamp(1.3rem, 2vw, 2.7rem);
   font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  overflow-wrap: break-word;
 }
 
 .heroInfoTags {
   display: flex;
+  width: 100%;
   flex-wrap: nowrap;
+  align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-block: 12px;
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  overflow: visible;
+  padding: 0 4px;
 }
 
 .heroInfoTag {
-  display: inline-flex;
+  display: inline-grid;
   width: fit-content;
   min-width: 0;
-  min-height: 28px;
+  min-height: 32px;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  padding: 3px 8px;
+  padding: 4px 6px;
   box-shadow: 0 4px 10px rgb(0 0 0 / 18%);
 }
 
 .heroInfoTag span {
   font-family: "Valve_Pulp", sans-serif;
-  font-size: 1.4rem;
+  font-size: clamp(1.05rem, 1.45vw, 1.3rem);
   font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 0.92;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -141,7 +156,7 @@
   position: relative;
   display: inline-flex;
   aspect-ratio: 1;
-  width: clamp(54px, 4.5vw, 75px);
+  width: clamp(54px, 5vw, 75px);
   flex-shrink: 0;
   overflow: visible;
 }
@@ -728,6 +743,8 @@
   column-gap: 2px;
   row-gap: 0;
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .inlineStatEditorLower {
@@ -1060,7 +1077,7 @@
 }
 
 .inlineStatEditorMain .valueInput {
-  max-width: 72px;
+  max-width: 100%;
   font-size: 1.55rem;
   color: rgb(251 240 208 / 100%);
 }
@@ -1081,13 +1098,17 @@
 
 .inlineStatEditorMain .valueInputLabel {
   min-width: 0;
-  flex: 0 1 auto;
+  max-width: 72px;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .inlineStatEditorMain .appendInputLabel {
   flex: 0 1 auto;
   min-width: 3ch;
+  max-width: 100%;
   margin-inline: 1px 0;
+  overflow: hidden;
 }
 
 .inlineStatEditorMain .unitInputLabel {
@@ -1113,6 +1134,7 @@
 }
 
 .inlineStatEditorMain .appendInput {
+  max-width: 100%;
   color: rgb(169 166 166 / 100%);
   font-size: 1.1rem;
   font-weight: 950;
@@ -1642,7 +1664,15 @@
   align-items: stretch;
   width: 100%;
   min-width: 0;
-  overflow-x: hidden;
+  /* Keep the tiers inside the main column's horizontal bounds without
+     accidentally creating a second vertical scroll container. */
+  overflow-x: clip;
+  overflow-y: visible;
+}
+
+.mainEditorColumnEditorPreview {
+  width: min(560px, calc(100vw - 72px));
+  max-height: calc(100dvh - 170px);
 }
 
 .baseTierButton {
@@ -1871,6 +1901,37 @@
   text-transform: uppercase;
 }
 
+.modeToggleButton {
+  position: absolute;
+  top: 18px;
+  left: calc(100% + 8px);
+  z-index: 6;
+  display: inline-flex;
+  width: 36px;
+  min-height: 112px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 7px;
+  border: 1px solid rgb(198 154 246 / 62%);
+  border-radius: 2px;
+  color: #efe2ff;
+  background: rgb(45 27 58 / 86%);
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  pointer-events: auto;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+}
+
+.modeToggleButtonActive {
+  border-color: rgb(153 255 214 / 72%);
+  color: #c9ffe8;
+  background: rgb(20 76 58 / 88%);
+}
+
 .saveReturnButton {
   color: #201827;
   border-color: rgb(242 214 255 / 88%);
@@ -2018,13 +2079,34 @@
   padding: 2px 6px 2px 2px;
 }
 
-.iconGridTitle {
-  margin: 0;
-  color: #f5eadb;
-  font-size: 0.78rem;
+.iconTabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgb(205 142 255 / 22%);
+}
+
+.iconTabs button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  color: rgb(245 234 219 / 68%);
+  background: transparent;
+  font-size: 0.72rem;
   font-weight: 950;
-  letter-spacing: 0;
   text-transform: uppercase;
+}
+
+.iconTabs button:hover,
+.iconTabs button:focus-visible {
+  color: #f5eadb;
+  background: rgb(255 255 255 / 8%);
+}
+
+.iconTabs .iconTabActive {
+  border-color: rgb(205 142 255 / 38%);
+  color: #ffffff;
+  background: rgb(198 127 255 / 14%);
 }
 
 .iconAbilityGroup {
@@ -2167,6 +2249,16 @@
     right: clamp(24px, 5vw, 72px);
     width: min(52vw, 500px);
   }
+
+  .modeToggleButton {
+    top: -50px;
+    right: 92px;
+    left: auto;
+    width: auto;
+    min-height: 34px;
+    padding: 0 12px;
+    writing-mode: horizontal-tb;
+  }
 }
 
 @media (max-width: 760px) {
@@ -2188,6 +2280,16 @@
 
   .mainEditorColumnPreview {
     max-height: min(64dvh, calc(100dvh - 110px));
+  }
+
+  .modeToggleButton {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    grid-column: 1;
+    justify-self: end;
+    order: -2;
   }
 
   .sideTabs {

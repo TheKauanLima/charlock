@@ -1,7 +1,7 @@
 import ProfileUnavailable from '@/components/UserProfile/ProfileUnavailable'
 import UserProfile from '@/components/UserProfile/UserProfile'
 import { HEROES } from '@/lib/hero-data'
-import { getUserProfile, isProfileUnavailableError } from '@/lib/profile'
+import { getUserProfile, isProfilePrivateError, isProfileUnavailableError } from '@/lib/profile'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +18,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   try {
     data = await getUserProfile(username)
   } catch (error) {
+    if (isProfilePrivateError(error)) {
+      return <ProfileUnavailable reason="private" />
+    }
+
     if (isProfileUnavailableError(error)) {
       return <ProfileUnavailable />
     }

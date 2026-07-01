@@ -63,7 +63,7 @@ const abilityGridCellSchema = new Schema<IAbilityGridCell>({
   },
   scalingValue: { type: String, default: '0' },
   description: { type: String },
-})
+}, { _id: false })
 
 const abilitySectionSchema = new Schema<IAbilitySection>({
   id: { type: String, required: true },
@@ -84,7 +84,7 @@ const abilitySectionSchema = new Schema<IAbilitySection>({
     },
   },
   lowerCells: [abilityGridCellSchema],
-})
+}, { _id: false })
 
 const abilityVariantSchema = new Schema<IAbilityVariant>({
   name: { type: String, required: true },
@@ -105,7 +105,7 @@ const abilityVariantSchema = new Schema<IAbilityVariant>({
   },
   subStats: [statSchema],
   sections: [abilitySectionSchema],
-})
+}, { _id: false })
 
 const abilityTierSchema = new Schema<IAbilityTier>({
   tier: {
@@ -118,7 +118,7 @@ const abilityTierSchema = new Schema<IAbilityTier>({
     type: abilityVariantSchema,
     required: true,
   },
-})
+}, { _id: false })
 
 const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
   slot: { type: Number, required: true, min: 1 },
@@ -149,7 +149,7 @@ const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
       message: 'Ability definitions must include exactly 3 upgrade tiers.',
     },
   },
-})
+}, { _id: false })
 
 const abilityStatsSchema = new Schema<IAbilityStats>(
   {

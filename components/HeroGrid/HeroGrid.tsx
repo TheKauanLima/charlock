@@ -7,10 +7,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
+import { ConnectionStatus, LoadingOverlay, SessionExpiredModal } from '@/components/system-feedback/SystemFeedback'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
 import type { EditorRenderSelection } from '@/lib/editor-assets'
 import { buildDefaultAbilityStats, type AbilityStatsPayload } from '@/lib/ability-editor-types'
 import type { CustomHeroDetail, CustomHeroSavePayload, CustomHeroSort, CustomHeroSummary } from '@/lib/custom-hero-types'
+import { getNetworkRequestError, getUserFacingSaveError, parseClientRequestError, readApiResponse, type ApiErrorPayload } from '@/lib/client-errors'
+import { clearEditorRecovery } from '@/lib/editor-recovery'
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
@@ -180,6 +183,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }, [])
   const [isSavingHero, setIsSavingHero] = useState(false)
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null)
+  const [saveFailure, setSaveFailure] = useState<string | null>(null)
+  const [lastSavePayload, setLastSavePayload] = useState<CustomHeroSavePayload | null>(null)
+  const [isSessionExpired, setIsSessionExpired] = useState(false)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
   const renderHero = HEROES.find(hero => hero.slug === renderHeroSlug) ?? activeHero
   const editorHero = editingCustomHero ?? templateHero ?? activeHero
@@ -216,6 +222,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   )
 
   const applySavedHeroToEditor = useCallback((hero: CustomHeroDetail) => {
+    clearEditorRecovery()
     const renderState = getSavedRenderSelection(hero.render)
 
     setEditingCustomHero(hero)
@@ -286,6 +293,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }, [])
 
   const startCreateFromTemplate = useCallback((template: HeroTemplateDefinition) => {
+    clearEditorRecovery()
     const hero = template.hero
     const renderState = getSavedRenderSelection(hero.render)
 
@@ -533,6 +541,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     const nextHero = HEROES.find(hero => hero.slug === heroSlug)
 
     if (nextHero) {
+      clearEditorRecovery()
       setEditingCustomHero(null)
       setTemplateHero(null)
       setEditingHeroStats(null)
@@ -550,9 +559,15 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
   async function handleSaveHero(payload: CustomHeroSavePayload) {
     setIsSavingHero(true)
+    setLastSavePayload(payload)
+    setSaveFailure(null)
     setSaveStatusMessage(payload.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
 
     try {
+      if (navigator.onLine === false) {
+        throw new Error('Network connection is offline.')
+      }
+
       const response = await fetch('/api/heroes', {
         method: 'POST',
         headers: {
@@ -560,22 +575,40 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         },
         body: JSON.stringify(payload),
       })
-      const body = await response.json() as { hero?: CustomHeroDetail; error?: string }
+      const body = await readApiResponse<{ hero?: CustomHeroDetail } & ApiErrorPayload>(response)
 
-      if (!response.ok || !body.hero) {
-        throw new Error(getHeroResponseError(body, `Save request failed with ${response.status}`))
+      if (!response.ok || !body?.hero) {
+        const requestError = parseClientRequestError(
+          response,
+          body,
+          body ? `Save request failed with ${response.status}` : 'The save service returned an invalid response.',
+        )
+
+        setSaveFailure(getUserFacingSaveError(requestError.message, requestError.code))
+        setSaveStatusMessage(null)
+        if (requestError.isSessionExpired) setIsSessionExpired(true)
+        return
       }
 
       applySavedHeroToEditor({
         ...body.hero,
         abilityStats: mergeSubmittedSecondaryAbilities(body.hero.abilityStats, payload.abilityStats),
       })
+      clearEditorRecovery()
+      setLastSavePayload(null)
       setSaveStatusMessage(body.hero.status === 'published' ? 'Hero published to Browse.' : 'Private hero saved to your profile.')
     } catch (error) {
-      setSaveStatusMessage(error instanceof Error ? error.message : 'Failed to save hero.')
+      const requestError = getNetworkRequestError(error, 'Failed to save hero.')
+
+      setSaveFailure(getUserFacingSaveError(requestError.message, requestError.code))
+      setSaveStatusMessage(null)
     } finally {
       setIsSavingHero(false)
     }
+  }
+
+  function retrySaveHero() {
+    if (lastSavePayload) void handleSaveHero(lastSavePayload)
   }
 
   async function handleLikeHero(heroId: string) {
@@ -1021,6 +1054,8 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           initialAbilityStats={editingAbilityStats}
           isSaving={isSavingHero}
           saveStatusMessage={saveStatusMessage}
+          saveFailure={saveFailure}
+          onRetrySave={retrySaveHero}
           onBackgroundChange={setEditorBackground}
           onRenderSelectionChange={setEditorRenderSelection}
           onDraftChange={setEditorDraft}
@@ -1084,6 +1119,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           </section>
         </div>
       ) : null}
+      <ConnectionStatus />
+      <LoadingOverlay visible={isSavingHero} status={saveStatusMessage ? `[SYS] ${saveStatusMessage}` : undefined} />
+      <SessionExpiredModal open={isSessionExpired} onDismiss={() => setIsSessionExpired(false)} />
     </div>
   )
 }

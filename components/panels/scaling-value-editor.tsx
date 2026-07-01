@@ -1,6 +1,6 @@
 import type { CSSProperties, ChangeEvent, MouseEvent } from 'react'
 
-import { limitScalingValuePrecision, SCALING_ICONS, SCALING_VALUE_COLORS, SCALING_VALUE_CONFIG } from '@/components/panels/scaling-utils'
+import { limitScalingValuePrecision, SCALING_ICONS, SCALING_LABELS, SCALING_VALUE_COLORS, SCALING_VALUE_CONFIG } from '@/components/panels/scaling-utils'
 import type { ScalingType } from '@/components/panels/scaling-utils'
 
 import styles from './ScalingValueEditor.module.css'
@@ -40,6 +40,7 @@ function getScalingValueStyle(scaling: Exclude<ScalingType, 'none'>): CSSPropert
 
 export default function ScalingValueEditor({ scaling, scalingValue, isEditable = false, showValue = false, position = 'default', valuePosition = 'center', onChange }: ScalingValueEditorProps) {
   const scalingIconStyle = getScalingIconStyle(scaling)
+  const scalingLabel = SCALING_LABELS[scaling].toLowerCase()
 
   if (!scalingIconStyle) {
     return isEditable ? (
@@ -60,7 +61,7 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
   }
 
   return (
-    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''} ${valuePosition === 'lower' ? styles.rootValueLower : ''}`} data-scaling-editor="true" title={`${scaling} scaling ${scalingValue}`}>
+    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''} ${valuePosition === 'lower' ? styles.rootValueLower : ''}`} data-scaling-editor="true" title={`${scalingLabel} scaling ${scalingValue}`}>
       <span className={styles.icon} style={scalingIconStyle} aria-hidden="true" />
       {isEditable && scaling !== 'none' ? (
         <span className={styles.valueWrap} style={getScalingValueStyle(scaling)}>
@@ -71,14 +72,14 @@ export default function ScalingValueEditor({ scaling, scalingValue, isEditable =
             onChange={handleScalingValueChange}
             onClick={stopStatCellClick}
             onMouseDown={stopStatCellClick}
-            aria-label={`${scaling} scaling value`}
+            aria-label={`${scalingLabel} scaling value`}
             placeholder="0"
             className={`${styles.input} border-0 bg-transparent`}
             style={getScalingValueStyle(scaling)}
           />
         </span>
       ) : scaling !== 'none' ? (
-        <span className={`${styles.valueWrap} ${showValue ? styles.valueWrapVisible : ''}`} style={getScalingValueStyle(scaling)} aria-label={`${scaling} scaling value x${scalingValue}`}>
+        <span className={`${styles.valueWrap} ${showValue ? styles.valueWrapVisible : ''}`} style={getScalingValueStyle(scaling)} aria-label={`${scalingLabel} scaling value x${scalingValue}`}>
           <span className={styles.prefix} aria-hidden="true">x</span>
           <span className={styles.valueText}>{scalingValue}</span>
         </span>

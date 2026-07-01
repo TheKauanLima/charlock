@@ -3,6 +3,22 @@ import { z } from 'zod'
 const scalingSchema = z.enum(['none', 'spirit', 'courage', 'melee', 'boon'])
 const stringOrNumberSchema = z.union([z.string(), z.number()])
 
+export function stripDatabaseMetadata(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(stripDatabaseMetadata)
+  }
+
+  if (typeof value !== 'object' || value === null) {
+    return value
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== '_id' && key !== '__v')
+      .map(([key, nestedValue]) => [key, stripDatabaseMetadata(nestedValue)]),
+  )
+}
+
 export const panelStatSchema = z.object({
   label: z.string().max(120).optional(),
   value: stringOrNumberSchema.optional(),

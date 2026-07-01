@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, WheelEvent } from 'react'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
@@ -14,6 +14,7 @@ import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
+import { SaveFailureBanner, SystemToast } from '@/components/system-feedback/SystemFeedback'
 import { ABILITY_ICON_GROUPS, HERO_BACKGROUND_GROUPS, HERO_RENDER_GROUPS, PROPERTY_ICON_GROUPS, WEAPON_IMAGE_GROUPS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, HeroBackgroundOption } from '@/lib/editor-assets'
 import type { AbilityDefinition, AbilityStatsPayload } from '@/lib/ability-editor-types'
@@ -27,9 +28,11 @@ import {
   normalizeAbilityStats,
 } from '@/lib/ability-editor-types'
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
-import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
-import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
+import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { UploadButton } from '@/lib/uploadthing'
+import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
 import cn from '@/lib/utilsd'
 
@@ -48,6 +51,8 @@ interface HeroInfoEditorProps {
   initialAbilityStats?: AbilityStatsPayload | null
   isSaving?: boolean
   saveStatusMessage?: string | null
+  saveFailure?: string | null
+  onRetrySave?: () => void
   onBackgroundChange: (backgroundPath: string) => void
   onRenderSelectionChange: (renderSelection: EditorRenderSelection) => void
   onDraftChange: (draft: HeroInfoDefinition) => void
@@ -133,6 +138,12 @@ const TAG_WHEEL_STEP = 0.5
 const TAG_DRAG_PIXELS_PER_DEGREE = 6
 const TAG_OFFSET_MIN = -28
 const TAG_OFFSET_MAX = 28
+
+function hasPersistedHeroId(hero: HeroDefinition) {
+  const id = (hero as HeroDefinition & { id?: unknown }).id
+
+  return typeof id === 'string' && id.length > 0
+}
 const NAME_SIZE_MIN = 1
 const NAME_SIZE_MAX = 30
 const NAME_SIZE_DEFAULT = 6
@@ -171,6 +182,18 @@ function parseEditableNumber(value: string | number | null | undefined) {
 
 function sanitizeNumberInput(value: string | number) {
   return String(value).replace(/[^\d.-]/g, '')
+}
+
+function restoreRequiredAbilityIcons(heroInfo: HeroInfoDefinition): HeroInfoDefinition {
+  const fallback = HEROES[0].heroInfo
+
+  return {
+    ...heroInfo,
+    ability1Icon: heroInfo.ability1Icon || fallback.ability1Icon,
+    ability2Icon: heroInfo.ability2Icon || fallback.ability2Icon,
+    ability3Icon: heroInfo.ability3Icon || fallback.ability3Icon,
+    ability4Icon: heroInfo.ability4Icon || fallback.ability4Icon,
+  }
 }
 
 function clampTagTilt(value: number) {
@@ -301,21 +324,33 @@ function ColorField({ label, value, onChange }: ColorFieldProps) {
 
 function CloudUploadButton({ endpoint, label, className, onUploaded }: CloudUploadButtonProps) {
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const uploadPolicy = UPLOAD_POLICIES[endpoint]
 
   return (
-    <span className={cn(styles.cloudUploadWrap, className)}>
+    <span className={cn(styles.cloudUploadWrap, className)} data-upload-error={Boolean(uploadError) || undefined}>
       <UploadButton
         endpoint={endpoint}
         appearance={{
           container: styles.cloudUploadContainer,
-          button: styles.cloudUploadButton,
+          button: cn(styles.cloudUploadButton, uploadError && styles.cloudUploadButtonError),
           allowedContent: styles.cloudUploadAllowed,
         }}
         content={{
-          button: ({ isUploading }) => (isUploading ? 'Uploading...' : label),
+          button: ({ isUploading }) => (isUploading ? 'Uploading...' : uploadError ? 'Select Different Asset' : label),
           allowedContent: () => null,
         }}
         onUploadBegin={() => setUploadError(null)}
+        onBeforeUploadBegin={files => {
+          const validation = validateUploadFiles(files, uploadPolicy)
+
+          if (!validation.valid) {
+            setUploadError(validation.message)
+            return []
+          }
+
+          setUploadError(null)
+          return files
+        }}
         onClientUploadComplete={uploadedAssets => {
           const uploadedUrl = getUploadedAssetUrl(uploadedAssets)
 
@@ -324,6 +359,7 @@ function CloudUploadButton({ endpoint, label, className, onUploaded }: CloudUplo
             return
           }
 
+          setUploadError(null)
           onUploaded(uploadedUrl)
         }}
         onUploadError={error => setUploadError(error.message || 'Upload failed.')}
@@ -346,19 +382,22 @@ export default function HeroInfoEditor({
   initialAbilityStats = null,
   isSaving = false,
   saveStatusMessage = null,
+  saveFailure = null,
+  onRetrySave,
   onBackgroundChange,
   onRenderSelectionChange,
   onDraftChange,
   onSaveHero,
 }: HeroInfoEditorProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [activeAbilityTarget, setActiveAbilityTarget] = useState<ActiveAbilityTarget | null>(null)
   const [isWeaponAssetModalOpen, setIsWeaponAssetModalOpen] = useState(false)
   const [isBackgroundAssetModalOpen, setIsBackgroundAssetModalOpen] = useState(false)
   const [isHeroRenderAssetModalOpen, setIsHeroRenderAssetModalOpen] = useState(false)
   const [secondAbilitySetModal, setSecondAbilitySetModal] = useState<SecondAbilitySetModal | null>(null)
   const [tagDragState, setTagDragState] = useState<TagDragState | null>(null)
-  const initialStatsDraft = initialStats ?? buildHeroStatsSeed(hero)
+  const initialStatsDraft = initialStats ?? (hasPersistedHeroId(hero) ? buildEmptyHeroStats(hero) : buildHeroStatsSeed(hero))
   const initialAbilityDraft = initialAbilityStats ?? buildDefaultAbilityStats(hero)
   const normalizedInitialAbilityDraft = normalizeAbilityStats(initialAbilityDraft, hero)
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
@@ -370,6 +409,53 @@ export default function HeroInfoEditor({
   const [heroPortraitInput, setHeroPortraitInput] = useState(hero.portrait)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null)
+  const recoveryReadyRef = useRef(false)
+
+  useEffect(() => {
+    const snapshot = readEditorRecovery()
+    const timeoutId = window.setTimeout(() => {
+      if (snapshot) {
+        onDraftChange(snapshot.heroInfo)
+        onBackgroundChange(snapshot.background)
+        onRenderSelectionChange(snapshot.renderSelection)
+        setStatsDraft(snapshot.stats)
+        setAbilityStatsDraft(snapshot.abilityStats)
+        setSecondarySlotSelection(snapshot.abilityStats.secondaryAbilitySlots ?? [])
+        setWeaponBaseValues(buildWeaponBaseValues(snapshot.stats.weapon.stats))
+        setWeaponTagsInput(snapshot.stats.weapon.weaponAttributes.join(', '))
+        setHeroNameInput(snapshot.heroName)
+        setHeroPortraitInput(snapshot.portrait)
+        setAllowCopiesInput(snapshot.allowCopies)
+        setRecoveryStatus(`Recovered local draft from ${new Date(snapshot.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`)
+      }
+
+      recoveryReadyRef.current = true
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [onBackgroundChange, onDraftChange, onRenderSelectionChange])
+
+  useEffect(() => {
+    if (!recoveryReadyRef.current) return undefined
+
+    const timeoutId = window.setTimeout(() => {
+      writeEditorRecovery(buildEditorRecoverySnapshot({
+        heroSlug: hero.slug,
+        savedHeroId,
+        heroInfo: restoreRequiredAbilityIcons(draft),
+        background: selectedBackground,
+        renderSelection,
+        heroName: heroNameInput,
+        portrait: heroPortraitInput,
+        allowCopies: allowCopiesInput,
+        stats: statsDraft,
+        abilityStats: abilityStatsDraft,
+      }))
+    }, 250)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [abilityStatsDraft, allowCopiesInput, draft, hero.slug, heroNameInput, heroPortraitInput, renderSelection, savedHeroId, selectedBackground, statsDraft])
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
   const heroNameTextStyle = getHeroNameTextStyle(draft)
   const nameSizeControlValue = getNameSizeControlValue(draft.nameFontSize)
@@ -380,7 +466,7 @@ export default function HeroInfoEditor({
       ...hero,
       displayName: exportHeroName,
       render: getRenderPath(),
-      heroInfo: draft,
+      heroInfo: restoreRequiredAbilityIcons(draft),
     },
     {
       hero: {
@@ -389,7 +475,7 @@ export default function HeroInfoEditor({
         portrait: heroPortraitInput,
         render: getRenderPath(),
       },
-      heroInfo: draft,
+      heroInfo: restoreRequiredAbilityIcons(draft),
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
@@ -397,7 +483,7 @@ export default function HeroInfoEditor({
     {
       name: exportHeroName,
       render: getRenderPath(),
-      heroInfo: draft,
+      heroInfo: restoreRequiredAbilityIcons(draft),
     },
   )
 
@@ -589,7 +675,7 @@ export default function HeroInfoEditor({
         background: selectedBackground,
       },
       allowCopies: allowCopiesInput,
-      heroInfo: draft,
+      heroInfo: restoreRequiredAbilityIcons(draft),
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
@@ -636,6 +722,11 @@ export default function HeroInfoEditor({
   function handleAbilitySave(nextAbility: AbilityDefinition) {
     commitAbilityDraft(nextAbility)
     setActiveAbilityTarget(null)
+  }
+
+  function handleAbilityModeToggle(currentAbility: AbilityDefinition) {
+    commitAbilityDraft(currentAbility)
+    setIsPreviewMode(currentMode => !currentMode)
   }
 
   function handleFocusedAbilitySelect(target: ActiveAbilityTarget, currentAbility: AbilityDefinition) {
@@ -916,6 +1007,8 @@ export default function HeroInfoEditor({
         <AbilityEditor
           key={`${activeAbilityTarget.set}-${activeAbilityDraft.slot}`}
           ability={activeAbilityDraft}
+          mode={isPreviewMode ? 'preview' : 'edit'}
+          previewLayout="editor"
           propertyIconGroups={PROPERTY_ICON_GROUPS}
           hero={hero}
           heroInfo={draft}
@@ -924,10 +1017,12 @@ export default function HeroInfoEditor({
           secondaryAbilitySlots={secondaryAbilitySlots}
           isSecondAbilitySetEnabled={isSecondAbilitySetEnabled}
           abilityIconGroups={ABILITY_ICON_GROUPS}
+          showDetails={isPreviewMode}
           onHeroInfoChange={onDraftChange}
           onAbilityIconChange={handleAbilityIconChange}
           onAbilitySelect={handleFocusedAbilitySelect}
           onSecondAbilitySetToggle={handleFocusedSecondAbilitySetToggle}
+          onModeToggle={handleAbilityModeToggle}
           onSave={handleAbilitySave}
           onCancel={() => setActiveAbilityTarget(null)}
         />
@@ -1082,9 +1177,9 @@ export default function HeroInfoEditor({
               className={styles.abilitiesRow}
               primaryTestIdPrefix="editor-ability"
               secondaryTestIdPrefix="editor-secondary-ability"
-              primaryLabel={slot => `Edit Ability ${slot}`}
-              secondaryLabel={slot => `Edit Secondary Ability ${slot}`}
-              editable
+              primaryLabel={slot => `${isPreviewMode ? 'Preview' : 'Edit'} Ability ${slot}`}
+              secondaryLabel={slot => `${isPreviewMode ? 'Preview' : 'Edit'} Secondary Ability ${slot}`}
+              editable={!isPreviewMode}
             />
       </div>
 
@@ -1093,7 +1188,9 @@ export default function HeroInfoEditor({
           {activeTabId === 'weapon' ? (
             <div className={styles.weaponStack}>
               <WeaponPanel
-                isEditable
+                key={isPreviewMode ? 'weapon-preview' : 'weapon-edit'}
+                isEditable={!isPreviewMode}
+                showDetails={isPreviewMode}
                 weaponName={statsDraft.weapon.weaponName}
                 weaponDesc={statsDraft.weapon.weaponDesc}
                 gunImageSrc={statsDraft.weapon.gunImageSrc}
@@ -1115,10 +1212,10 @@ export default function HeroInfoEditor({
             </div>
           ) : null}
 
-          {activeTabId === 'vitality' ? <HeroStatsVitalityPanel isEditable stats={statsDraft.vitality.stats} onStatsChange={handleVitalityStatsChange} /> : null}
+          {activeTabId === 'vitality' ? <HeroStatsVitalityPanel key={isPreviewMode ? 'vitality-preview' : 'vitality-edit'} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={statsDraft.vitality.stats} onStatsChange={handleVitalityStatsChange} /> : null}
 
           {activeTabId === 'spirit' ? (
-          <HeroStatsSpiritPanel isEditable stats={statsDraft.spirit.topStats} spiritPowerStat={statsDraft.spirit.spiritPowerStat} onStatsChange={handleSpiritTopStatsChange} onSpiritPowerStatChange={handleSpiritPowerStatChange} />
+          <HeroStatsSpiritPanel key={isPreviewMode ? 'spirit-preview' : 'spirit-edit'} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={statsDraft.spirit.topStats} spiritPowerStat={statsDraft.spirit.spiritPowerStat} onStatsChange={handleSpiritTopStatsChange} onSpiritPowerStatChange={handleSpiritPowerStatChange} />
           ) : null}
         </aside>
       ) : null}
@@ -1129,7 +1226,14 @@ export default function HeroInfoEditor({
             <h2 className={styles.railTitle}>Create</h2>
             <p className={styles.railSubtitle}>{hero.displayName} draft</p>
           </div>
-          <span className={styles.liveBadge}>Live</span>
+          <button
+            type="button"
+            className={cn(styles.previewModeButton, isPreviewMode && styles.previewModeButtonActive)}
+            aria-pressed={isPreviewMode}
+            onClick={() => setIsPreviewMode(currentMode => !currentMode)}
+          >
+            {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
+          </button>
         </div>
 
         <div className={styles.railContent}>
@@ -1362,7 +1466,9 @@ export default function HeroInfoEditor({
           </button>
           <CharacterExportButton payload={exportPayload} className={styles.exportActionButton} />
           {saveError ? <p className={styles.saveError} role="alert">{saveError}</p> : null}
-          {saveStatusMessage ? <p className={styles.actionStatus} role="status">{saveStatusMessage}</p> : null}
+          {saveFailure && onRetrySave ? <SaveFailureBanner reason={saveFailure} onRetry={onRetrySave} /> : null}
+          {saveStatusMessage ? <SystemToast message={saveStatusMessage} /> : null}
+          {recoveryStatus && !saveStatusMessage ? <SystemToast message={recoveryStatus} /> : null}
         </div>
       </div>
 

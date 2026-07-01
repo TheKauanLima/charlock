@@ -6,6 +6,7 @@ import type { ChangeEvent, CSSProperties, KeyboardEvent, MouseEvent, RefObject }
 import {
   limitScalingValuePrecision,
   SCALING_ICONS,
+  SCALING_LABELS,
   SCALING_TYPES,
 } from '@/components/panels/scaling-utils'
 import type { ScalingState, ScalingType } from '@/components/panels/scaling-utils'
@@ -18,12 +19,9 @@ interface ScalingPickerProps extends ScalingState {
   boundaryRef?: RefObject<HTMLElement | null>
   openPickerId: string | null
   className?: string
+  menuPosition?: 'above' | 'below'
   onChange: (updates: ScalingState) => void
   onOpenPickerChange: (pickerId: string | null) => void
-}
-
-function formatScalingLabel(scaling: ScalingType) {
-  return scaling.charAt(0).toUpperCase() + scaling.slice(1)
 }
 
 function getScalingButtonIconStyle(scaling: ScalingType): CSSProperties | undefined {
@@ -32,7 +30,7 @@ function getScalingButtonIconStyle(scaling: ScalingType): CSSProperties | undefi
   return icon ? { backgroundImage: `url('${icon}')` } : undefined
 }
 
-export default function ScalingPicker({ label, scaling, scalingValue, boundaryRef, openPickerId, className, onChange, onOpenPickerChange }: ScalingPickerProps) {
+export default function ScalingPicker({ label, scaling, scalingValue, boundaryRef, openPickerId, className, menuPosition = 'below', onChange, onOpenPickerChange }: ScalingPickerProps) {
   const pickerId = useId()
   const pickerRef = useRef<HTMLSpanElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -124,6 +122,7 @@ export default function ScalingPicker({ label, scaling, scalingValue, boundaryRe
       data-scaling-picker="true"
       data-scaling={scaling}
       data-menu-side={menuSide}
+      data-menu-position={menuPosition}
       onClick={stopPickerEvent}
       onMouseDown={stopPickerEvent}
       onKeyDown={handleKeyDown}
@@ -147,6 +146,7 @@ export default function ScalingPicker({ label, scaling, scalingValue, boundaryRe
           <span className={styles.typeRow}>
             {SCALING_TYPES.map(nextScaling => {
               const scalingIconStyle = getScalingButtonIconStyle(nextScaling)
+              const scalingLabel = SCALING_LABELS[nextScaling]
 
               return (
                 <button
@@ -154,14 +154,14 @@ export default function ScalingPicker({ label, scaling, scalingValue, boundaryRe
                   type="button"
                   data-scaling={nextScaling}
                   className={cn(styles.typeCell, scaling === nextScaling && styles.typeCellActive)}
-                  aria-label={`Set ${label} scaling to ${nextScaling}`}
+                  aria-label={`Set ${label} scaling to ${scalingLabel.toLowerCase()}`}
                   aria-pressed={scaling === nextScaling}
                   onClick={() => updateScaling(nextScaling)}
                 >
                   {scalingIconStyle ? (
                     <span className={styles.typeIcon} style={scalingIconStyle} aria-hidden="true" />
                   ) : null}
-                  <span>{formatScalingLabel(nextScaling)}</span>
+                  <span>{scalingLabel}</span>
                 </button>
               )
             })}

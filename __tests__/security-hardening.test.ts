@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 
 import nextConfig from '@/next.config'
-import { authEmailRequestSchema, customHeroSaveSchema, heroCommentRequestSchema } from '@/lib/custom-hero-schemas'
+import { authEmailRequestSchema, customHeroSaveSchema, heroCommentRequestSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { isDatabaseConnectionError } from '@/lib/dbConnect'
 import { checkRateLimit, resetRateLimitStore } from '@/lib/rate-limit'
 
@@ -73,6 +73,28 @@ describe('security hardening', () => {
         injected: true,
       },
     })).toThrow()
+  })
+
+  it('removes leaked Mongo metadata without weakening strict payload validation', () => {
+    const sanitized = stripDatabaseMetadata({
+      name: 'Loaded Hero',
+      hero: { render: '/render/loaded.png' },
+      weapon: {
+        stats: [{
+          _id: 'mongo-subdocument-id',
+          __v: 0,
+          label: 'Weapon Damage',
+          value: '22',
+        }],
+      },
+    })
+    const parsed = customHeroSaveSchema.parse(sanitized)
+
+    expect(parsed.weapon.stats?.[0]).toEqual({ label: 'Weapon Damage', value: '22' })
+    expect(() => customHeroSaveSchema.parse(stripDatabaseMetadata({
+      name: 'Still Strict',
+      hero: { render: '/render/strict.png', injected: true },
+    }))).toThrow()
   })
 
   it('enforces local sliding-window request limits', () => {
