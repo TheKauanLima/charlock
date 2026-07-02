@@ -70,6 +70,8 @@ describe('Mongoose model schemas', () => {
     expect(User.schema.path('anonymousEdits')).toBeDefined()
     expect(User.schema.path('customBio')).toBeDefined()
     expect(User.schema.path('bookmarks')).toBeDefined()
+    expect(User.schema.path('suspendedAt')).toBeDefined()
+    expect(User.schema.path('suspensionReason')).toBeDefined()
   })
 
   it('stores official hero asset identity in the heroes collection', () => {
@@ -93,12 +95,18 @@ describe('Mongoose model schemas', () => {
     expect(CustomHero.schema.path('likedBy')).toBeDefined()
     expect(CustomHero.schema.path('allowCopies')).toBeDefined()
     expect(CustomHero.schema.path('publishedAt')).toBeDefined()
+    expect(CustomHero.schema.path('reports')).toBeDefined()
+    expect(CustomHero.schema.path('reports.reporterId')).toBeDefined()
+    expect(CustomHero.schema.path('moderationStatus')).toHaveProperty('enumValues', ['clean', 'flagged', 'hidden'])
   })
 
   it('stores social comments and follow relationships', () => {
     expect(Comment.schema.path('heroId')).toBeDefined()
     expect(Comment.schema.path('userId')).toBeDefined()
     expect(Comment.schema.path('content')).toBeDefined()
+    expect(Comment.schema.path('reports')).toBeDefined()
+    expect(Comment.schema.path('reports.reason')).toBeDefined()
+    expect(Comment.schema.path('moderationStatus')).toHaveProperty('enumValues', ['clean', 'flagged', 'hidden'])
     expect(Follow.schema.path('followerId')).toBeDefined()
     expect(Follow.schema.path('followingId')).toBeDefined()
     expect(Like.schema.path('heroId')).toBeDefined()

@@ -13,6 +13,7 @@ import type { IComment } from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import User from '@/lib/models/User'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
+import { assertUserNotSuspended } from '@/lib/user-suspension'
 
 const FALLBACK_HERO_PORTRAIT = HEROES[0]?.portrait ?? ''
 
@@ -140,7 +141,7 @@ function serializeComment(comment: CommentRecord, usersByClerkId: Map<string, Us
 
 async function getPublishedHero(id: string) {
   const objectId = getValidObjectId(id)
-  const hero = await CustomHero.findOne({ _id: objectId, status: 'published' }).lean<HeroRecord | null>()
+  const hero = await CustomHero.findOne({ _id: objectId, status: 'published', moderationStatus: { $ne: 'hidden' } }).lean<HeroRecord | null>()
 
   if (!hero) {
     throw new CustomHeroError('Hero not found', 404)
@@ -155,7 +156,7 @@ export async function listHeroComments(heroId: string): Promise<HeroComment[]> {
   await dbConnect()
   await getPublishedHero(heroId)
 
-  const comments = await Comment.find({ heroId: getValidObjectId(heroId) })
+  const comments = await Comment.find({ heroId: getValidObjectId(heroId), moderationStatus: { $ne: 'hidden' } })
     .sort({ createdAt: -1 })
     .limit(40)
     .lean<CommentRecord[]>()
@@ -177,11 +178,14 @@ export async function postHeroComment(heroId: string, content: unknown): Promise
   }
 
   await dbConnect()
+  await assertUserNotSuspended(actor.clerkId)
   const hero = await getPublishedHero(heroId)
   const comment = await Comment.create({
     heroId: hero._id,
     userId: actor.clerkId,
     content: trimmedContent,
+    reports: [],
+    moderationStatus: 'clean',
   }) as CommentRecord
   const recipientId = await resolveRecipientClerkId(hero.createdByUserId)
 
@@ -363,7 +367,7 @@ export async function getActivityFeed(): Promise<ActivityFeedItem[]> {
       ...followedUsers.map(user => user._id.toString()),
     ]
     const followedHeroes = followedOwnerIds.length
-      ? await CustomHero.find({ status: 'published', createdByUserId: { $in: followedOwnerIds } })
+      ? await CustomHero.find({ status: 'published', moderationStatus: { $ne: 'hidden' }, createdByUserId: { $in: followedOwnerIds } })
           .sort({ publishedAt: -1, updatedAt: -1 })
           .limit(20)
           .lean<HeroRecord[]>()
@@ -371,7 +375,7 @@ export async function getActivityFeed(): Promise<ActivityFeedItem[]> {
 
     const ownHeroes = await CustomHero.find({ createdByUserId: { $in: actor.ownerIds } }).select('_id name portrait createdByUserId').lean<HeroRecord[]>()
     const comments = ownHeroes.length
-      ? await Comment.find({ heroId: { $in: ownHeroes.map(hero => hero._id) } })
+      ? await Comment.find({ heroId: { $in: ownHeroes.map(hero => hero._id) }, moderationStatus: { $ne: 'hidden' } })
           .sort({ createdAt: -1 })
           .limit(20)
           .lean<CommentRecord[]>()

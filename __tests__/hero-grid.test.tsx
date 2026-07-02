@@ -487,10 +487,75 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
 
     expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Toggle secondary Ability 1' })).toHaveAttribute('aria-pressed', 'true')
+    const abilityOneChoice = screen.getByRole('button', { name: 'Toggle secondary Ability 1' })
+    const abilityTwoChoice = screen.getByRole('button', { name: 'Toggle secondary Ability 2' })
+
+    expect(abilityOneChoice).toHaveAttribute('aria-pressed', 'true')
+    expect(abilityOneChoice).toHaveAttribute('style', expect.stringContaining('background'))
+    expect(abilityOneChoice.querySelector('[aria-hidden="true"]')).toHaveAttribute('style', expect.stringContaining('mask-image'))
+    await user.click(abilityOneChoice)
+    expect(abilityOneChoice).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Apply Selection' })).toBeEnabled()
+    await user.click(abilityTwoChoice)
     await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
 
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+  })
+
+  it('allows every secondary ability choice to be cleared through removal confirmation', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
+    expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
+    await user.click(screen.getByRole('button', { name: 'Toggle secondary Ability 1' }))
+    expect(screen.getByRole('button', { name: 'Toggle secondary Ability 1' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
+
+    expect(screen.getByRole('dialog', { name: 'REMOVE SECOND SET?' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Delete Second Set' }))
+    expect(screen.queryByRole('button', { name: 'Edit Secondary Ability 1' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the existing ability primary until its explicit slot swap is used', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Existing Primary')
+    await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
+    await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Existing Primary')
+    const primaryCircle = screen.getByTestId('ability-editor-hero-info-ability-1')
+    const clippedIcon = primaryCircle.querySelector('[class*="abilityIconClipWithSecondary"]')
+
+    expect(clippedIcon).toHaveAttribute('style', expect.stringContaining('radial-gradient'))
+    expect(clippedIcon?.querySelector('[aria-hidden="true"]')).toHaveAttribute('style', expect.stringContaining('mask-image'))
+
+    await user.click(screen.getByRole('button', { name: 'Edit Secondary Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'New Secondary')
+    await user.click(screen.getByRole('button', { name: 'Swap primary and secondary Ability 1' }))
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Existing Primary')
+    expect(screen.getByRole('button', { name: 'Change Secondary Ability 1 icon' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('New Secondary')
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Secondary Ability 1' }))
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Existing Primary')
   })
 
   it('publishes a second ability set enabled from the focused ability editor', async () => {

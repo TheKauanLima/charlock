@@ -13,6 +13,8 @@ export interface IUser {
   anonymousEdits: boolean
   customBio?: string | null
   bookmarks: Types.ObjectId[]
+  suspendedAt?: Date | null
+  suspensionReason?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -71,6 +73,16 @@ const userSchema = new Schema<IUser>(
       type: [Schema.Types.ObjectId],
       ref: 'Hero',
       default: [],
+    },
+    suspendedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
+    suspensionReason: {
+      type: String,
+      default: null,
+      maxlength: 500,
     },
   },
   {

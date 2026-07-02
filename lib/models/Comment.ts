@@ -1,9 +1,14 @@
 import { Schema, model, models, type Model, type Types } from 'mongoose'
 
+import type { ContentReport, ModerationStatus } from '@/lib/moderation-types'
+import { contentReportSchema } from '@/lib/models/moderation'
+
 export interface IComment {
   heroId: Types.ObjectId
   userId: string
   content: string
+  reports: ContentReport[]
+  moderationStatus: ModerationStatus
   createdAt: Date
   updatedAt: Date
 }
@@ -26,6 +31,16 @@ const commentSchema = new Schema<IComment>(
       required: true,
       trim: true,
       maxlength: 500,
+    },
+    reports: {
+      type: [contentReportSchema],
+      default: [],
+    },
+    moderationStatus: {
+      type: String,
+      enum: ['clean', 'flagged', 'hidden'],
+      default: 'clean',
+      index: true,
     },
   },
   {

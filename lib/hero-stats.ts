@@ -232,10 +232,10 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
   }
 
   const customHeroById = Types.ObjectId.isValid(slug)
-    ? await CustomHero.findById(slug).select('_id slug name portrait render').lean<HeroRecord | null>()
+    ? await CustomHero.findOne({ _id: new Types.ObjectId(slug), status: 'published', moderationStatus: { $ne: 'hidden' } }).select('_id slug name portrait render').lean<HeroRecord | null>()
     : null
   const officialHero = customHeroById ? null : await OfficialHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
-  const hero = customHeroById ?? officialHero ?? await CustomHero.findOne({ slug }).select('_id slug name portrait render').lean<HeroRecord | null>()
+  const hero = customHeroById ?? officialHero ?? await CustomHero.findOne({ slug, status: 'published', moderationStatus: { $ne: 'hidden' } }).select('_id slug name portrait render').lean<HeroRecord | null>()
 
   if (!hero) {
     return null

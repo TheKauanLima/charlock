@@ -10,6 +10,7 @@ import CustomHero from '@/lib/models/CustomHero'
 import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import User from '@/lib/models/User'
+import type { ModerationStatus } from '@/lib/moderation-types'
 
 export interface UserLevel {
   label: 'New User' | 'Contributor' | 'Power User' | 'Community Leader'
@@ -40,6 +41,7 @@ export interface ProfileHeroCard {
   render: string
   updatedAt: string
   status: string
+  moderationStatus: ModerationStatus
 }
 
 export interface ProfileBackgroundVisual {
@@ -89,6 +91,7 @@ interface HeroRecord {
   portrait: string
   render: string
   status: string
+  moderationStatus?: ModerationStatus
   updatedAt: Date
 }
 
@@ -202,6 +205,7 @@ function serializeHero(hero: HeroRecord): ProfileHeroCard {
     render: hero.render,
     updatedAt: hero.updatedAt.toISOString(),
     status: hero.status,
+    moderationStatus: hero.moderationStatus ?? 'clean',
   }
 }
 
@@ -357,7 +361,10 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
   }
 
   const ownerIds = buildOwnerIds(user)
-  const authoredHeroRecords = await CustomHero.find({ createdByUserId: { $in: ownerIds } })
+  const authoredHeroRecords = await CustomHero.find({
+    createdByUserId: { $in: ownerIds },
+    ...(viewerIsOwner ? {} : { status: 'published', moderationStatus: { $ne: 'hidden' } }),
+  })
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const authoredHeroIds = authoredHeroRecords.map(hero => hero._id)

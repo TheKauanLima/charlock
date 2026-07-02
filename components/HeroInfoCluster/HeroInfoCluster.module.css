@@ -184,7 +184,7 @@
 .bookmarkButton,
 .commentsToggle,
 .commentForm button,
-.commentItem button {
+.commentDeleteButton {
   border: 1px solid rgba(255, 239, 214, 0.16);
   background: rgba(0, 0, 0, 0.42);
   color: rgba(255, 239, 214, 0.78);
@@ -223,8 +223,8 @@
 .commentsToggle:focus-visible,
 .commentForm button:hover,
 .commentForm button:focus-visible,
-.commentItem button:hover,
-.commentItem button:focus-visible {
+.commentDeleteButton:hover,
+.commentDeleteButton:focus-visible {
   border-color: rgba(47, 200, 144, 0.66);
   color: #bafbe0;
   outline: none;
@@ -385,7 +385,7 @@
   line-height: 1.35;
 }
 
-.commentItem button {
+.commentDeleteButton {
   position: absolute;
   top: 8px;
   right: 8px;

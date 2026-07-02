@@ -250,7 +250,6 @@
 .abilitiesRow {
   display: flex;
   justify-content: center;
-  gap: 10px;
 }
 
 .abilityButtonWrap {
@@ -970,59 +969,14 @@
   line-height: 1.45;
 }
 
-.anchorAbilityGrid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+.secondaryAbilityChoices {
+  display: flex;
+  justify-content: center;
   margin-top: 18px;
-}
-
-.anchorAbilityButton {
-  display: grid;
-  min-height: 132px;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
   border: 1px solid rgba(198, 154, 246, 0.42);
   border-radius: 4px;
+  padding: 22px 16px;
   background: rgba(255, 255, 255, 0.06);
-  color: #fff3dd;
-  transition:
-    border-color 140ms ease,
-    background 140ms ease,
-    transform 140ms ease;
-}
-
-.anchorAbilityButton:hover,
-.anchorAbilityButton:focus-visible {
-  border-color: rgba(255, 243, 221, 0.88);
-  background: rgba(198, 154, 246, 0.16);
-  transform: translateY(-1px);
-}
-
-.anchorAbilityButtonSelected {
-  border-color: rgba(255, 243, 221, 0.9);
-  background: rgba(198, 154, 246, 0.22);
-  box-shadow: inset 0 0 0 1px rgba(255, 243, 221, 0.36);
-}
-
-.anchorAbilityIcon {
-  width: 58px;
-  aspect-ratio: 1;
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
-  -webkit-mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-}
-
-.anchorAbilityButton strong {
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-align: center;
-  text-transform: uppercase;
 }
 
 .secondSetConfirmActions {

@@ -9,6 +9,7 @@ import BackstoryModule from '@/components/backstory/BackstoryModule'
 import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import type { AbilityIconTarget } from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
+import ReportDialog from '@/components/Moderation/ReportDialog'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
@@ -439,6 +440,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
                 <span>{visibleComments.length}</span>
               </button>
               <CharacterExportButton payload={exportPayload} />
+              <ReportDialog endpoint={`/api/heroes/${encodeURIComponent(heroId)}/report`} contentLabel="character" />
             </div>
 
             {isCommentsOpen ? (
@@ -472,8 +474,17 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
                           <time dateTime={comment.createdAt}>{formatNoteTime(comment.createdAt)}</time>
                         </div>
                         <p>{comment.content}</p>
+                        <ReportDialog
+                          endpoint={`/api/comments/${encodeURIComponent(comment.id)}/report`}
+                          contentLabel="comment"
+                          onReported={moderationStatus => {
+                            if (moderationStatus === 'hidden') {
+                              setComments(currentComments => currentComments.filter(item => item.id !== comment.id))
+                            }
+                          }}
+                        />
                         {comment.viewerCanDelete ? (
-                          <button type="button" aria-label="Delete comment" onClick={() => handleDeleteComment(comment.id)}>
+                          <button type="button" className={styles.commentDeleteButton} aria-label="Delete comment" onClick={() => handleDeleteComment(comment.id)}>
                             <Trash2 aria-hidden="true" />
                           </button>
                         ) : null}

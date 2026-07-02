@@ -1,5 +1,8 @@
 import { Schema, model, models, type Model } from 'mongoose'
 
+import type { ContentReport, ModerationStatus } from '@/lib/moderation-types'
+import { contentReportSchema } from '@/lib/models/moderation'
+
 export interface ICustomHeroEngagementEvent {
   userId: string
   createdAt: Date
@@ -19,6 +22,8 @@ export interface ICustomHero {
   copyEvents: ICustomHeroEngagementEvent[]
   allowCopies: boolean
   publishedAt?: Date | null
+  reports: ContentReport[]
+  moderationStatus: ModerationStatus
   createdAt: Date
   updatedAt: Date
 }
@@ -98,6 +103,16 @@ const customHeroSchema = new Schema<ICustomHero>(
     publishedAt: {
       type: Date,
       default: null,
+    },
+    reports: {
+      type: [contentReportSchema],
+      default: [],
+    },
+    moderationStatus: {
+      type: String,
+      enum: ['clean', 'flagged', 'hidden'],
+      default: 'clean',
+      index: true,
     },
   },
   {

@@ -42,6 +42,7 @@ interface ProfileGridHero {
   bookmarkIndex: number
   creatorType: 'Official' | 'Community'
   roleTags: string[]
+  restricted?: boolean
 }
 
 interface ProfileBackgroundOption extends ProfileBackgroundVisual {
@@ -120,6 +121,7 @@ function getCreatedHeroes(data: UserProfileData): ProfileGridHero[] {
         summary?.heroInfo.tag2Text,
         summary?.heroInfo.tag3Text,
       ].filter((tag): tag is string => Boolean(tag)),
+      restricted: hero.moderationStatus === 'hidden',
     }
   })
 }
@@ -262,6 +264,11 @@ function ProfileHeroGrid({
             <span className={heroGridStyles.heroNameBadge} aria-hidden="true">
               {hero.name}
             </span>
+            {hero.restricted ? (
+              <span className={styles.restrictedCardMessage} role="status">
+                ALERT: This character has been temporarily restricted due to safety reports and is undergoing review.
+              </span>
+            ) : null}
           </Link>
           {onUnbookmark ? (
             <button

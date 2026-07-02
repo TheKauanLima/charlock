@@ -345,6 +345,22 @@
   gap: 18px;
 }
 
+.restrictedCardMessage {
+  position: absolute;
+  inset: 8px;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 113, 93, 0.62);
+  background: rgba(35, 5, 5, 0.9);
+  color: #ffd0c7;
+  font: 900 0.62rem var(--font-geist-mono), monospace;
+  line-height: 1.35;
+  text-align: center;
+  text-transform: uppercase;
+}
+
 .panelFrame {
   position: relative;
   min-height: 380px;

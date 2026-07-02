@@ -168,9 +168,9 @@ function normalizeAbilityStat(value: unknown, fallback: AbilityStat): AbilitySta
 }
 
 function normalizeStatArray(value: unknown, fallback: AbilityStat[], limit?: number) {
-  const source = Array.isArray(value) ? value : []
-  const normalized = source.map((item, index) => normalizeAbilityStat(item, fallback[index] ?? buildAbilityStat()))
-  const nextStats = normalized.length ? normalized : fallback
+  const nextStats = Array.isArray(value)
+    ? value.map((item, index) => normalizeAbilityStat(item, fallback[index] ?? buildAbilityStat()))
+    : fallback
 
   return typeof limit === 'number' ? nextStats.slice(0, limit) : nextStats
 }

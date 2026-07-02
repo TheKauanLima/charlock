@@ -1,0 +1,175 @@
+.trigger {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 135, 120, 0.32);
+  background: rgba(50, 8, 8, 0.46);
+  color: #ffc7bc;
+  font: 900 0.68rem var(--font-geist-mono), "Roboto Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  border-color: rgba(255, 135, 120, 0.78);
+  color: #fff0eb;
+  outline: none;
+}
+
+.trigger svg {
+  width: 13px;
+  height: 13px;
+}
+
+.triggerCompact {
+  width: 26px;
+  min-height: 26px;
+  justify-content: center;
+  padding: 0;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.dialog {
+  display: grid;
+  width: min(520px, 100%);
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255, 239, 214, 0.22);
+  background: linear-gradient(145deg, #191b18, #090b0a);
+  color: #ffefd6;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.68);
+}
+
+.dialog header,
+.dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dialog header p,
+.dialog header h2,
+.dialog fieldset,
+.error {
+  margin: 0;
+}
+
+.dialog header p,
+.dialog legend,
+.detailsLabel span {
+  color: rgba(255, 239, 214, 0.5);
+  font: 800 0.68rem var(--font-geist-mono), monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.dialog header h2 {
+  margin-top: 4px;
+  font-size: 1.4rem;
+}
+
+.dialog header button,
+.dialog footer button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 239, 214, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffefd6;
+}
+
+.dialog header button {
+  display: grid;
+  width: 34px;
+  place-items: center;
+  padding: 0;
+}
+
+.dialog header svg {
+  width: 16px;
+}
+
+.dialog fieldset {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 239, 214, 0.14);
+}
+
+.dialog fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.86rem;
+}
+
+.dialog input {
+  accent-color: #c97d70;
+}
+
+.detailsLabel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  font-size: 0.8rem;
+}
+
+.detailsLabel textarea {
+  grid-column: 1 / -1;
+  min-height: 100px;
+  resize: vertical;
+  border: 1px solid rgba(255, 239, 214, 0.16);
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffefd6;
+  padding: 10px;
+  font: 0.8rem var(--font-geist-mono), monospace;
+}
+
+.dialog footer {
+  justify-content: flex-end;
+}
+
+.dialog footer button {
+  padding: 0 14px;
+  font: 900 0.68rem var(--font-geist-mono), monospace;
+  text-transform: uppercase;
+}
+
+.dialog footer button:last-child {
+  border-color: rgba(255, 135, 120, 0.52);
+  background: rgba(111, 26, 21, 0.54);
+}
+
+.dialog button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.error {
+  color: #ff9f91;
+  font-size: 0.76rem;
+}
+
+.toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 520;
+  max-width: min(420px, calc(100vw - 44px));
+  padding: 12px 14px;
+  border: 1px solid rgba(47, 200, 144, 0.48);
+  background: rgba(5, 29, 21, 0.96);
+  color: #bafbe0;
+  font: 800 0.72rem var(--font-geist-mono), monospace;
+}

@@ -1,7 +1,8 @@
 .row {
   display: flex;
+  align-items: flex-start;
   justify-content: center;
-  gap: 10px;
+  gap: 13px;
 }
 
 .wrap {
@@ -9,8 +10,13 @@
   display: inline-flex;
   aspect-ratio: 1;
   width: clamp(54px, 4.5vw, 75px);
+  height: clamp(54px, 4.5vw, 75px);
   flex-shrink: 0;
   overflow: visible;
+}
+
+.wrapWithSecondary {
+  margin-bottom: 34px;
 }
 
 .ability {
@@ -49,6 +55,23 @@ button.ability:focus-visible {
     0 4px 10px rgb(0 0 0 / 18%),
     0 0 0 3px rgb(198 154 246 / 42%),
     0 0 22px rgb(198 154 246 / 55%);
+}
+
+.abilityIconClip {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
+.abilityIconClipWithSecondary {
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 100% 100%;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
 }
 
 .abilityIcon {
@@ -110,4 +133,40 @@ button.secondaryAbility:focus-visible {
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
+}
+
+.swapAbility {
+  position: absolute;
+  top: calc(114% + 7px);
+  left: 57%;
+  z-index: 3;
+  display: inline-flex;
+  width: 30%;
+  min-width: 24px;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(255 243 221 / 72%);
+  border-radius: 999px;
+  color: #fff3dd;
+  background: rgb(39 24 50 / 94%);
+  box-shadow: 0 3px 9px rgb(0 0 0 / 38%);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.swapAbility:hover {
+  background: rgb(93 54 119 / 98%);
+  transform: translateX(-50%) scale(1.08);
+}
+
+.swapAbility:focus-visible {
+  outline: 2px solid #ffefd6;
+  outline-offset: 2px;
+}
+
+.swapAbility svg {
+  width: 62%;
+  height: 62%;
 }

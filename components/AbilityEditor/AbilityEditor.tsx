@@ -1,8 +1,8 @@
 'use client'
 
-import { Bold, Italic, Moon, Plus, Search, X } from 'lucide-react'
+import { Bold, GripVertical, Italic, Moon, Plus, Search, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
+import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import ScalingPicker from '@/components/panels/scaling-picker'
@@ -90,6 +90,7 @@ interface AbilityEditorProps {
   onHeroInfoChange?: (heroInfo: HeroInfoDefinition) => void
   onAbilityIconChange?: (target: AbilityEditorTarget, iconPath: string) => void
   onAbilitySelect?: (target: AbilityEditorTarget, currentAbility: AbilityDefinition) => void
+  onAbilitySwap?: (primaryIndex: number, currentAbility: AbilityDefinition) => void
   onSecondAbilitySetToggle?: (enabled: boolean, currentAbility: AbilityDefinition) => void
   onModeToggle?: (currentAbility: AbilityDefinition) => void
   onSave?: (ability: AbilityDefinition) => void
@@ -141,6 +142,7 @@ const TIER_BOXES: Array<{ tier: AbilityTierLevel; cost: string }> = [
   { tier: 3, cost: '5' },
 ]
 type ActiveTier = 0 | AbilityTierLevel
+type SectionDropPosition = 'before' | 'after'
 const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
 const TIER_TEXT_APPROX_CHARS_PER_LINE = 16
 
@@ -192,9 +194,8 @@ function getInlineIconHtml(iconName: string, iconColor = '') {
   return `<span class="${className}" data-inline-icon="${iconName}"${colorAttribute} contenteditable="false" style="${style}"></span><span class="${styles.inlineIconCaret}" data-inline-icon-caret="true">${INLINE_ICON_CARET_STOP}</span>`
 }
 
-function createStat(id: string, label = 'New Stat'): AbilityGridCell {
+function createStat(label = 'New Stat'): AbilityStat {
   return {
-    id,
     label,
     value: '0',
     unit: '',
@@ -202,6 +203,13 @@ function createStat(id: string, label = 'New Stat'): AbilityGridCell {
     icon: '/panorama/images/icons/properties/spirit.svg',
     scaling: 'none',
     scalingValue: '0',
+  }
+}
+
+function createGridCell(id: string, label = 'New Stat'): AbilityGridCell {
+  return {
+    id,
+    ...createStat(label),
   }
 }
 
@@ -799,7 +807,24 @@ function getMainCellTitleInputValue(cell: AbilityGridCell) {
   return cell.label === 'Damage' || cell.label === 'Value' ? '' : cell.label
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onSecondAbilitySetToggle, onModeToggle, onSave, onCancel }: AbilityEditorProps) {
+function reorderSections(sections: AbilitySection[], sourceIndex: number, targetIndex: number, position: SectionDropPosition) {
+  if (sourceIndex < 0 || sourceIndex >= sections.length || targetIndex < 0 || targetIndex >= sections.length) {
+    return sections
+  }
+
+  const nextSections = [...sections]
+  const [movedSection] = nextSections.splice(sourceIndex, 1)
+  let insertionIndex = targetIndex + (position === 'after' ? 1 : 0)
+
+  if (sourceIndex < insertionIndex) {
+    insertionIndex -= 1
+  }
+
+  nextSections.splice(insertionIndex, 0, movedSection)
+  return nextSections
+}
+
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onAbilitySwap, onSecondAbilitySetToggle, onModeToggle, onSave, onCancel }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
   const isEditorPreview = isPreviewMode && previewLayout === 'editor'
@@ -814,6 +839,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
   const [iconSearch, setIconSearch] = useState('')
   const [selectedIconColor, setSelectedIconColor] = useState('')
+  const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null)
+  const [sectionDropTarget, setSectionDropTarget] = useState<{ id: string; position: SectionDropPosition } | null>(null)
   const [baseTierButtonStyle, setBaseTierButtonStyle] = useState<CSSProperties>({ visibility: 'hidden' })
   const abilityIconAssetGroups = useMemo(() => getAbilityIconGroupsAsAssets(abilityIconGroups), [abilityIconGroups])
   const filteredIconGroups = useMemo(() => {
@@ -1004,7 +1031,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           id,
           type: 'grid',
           title: 'Stats',
-          mainCells: [createStat(`${id}-main-1`, 'Damage')],
+          mainCells: [createGridCell(`${id}-main-1`, 'Damage')],
           lowerCells: [],
         }
 
@@ -1012,6 +1039,74 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       ...current,
       sections: [...current.sections, section],
     }), { cascadeToHigher: true })
+  }
+
+  function reorderSection(sourceId: string, targetId: string, position: SectionDropPosition) {
+    const sourceIndex = activeAbility.sections.findIndex(section => section.id === sourceId)
+    const targetIndex = activeAbility.sections.findIndex(section => section.id === targetId)
+
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+      return
+    }
+
+    setActiveAbility(current => ({
+      ...current,
+      sections: reorderSections(current.sections, sourceIndex, targetIndex, position),
+    }), { cascadeToHigher: true })
+  }
+
+  function handleSectionDragStart(event: DragEvent<HTMLButtonElement>, sectionId: string) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', sectionId)
+    setDraggedSectionId(sectionId)
+    setSectionDropTarget(null)
+  }
+
+  function handleSectionDragOver(event: DragEvent<HTMLElement>, targetId: string) {
+    if (!draggedSectionId || draggedSectionId === targetId) {
+      return
+    }
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const position = event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after'
+
+    setSectionDropTarget(current => current?.id === targetId && current.position === position
+      ? current
+      : { id: targetId, position })
+  }
+
+  function finishSectionDrag() {
+    setDraggedSectionId(null)
+    setSectionDropTarget(null)
+  }
+
+  function handleSectionDrop(event: DragEvent<HTMLElement>, targetId: string) {
+    event.preventDefault()
+
+    if (draggedSectionId && sectionDropTarget?.id === targetId) {
+      reorderSection(draggedSectionId, targetId, sectionDropTarget.position)
+    }
+
+    finishSectionDrag()
+  }
+
+  function handleSectionReorderKey(event: KeyboardEvent<HTMLButtonElement>, sectionId: string) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') {
+      return
+    }
+
+    const sourceIndex = activeAbility.sections.findIndex(section => section.id === sectionId)
+    const targetIndex = sourceIndex + (event.key === 'ArrowUp' ? -1 : 1)
+    const target = activeAbility.sections[targetIndex]
+
+    if (!target) {
+      return
+    }
+
+    event.preventDefault()
+    reorderSection(sectionId, target.id, event.key === 'ArrowUp' ? 'before' : 'after')
   }
 
   function getIconTargetStat(target: IconTarget): AbilityStat | null {
@@ -1173,7 +1268,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
   function renderInlineStat(stat: AbilityStat, label: string, onChange: (stat: AbilityStat) => void, onIconClick: () => void, variant: 'timing' | 'sub' | 'main' | 'lower' = 'sub') {
     const canEditStat = capabilities.canEditStats
-    const showAppend = (variant === 'main' || variant === 'lower') && (capabilities.canEditStats || Boolean(stat.append))
+    const showAppend = (variant === 'timing' || variant === 'main' || variant === 'lower') && (capabilities.canEditStats || Boolean(stat.append))
     const showDetail = variant !== 'lower'
     const valueInputStyle = { width: `${Math.max(2, String(stat.value).length + 1)}ch` }
     const unitInputStyle = variant === 'main'
@@ -1370,13 +1465,14 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
               onAbilitySelect?.(target, syncAbilityNames(draftAbility))
             }}
+            onAbilitySwap={onAbilitySwap ? primaryIndex => onAbilitySwap(primaryIndex, syncAbilityNames(draftAbility)) : undefined}
           />
         </>
       ) : null}
       <div className={cn(styles.editorLayout, isPreviewMode && previewLayout === 'browse' && styles.editorLayoutPreview)} data-ability-preview-panel={isPreviewMode ? 'true' : undefined}>
         {capabilities.canAddSections ? (
           <aside className={styles.sideTabs} aria-label="Append ability sections">
-          <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat(`ability-${draftAbility.slot}-tier-${activeTier}-sub-${Date.now()}`, 'Stat')] }), { cascadeToHigher: true })}>
+          <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat('Stat')] }), { cascadeToHigher: true })}>
             <Plus aria-hidden="true" />
           </button>
           <button type="button" onClick={() => addSection('richText')}>Text</button>
@@ -1439,11 +1535,32 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
               <section className={styles.sections} aria-label="Ability sections">
               {activeAbility.sections.map(section => (
-                <article key={section.id} className={styles.section}>
+                <article
+                  key={section.id}
+                  className={styles.section}
+                  data-dragging={draggedSectionId === section.id ? 'true' : undefined}
+                  data-drop-position={sectionDropTarget?.id === section.id ? sectionDropTarget.position : undefined}
+                  onDragOver={event => handleSectionDragOver(event, section.id)}
+                  onDrop={event => handleSectionDrop(event, section.id)}
+                >
                   {capabilities.canDeleteSections ? (
-                    <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${getSectionActionLabel(section)} section`} onClick={() => removeSection(section.id)}>
-                    <X aria-hidden="true" />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className={styles.sectionDragHandle}
+                        aria-label={`Reorder ${getSectionActionLabel(section)} section`}
+                        title="Drag to reorder; use arrow keys to move"
+                        draggable
+                        onDragStart={event => handleSectionDragStart(event, section.id)}
+                        onDragEnd={finishSectionDrag}
+                        onKeyDown={event => handleSectionReorderKey(event, section.id)}
+                      >
+                        <GripVertical aria-hidden="true" />
+                      </button>
+                      <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${getSectionActionLabel(section)} section`} onClick={() => removeSection(section.id)}>
+                        <X aria-hidden="true" />
+                      </button>
+                    </>
                   ) : null}
 
                   {section.type === 'richText' ? (
@@ -1455,8 +1572,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                       section={section}
                       readOnly={!capabilities.canEditStats}
                       renderInlineStat={renderInlineStat}
-                      onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createStat(`${current.id}-main-${current.mainCells.length + 1}`, 'Value')].slice(0, 3) } : current, { cascadeToHigher: true })}
-                      onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: [...current.lowerCells, createStat(`${current.id}-lower-${current.lowerCells.length + 1}`, 'Detail')] } : current, { cascadeToHigher: true })}
+                      onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createGridCell(`${current.id}-main-${current.mainCells.length + 1}`, 'Value')].slice(0, 3) } : current, { cascadeToHigher: true })}
+                      onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: [...current.lowerCells, createGridCell(`${current.id}-lower-${current.lowerCells.length + 1}`, 'Detail')] } : current, { cascadeToHigher: true })}
                       onMainCellChange={(index, cell) => updateGridCell(section.id, 'mainCells', index, cell)}
                       onLowerCellChange={(index, cell) => updateGridCell(section.id, 'lowerCells', index, cell)}
                       onMainCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: current.mainCells.filter((_, cellIndex) => cellIndex !== index) } : current, { cascadeToHigher: true })}
@@ -1834,9 +1951,10 @@ interface AbilityHeroInfoClusterProps {
   secondaryAbilityAnchorIndex?: number
   editable?: boolean
   onAbilityClick: (target: AbilityEditorTarget) => void
+  onAbilitySwap?: (primaryIndex: number) => void
 }
 
-function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbilities, secondaryAbilitySlots, secondaryAbilityAnchorIndex, editable = true, onAbilityClick }: AbilityHeroInfoClusterProps) {
+function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbilities, secondaryAbilitySlots, secondaryAbilityAnchorIndex, editable = true, onAbilityClick, onAbilitySwap }: AbilityHeroInfoClusterProps) {
   const tags = [
     { text: heroInfo.tag1Text, tilt: heroInfo.tag1Tilt, offsetY: heroInfo.tag1OffsetY },
     { text: heroInfo.tag2Text, tilt: heroInfo.tag2Tilt, offsetY: heroInfo.tag2OffsetY },
@@ -1895,6 +2013,7 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
         secondaryAbilityAnchorIndex={secondaryAbilityAnchorIndex}
         activeTarget={activeTarget}
         onAbilityClick={onAbilityClick}
+        onAbilitySwap={editable ? onAbilitySwap : undefined}
         className={styles.heroInfoAbilities}
         primaryTestIdPrefix="ability-editor-hero-info-ability"
         secondaryTestIdPrefix="ability-editor-hero-info-secondary-ability"

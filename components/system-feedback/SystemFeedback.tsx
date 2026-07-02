@@ -1,7 +1,8 @@
 'use client'
 
 import { AlertTriangle, LoaderCircle, RefreshCw, WifiOff, X } from 'lucide-react'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 
 import styles from './SystemFeedback.module.css'
 
@@ -67,8 +68,24 @@ export function ConnectionStatus() {
   ) : null
 }
 
-export function SystemToast({ message }: { message: string }) {
-  return <p className={styles.toast} role="status">{message}</p>
+export function SystemToast({ message, durationMs = 3200 }: { message: string; durationMs?: number }) {
+  return <TimedSystemToast key={message} message={message} durationMs={durationMs} />
+}
+
+function TimedSystemToast({ message, durationMs }: { message: string; durationMs: number }) {
+  const [visible, setVisible] = useState(true)
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setVisible(false), durationMs)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [durationMs])
+
+  if (!visible || typeof document === 'undefined') {
+    return null
+  }
+
+  return createPortal(<p className={styles.toast} role="status">{message}</p>, document.body)
 }
 
 export function ProfileLoadingSkeleton() {

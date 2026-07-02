@@ -4,6 +4,7 @@ import nextConfig from '@/next.config'
 import { authEmailRequestSchema, customHeroSaveSchema, heroCommentRequestSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { isDatabaseConnectionError } from '@/lib/dbConnect'
 import { checkRateLimit, resetRateLimitStore } from '@/lib/rate-limit'
+import { contentReportRequestSchema, moderationResolveRequestSchema } from '@/lib/moderation-schemas'
 
 beforeEach(() => {
   resetRateLimitStore()
@@ -72,6 +73,18 @@ describe('security hardening', () => {
         render: '/render/strict.png',
         injected: true,
       },
+    })).toThrow()
+
+    expect(() => contentReportRequestSchema.parse({
+      reason: 'Spam / Irrelevant',
+      reporterId: 'attacker-selected-id',
+    })).toThrow()
+
+    expect(() => moderationResolveRequestSchema.parse({
+      type: 'hero',
+      id: 'hero_1',
+      action: 'approve',
+      moderationStatus: 'clean',
     })).toThrow()
   })
 

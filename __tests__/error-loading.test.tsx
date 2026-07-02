@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import HeroGrid from '@/components/HeroGrid/HeroGrid'
-import { ConnectionStatus } from '@/components/system-feedback/SystemFeedback'
+import { ConnectionStatus, SystemToast } from '@/components/system-feedback/SystemFeedback'
 import ProfileUnavailable from '@/components/UserProfile/ProfileUnavailable'
 import { buildDefaultAbilityStats } from '@/lib/ability-editor-types'
 import { ApiRequestError, toApiErrorResponse } from '@/lib/api-errors'
@@ -130,6 +130,27 @@ describe('error and loading states', () => {
     fireEvent(window, new Event('offline'))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Draft changes remain stored locally')
+  })
+
+  it('portals temporary system notices to the viewport and dismisses them', async () => {
+    vi.useFakeTimers()
+
+    try {
+      render(<SystemToast message="Template loaded." durationMs={1000} />)
+
+      const toast = screen.getByRole('status')
+
+      expect(toast).toHaveTextContent('Template loaded.')
+      expect(toast.parentElement).toBe(document.body)
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('preserves a draft and offers retry when the save session expires', async () => {

@@ -149,7 +149,6 @@
 .heroInfoAbilities {
   display: flex;
   justify-content: center;
-  gap: 10px;
 }
 
 .heroInfoAbilityWrap {
@@ -504,6 +503,32 @@
   display: grid;
   gap: 8px;
   padding-inline: 22px;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.section[data-dragging='true'] {
+  opacity: 0.45;
+}
+
+.section[data-drop-position='before']::before,
+.section[data-drop-position='after']::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  right: 22px;
+  left: 22px;
+  height: 2px;
+  border-radius: 999px;
+  background: #dca7ff;
+  box-shadow: 0 0 10px rgb(206 146 255 / 78%);
+}
+
+.section[data-drop-position='before']::before {
+  top: -7px;
+}
+
+.section[data-drop-position='after']::after {
+  bottom: -7px;
 }
 
 .sectionTitleLabel input,
@@ -603,8 +628,8 @@
 
 .inlineStatEditorTiming {
   display: inline-grid;
-  grid-template-columns: 18px max-content max-content;
-  grid-template-areas: "icon value unit";
+  grid-template-columns: 18px max-content max-content max-content;
+  grid-template-areas: "icon value append unit";
   align-items: center;
   justify-content: flex-start;
   column-gap: 2px;
@@ -616,8 +641,8 @@
 }
 
 .inlineStatEditorTiming.inlineStatEditorHasScaling {
-  grid-template-columns: 18px max-content max-content 28px;
-  grid-template-areas: "icon value unit scaleButton";
+  grid-template-columns: 18px max-content max-content max-content 28px;
+  grid-template-areas: "icon value append unit scaleButton";
 }
 
 .inlineStatEditorTiming .iconButton {
@@ -627,6 +652,7 @@
 }
 
 .inlineStatEditorTiming .valueInputLabel,
+.inlineStatEditorTiming .appendInputLabel,
 .inlineStatEditorTiming .unitInputLabel,
 .inlineStatEditorTiming .scalingValueWrap {
   display: flex;
@@ -638,6 +664,10 @@
 
 .inlineStatEditorTiming .valueInputLabel {
   grid-area: value;
+}
+
+.inlineStatEditorTiming .appendInputLabel {
+  grid-area: append;
 }
 
 .inlineStatEditorTiming .unitInputLabel {
@@ -656,6 +686,7 @@
   text-align: left;
 }
 
+.inlineStatEditorTiming .appendInput,
 .inlineStatEditorTiming .unitInput {
   color: #afabaf;
   text-align: left;
@@ -1198,6 +1229,7 @@
   font-weight: 900;
 }
 .inlineStatEditorTiming .valueInput,
+.inlineStatEditorTiming .appendInput,
 .inlineStatEditorTiming .unitInput,
 .inlineStatEditorSub .valueInput,
 .inlineStatEditorSub .unitInput,
@@ -2400,10 +2432,10 @@
   text-align: left;
 }
 
+.sectionDragHandle,
 .removeSectionButton {
   position: absolute;
   top: -2px;
-  right: 0;
   z-index: 2;
   display: inline-flex;
   align-items: center;
@@ -2417,12 +2449,28 @@
   opacity: 0.78;
 }
 
+.sectionDragHandle {
+  left: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sectionDragHandle:active {
+  cursor: grabbing;
+}
+
+.removeSectionButton {
+  right: 0;
+}
+
+.sectionDragHandle:hover,
 .removeSectionButton:hover {
   color: #fff;
   background: rgb(0 0 0 / 34%);
   opacity: 1;
 }
 
+.sectionDragHandle svg,
 .removeSectionButton svg {
   width: 12px;
   height: 12px;

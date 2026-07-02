@@ -16,6 +16,25 @@ afterEach(() => {
 })
 
 describe('AbilityEditor', () => {
+  it('uses the shared ability-circle gap and places pair swap controls below both circles', () => {
+    const sharedStyles = readFileSync('components/HeroAbilityIconRow/HeroAbilityIconRow.module.css', 'utf8')
+    const editorStyles = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const heroInfoEditorStyles = readFileSync('components/HeroInfoEditor/HeroInfoEditor.module.css', 'utf8')
+    const sharedRowRule = sharedStyles.match(/\.row\s*\{([^}]*)\}/)?.[1]
+    const sharedWrapRule = sharedStyles.match(/\.wrap\s*\{([^}]*)\}/)?.[1]
+    const swapRule = sharedStyles.match(/\.swapAbility\s*\{([^}]*)\}/)?.[1]
+    const focusedOverride = editorStyles.match(/\.heroInfoAbilities\s*\{([^}]*)\}/)?.[1]
+    const mainOverride = heroInfoEditorStyles.match(/\.abilitiesRow\s*\{([^}]*)\}/)?.[1]
+
+    expect(sharedRowRule).toMatch(/gap:\s*[^;]+;/)
+    expect(sharedRowRule).toMatch(/align-items:\s*flex-start/)
+    expect(sharedWrapRule).toMatch(/height:\s*clamp\(54px, 4\.5vw, 75px\)/)
+    expect(focusedOverride).not.toMatch(/gap:/)
+    expect(mainOverride).not.toMatch(/gap:/)
+    expect(swapRule).toMatch(/top:\s*calc\(114% \+ 7px\)/)
+    expect(swapRule).toMatch(/left:\s*57%/)
+  })
+
   it('keeps the tooltip and tiers in one vertical scroll container', () => {
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
     const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
@@ -526,11 +545,73 @@ describe('AbilityEditor', () => {
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+    const addedSubStat = savedAbility?.subStats.find(stat => stat.label === 'Stat')
 
+    expect(addedSubStat).not.toHaveProperty('id')
     expect(savedRichText?.text).toContain('[b]')
     expect(savedRichText?.text).toContain('[c:healing]')
     expect(savedRichText?.text).toContain('[i:heal]')
     expect(savedRichText?.text.indexOf('[i:heal]')).toBeLessThan(savedRichText?.text.indexOf(' channels') ?? 0)
+  })
+
+  it('drags text and grid sections above or below each other across higher tiers', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const descriptionHandle = screen.getByRole('button', { name: 'Reorder Description section' })
+    const statsHandle = screen.getByRole('button', { name: 'Reorder Impact section' })
+    const descriptionSection = descriptionHandle.closest('article')
+    const dataTransfer = {
+      dropEffect: 'none',
+      effectAllowed: 'none',
+      setData: vi.fn(),
+    }
+
+    expect(descriptionSection).not.toBeNull()
+    const boundsSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 100,
+      width: 500,
+      height: 100,
+      top: 100,
+      right: 500,
+      bottom: 200,
+      left: 0,
+      toJSON: () => ({}),
+    })
+
+    fireEvent.dragStart(statsHandle, { dataTransfer })
+    const dragOverEvent = new MouseEvent('dragover', { bubbles: true, cancelable: true, clientY: 110 })
+
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer })
+    fireEvent(descriptionSection!, dragOverEvent)
+
+    expect(descriptionSection).toHaveAttribute('data-drop-position', 'before')
+
+    fireEvent.drop(descriptionSection!, { clientY: 110, dataTransfer })
+    boundsSpy.mockRestore()
+
+    expect(screen.getAllByRole('button', { name: /Reorder .* section/ }).map(button => button.getAttribute('aria-label'))).toEqual([
+      'Reorder Impact section',
+      'Reorder Description section',
+    ])
+
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+
+    expect(savedAbility?.sections.map(section => section.type)).toEqual(['grid', 'richText'])
+    expect(savedAbility?.tiers.every(tier => tier.variant.sections.map(section => section.type).join(',') === 'grid,richText')).toBe(true)
   })
 
   it('keeps ability names unified while tier-specific upgrade text stays isolated', async () => {
@@ -666,6 +747,49 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByRole('button', { name: '0' }))
     expectCooldown('31')
+  })
+
+  it('keeps cooldown append text through tier cascades, saves, and preview rendering', async () => {
+    const user = userEvent.setup()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const onSave = vi.fn()
+
+    const { unmount } = render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const cooldown = screen.getByTestId('ability-stat-timing-cooldown')
+    const appendInput = within(cooldown).getByLabelText('Append')
+
+    await user.type(appendInput, '+')
+    await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
+    await user.click(screen.getByRole('button', { name: 'Tier 3 upgrade' }))
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+
+    expect(savedAbility?.cooldown.append).toBe('+')
+    expect(savedAbility?.tiers.every(tier => tier.variant.cooldown.append === '+')).toBe(true)
+
+    unmount()
+    render(
+      <AbilityEditor
+        ability={savedAbility!}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        mode="preview"
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByText('+')).toBeInTheDocument()
   })
 
   it('cascades ability text edits from lower tiers into higher tiers', async () => {

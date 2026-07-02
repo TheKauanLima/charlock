@@ -1,6 +1,7 @@
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import type { HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
+import type { ModerationStatus } from '@/lib/moderation-types'
 
 export type CustomHeroStatus = 'private' | 'published'
 export type CustomHeroSort = 'new' | 'liked' | 'trending'
@@ -52,6 +53,7 @@ export interface CustomHeroSummary extends HeroDefinition {
   allowCopies: boolean
   background: string
   viewerCanEdit: boolean
+  moderationStatus?: ModerationStatus
   abilityStats?: AbilityStatsPayload
   publishedAt: string | null
   createdAt: string

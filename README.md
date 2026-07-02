@@ -16,6 +16,17 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Moderation administration
+
+Access to `/admin` and its moderation APIs is denied unless the signed-in Clerk user matches one of these comma-separated environment variables:
+
+```bash
+ADMIN_USER_IDS=user_abc,user_def
+ADMIN_USER_EMAILS=owner@example.com
+```
+
+Configure at least one of them in each deployed environment. Clerk IDs are preferred because they do not change when an account email is updated.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

@@ -30,17 +30,17 @@ interface SidebarTabsProps {
   overviewLabel?: string
 }
 
-const SHOP_ICON_PATHS = {
-  courage: '/panorama/images/shop/keystat_courage_png.png',
-  fortitude: '/panorama/images/shop/keystat_fortitude_png.png',
-  spirit: '/panorama/images/shop/keystat_spirit_png.png',
+const HUD_CORE_ICON_PATHS = {
+  courage: '/panorama/images/hud/core/icon_courage.svg',
+  fortitude: '/panorama/images/hud/core/icon_fortitude.svg',
+  spirit: '/panorama/images/hud/core/icon_spirit.svg',
 } as const
 
 export const SIDEBAR_TAB_ITEMS: SidebarTabItem[] = [
   { id: 'overview', label: 'Overview', icon: Info },
-  { id: 'weapon', label: 'Weapon stats', iconSrc: SHOP_ICON_PATHS.courage },
-  { id: 'vitality', label: 'Vitality stats', iconSrc: SHOP_ICON_PATHS.fortitude },
-  { id: 'spirit', label: 'Spirit stats', iconSrc: SHOP_ICON_PATHS.spirit },
+  { id: 'weapon', label: 'Weapon stats', iconSrc: HUD_CORE_ICON_PATHS.courage },
+  { id: 'vitality', label: 'Vitality stats', iconSrc: HUD_CORE_ICON_PATHS.fortitude },
+  { id: 'spirit', label: 'Spirit stats', iconSrc: HUD_CORE_ICON_PATHS.spirit },
 ]
 
 function SidebarTabIcon({ tab, className }: { tab: SidebarTabItem; className: string }) {
@@ -48,7 +48,10 @@ function SidebarTabIcon({ tab, className }: { tab: SidebarTabItem; className: st
     return (
       <span
         className={cn(className, styles.iconImage)}
-        style={{ backgroundImage: `url('${tab.iconSrc}')` }}
+        style={{
+          WebkitMaskImage: `url('${tab.iconSrc}')`,
+          maskImage: `url('${tab.iconSrc}')`,
+        }}
         aria-hidden="true"
       />
     )

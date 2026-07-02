@@ -105,6 +105,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
   const storedHeroIds = storedLikes.map(like => like.heroId)
   const legacyLikedHeroes = await CustomHero.find({
     status: 'published',
+    moderationStatus: { $ne: 'hidden' },
     likedBy: { $in: ownerIds },
   })
     .sort({ 'likeEvents.createdAt': -1, updatedAt: -1 })
@@ -119,7 +120,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
     return []
   }
 
-  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published' }).lean<HeroRecord[]>()
+  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published', moderationStatus: { $ne: 'hidden' } }).lean<HeroRecord[]>()
   const heroesById = new Map(heroes.map(hero => [hero._id.toString(), hero]))
   const likesByHeroId = new Map(storedLikes.map(like => [like.heroId.toString(), like]))
   const usersByClerkId = await getUserMap(heroes.map(hero => hero.createdByUserId))
@@ -190,12 +191,12 @@ export async function listProfileComments(userId: string, limit = 40): Promise<P
     .lean<HeroRecord[]>()
   const authoredHeroIds = authoredHeroes.map(hero => hero._id)
   const [made, received] = await Promise.all([
-    Comment.find({ userId: profileUser.clerkId })
+    Comment.find({ userId: profileUser.clerkId, moderationStatus: { $ne: 'hidden' } })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean<CommentRecord[]>(),
     authoredHeroIds.length
-      ? Comment.find({ heroId: { $in: authoredHeroIds }, userId: { $ne: profileUser.clerkId } })
+      ? Comment.find({ heroId: { $in: authoredHeroIds }, userId: { $ne: profileUser.clerkId }, moderationStatus: { $ne: 'hidden' } })
           .sort({ createdAt: -1 })
           .limit(limit)
           .lean<CommentRecord[]>()

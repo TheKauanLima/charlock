@@ -24,6 +24,7 @@ import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { assertUserNotSuspended } from '@/lib/user-suspension'
 
 interface Actor {
   clerkId: string
@@ -359,6 +360,7 @@ function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, act
     background: hero.background || hero.render || DEFAULT_BACKGROUND,
     heroInfo: heroInfoPayload,
     status: hero.status,
+    moderationStatus: hero.moderationStatus ?? 'clean',
     likesCount: hero.likesCount ?? likedBy.length,
     likedByCurrentUser,
     bookmarkedByCurrentUser: bookmarks?.has(heroId) ?? false,
@@ -492,7 +494,7 @@ async function buildHeroListPipeline(filters: CustomHeroListFilters): Promise<Pi
   const searchHeroIds = await getTextSearchHeroIds(trimmedSearch)
 
   const pipeline: PipelineStage[] = [
-    { $match: { status: filters.status } },
+    { $match: { status: filters.status, moderationStatus: { $ne: 'hidden' } } },
     getLookupStage(HeroInfo.collection.name, 'heroInfo'),
     getUnwindStage('$heroInfo'),
     getLookupStage(AbilityStats.collection.name, 'abilityStats'),
@@ -752,7 +754,7 @@ export async function getEditableCustomHero(id: string): Promise<CustomHeroDetai
   const hero = await CustomHero.findOne({
     _id: objectId,
     $or: [
-      { status: 'published' },
+      { status: 'published', moderationStatus: { $ne: 'hidden' } },
       { createdByUserId: { $in: actor.ownerIds } },
     ],
   }).lean<HeroRecord | null>()
@@ -770,7 +772,13 @@ export async function getPublishedCustomHero(id: string): Promise<CustomHeroDeta
   await dbConnect()
 
   const objectId = getValidObjectId(id)
-  const hero = await CustomHero.findOne({ _id: objectId, status: 'published' }).lean<HeroRecord | null>()
+  const hero = await CustomHero.findOne({
+    _id: objectId,
+    $or: [
+      { status: 'published', moderationStatus: { $ne: 'hidden' } },
+      ...(actor ? [{ createdByUserId: { $in: actor.ownerIds } }] : []),
+    ],
+  }).lean<HeroRecord | null>()
 
   if (!hero) {
     throw new CustomHeroError('Hero not found', 404)
@@ -780,18 +788,19 @@ export async function getPublishedCustomHero(id: string): Promise<CustomHeroDeta
 }
 
 export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<CustomHeroSummary[]> {
+  const actor = await getOptionalActor()
+
   await dbConnect()
 
-  const heroes = await CustomHero.find({ createdByUserId: { $in: ownerIds } })
+  const viewerOwnsProfile = Boolean(actor?.ownerIds.some(ownerId => ownerIds.includes(ownerId)))
+  const heroes = await CustomHero.find({
+    createdByUserId: { $in: ownerIds },
+    ...(viewerOwnsProfile ? {} : { moderationStatus: { $ne: 'hidden' } }),
+  })
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
   const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
-  const actor = {
-    clerkId: ownerIds[0],
-    storageUserId: ownerIds[0],
-    ownerIds,
-  }
   const bookmarks = await getActorBookmarkSet(actor)
 
   return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks, abilityStatsById.get(hero._id.toString()) ?? null))
@@ -810,7 +819,7 @@ export async function listBookmarkedCustomHeroes(heroIds: Types.ObjectId[], owne
     return []
   }
 
-  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published' })
+  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published', moderationStatus: { $ne: 'hidden' } })
     .sort({ updatedAt: -1 })
     .lean<HeroRecord[]>()
   const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
@@ -836,6 +845,7 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
   const isPublishing = payload.status === 'published'
 
   await dbConnect()
+  await assertUserNotSuspended(actor.clerkId)
 
   const existingHero = payload.id
     ? await CustomHero.findOne({ _id: getValidObjectId(payload.id), createdByUserId: { $in: actor.ownerIds } }).lean<HeroRecord | null>()
@@ -868,6 +878,8 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
         likedBy: [],
         likeEvents: [],
         copyEvents: [],
+        reports: [],
+        moderationStatus: 'clean',
       },
     },
     {
@@ -964,7 +976,7 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
   await dbConnect()
 
   const objectId = getValidObjectId(id)
-  const existingHero = await CustomHero.findOne({ _id: objectId, status: 'published' }).lean<HeroRecord | null>()
+  const existingHero = await CustomHero.findOne({ _id: objectId, status: 'published', moderationStatus: { $ne: 'hidden' } }).lean<HeroRecord | null>()
 
   if (!existingHero) {
     throw new CustomHeroError('Hero not found', 404)
@@ -990,7 +1002,7 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
         },
       }
   const hero = await CustomHero.findOneAndUpdate(
-    { _id: objectId, status: 'published' },
+    { _id: objectId, status: 'published', moderationStatus: { $ne: 'hidden' } },
     {
       $set: {
         likedBy: nextLikedBy,
@@ -1046,7 +1058,7 @@ export async function recordCustomHeroCopy(id: string): Promise<void> {
 
   const objectId = getValidObjectId(id)
   const hero = await CustomHero.findOneAndUpdate(
-    { _id: objectId, status: 'published', allowCopies: true },
+    { _id: objectId, status: 'published', allowCopies: true, moderationStatus: { $ne: 'hidden' } },
     {
       $push: {
         copyEvents: {
