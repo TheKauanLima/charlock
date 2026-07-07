@@ -7,7 +7,7 @@ import { formatPanelValue } from '@/components/panels/scaling-utils'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
-import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
+import { buildPelletCountStat, buildWeaponStatsArray, PELLET_COUNT_LABEL } from '@/components/panels/weapon-stats-mapper'
 import cn from '@/lib/utilsd'
 
 import styles from './WeaponPanel.module.css'
@@ -91,11 +91,31 @@ const ICON_ASSETS: Record<string, IconAsset> = {
   ammoReload: { maskUrl: '/panorama/images/icons/properties/ammo_reload.svg' },
   ammoReloadReduction: { maskUrl: '/panorama/images/icons/properties/ammo_reload.svg', opacity: 0.45 },
   bulletDamage: { url: '/panorama/images/icons/properties/damage_bullet_color.svg' },
+  damage_bullet_color: { url: '/panorama/images/icons/properties/damage_bullet_color.svg' },
+  damage_magic_color: { url: '/panorama/images/icons/properties/damage_magic_color.svg' },
+  damage_melee_color: { url: '/panorama/images/icons/properties/damage_melee_color.svg' },
   bulletVelocity: { maskUrl: '/panorama/images/icons/properties/bullet_velocity.svg' },
   critBonusScale: { url: '/panorama/images/icons/properties/damage_crit_color.svg' },
   fireRate: { maskUrl: '/panorama/images/icons/properties/fire_rate.svg' },
   healthStealBullets: { url: '/panorama/images/icons/properties/health_stealing_bullets_color.svg' },
   melee: { maskUrl: '/panorama/images/icons/properties/melee.svg' },
+}
+
+const BULLET_DAMAGE_TYPES = [
+  { icon: 'damage_bullet_color', label: 'Bullet' },
+  { icon: 'damage_magic_color', label: 'Magic' },
+  { icon: 'damage_melee_color', label: 'Melee' },
+] as const
+
+function getBulletDamageType(icon: string | undefined) {
+  return BULLET_DAMAGE_TYPES.find(type => type.icon === icon) ?? BULLET_DAMAGE_TYPES[0]
+}
+
+function getNextBulletDamageIcon(icon: string | undefined) {
+  const currentType = getBulletDamageType(icon)
+  const currentIndex = BULLET_DAMAGE_TYPES.indexOf(currentType)
+
+  return BULLET_DAMAGE_TYPES[(currentIndex + 1) % BULLET_DAMAGE_TYPES.length].icon
 }
 
 const DEFAULT_WEAPON_STATS: PanelStat[] = [
@@ -197,6 +217,7 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
 
 function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, openScalingAbove = false, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
+  const bulletDamageType = getBulletDamageType(icon)
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
@@ -204,11 +225,19 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
 
   const content = (
     <>
-      <span
-        className={styles.statIcon}
-        style={getIconStyle(icon, theme.iconColor)}
-        aria-hidden="true"
-      />
+      {isEditable && label === 'Bullet Damage' ? (
+        <button
+          type="button"
+          className={styles.damageTypeButton}
+          aria-label={`Change Bullet Damage type (${bulletDamageType.label})`}
+          title={`Damage type: ${bulletDamageType.label}. Click to change.`}
+          onClick={() => onChange?.({ icon: getNextBulletDamageIcon(icon) })}
+        >
+          <span className={styles.statIcon} style={getIconStyle(icon, theme.iconColor)} aria-hidden="true" />
+        </button>
+      ) : (
+        <span className={styles.statIcon} style={getIconStyle(icon, theme.iconColor)} aria-hidden="true" />
+      )}
       <span className={styles.statContent}>
         {isEditable ? (
           <input
@@ -301,7 +330,9 @@ export default function WeaponPanel({
   const normalizedWeaponStats = combinedWeaponStats.map(stat => normalizeStat(stat))
   const [editedStats, setEditedStats] = useState<PanelStat[]>(() => normalizedWeaponStats)
   const displayStats = isEditable && onStatsChange ? normalizedWeaponStats : isEditable ? editedStats : normalizedWeaponStats
-  const weaponStatRows = splitRows(displayStats)
+  const pelletCountStat = displayStats.find(stat => stat.label === PELLET_COUNT_LABEL)
+  const pelletCountStatIndex = pelletCountStat ? displayStats.indexOf(pelletCountStat) : -1
+  const weaponStatRows = splitRows(displayStats.filter(stat => stat.label !== PELLET_COUNT_LABEL))
   const primaryWeaponStatRows = weaponStatRows.slice(0, -1)
   const bottomWeaponStatRows = weaponStatRows.slice(-1)
   const hasFalloffRange = weaponMinRange !== null || weaponMaxRange !== null || isEditable
@@ -347,6 +378,20 @@ export default function WeaponPanel({
 
     if (onStatsChange) {
       onStatsChange(nextStats, nextStats[index])
+      return
+    }
+
+    setEditedStats(nextStats)
+  }
+
+  function setPelletCountEnabled(enabled: boolean) {
+    const nextStats = enabled
+      ? [...displayStats, buildPelletCountStat()]
+      : displayStats.filter(stat => stat.label !== PELLET_COUNT_LABEL)
+    const changedStat = pelletCountStat ?? buildPelletCountStat()
+
+    if (onStatsChange) {
+      onStatsChange(nextStats, changedStat)
       return
     }
 
@@ -514,6 +559,31 @@ export default function WeaponPanel({
             </div>
           ))}
         </div>
+        {isEditable ? (
+          <label className={styles.shotgunToggle}>
+            <input
+              type="checkbox"
+              checked={Boolean(pelletCountStat)}
+              onChange={event => setPelletCountEnabled(event.target.checked)}
+            />
+            <strong>Shotgun Pellets</strong>
+          </label>
+        ) : null}
+        {pelletCountStat ? (
+          <div className={styles.pelletBand} aria-label="Shotgun pellet stats">
+            <CompactStatElement
+              {...pelletCountStat}
+              panelType={panelType}
+              isEditable={isEditable}
+              showDetails={showDetails}
+              boundaryRef={panelRef}
+              openScalingPickerId={openScalingPickerId}
+              openScalingAbove
+              onOpenScalingPickerChange={setOpenScalingPickerId}
+              onChange={updates => handleStatChange(pelletCountStatIndex, updates)}
+            />
+          </div>
+        ) : null}
         <div className={styles.bottomBand}>
           {bottomWeaponStatRows.map((row, rowIndex) => (
             <div key={`weapon-bottom-row-${rowIndex}`} className={styles.bottomRow}>

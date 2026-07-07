@@ -217,11 +217,13 @@ function ProfileHeroGrid({
   heroes,
   emptyMessage,
   onUnbookmark,
+  onDelete,
   pendingRemovalIds = new Set<string>(),
 }: {
   heroes: ProfileGridHero[]
   emptyMessage: string
   onUnbookmark?: (heroId: string) => void
+  onDelete?: (hero: ProfileGridHero) => void
   pendingRemovalIds?: Set<string>
 }) {
   if (!heroes.length) {
@@ -241,7 +243,7 @@ function ProfileHeroGrid({
       {heroes.map(hero => (
         <article
           key={hero.id}
-          className={`${heroGridStyles.browseCard} ${pendingRemovalIds.has(hero.id) ? styles.removingCard : ''}`}
+          className={`${heroGridStyles.browseCard} ${styles.profileHeroCard} ${pendingRemovalIds.has(hero.id) ? styles.removingCard : ''}`}
         >
           <Link
             href={hero.href}
@@ -281,8 +283,65 @@ function ProfileHeroGrid({
               <BookmarkX aria-hidden="true" size={16} />
             </button>
           ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              className={`${styles.cardIconButton} ${styles.cardDeleteButton}`}
+              onClick={event => {
+                event.preventDefault()
+                event.stopPropagation()
+                onDelete(hero)
+              }}
+              aria-label={`Delete character ${hero.name}`}
+              title={`Delete ${hero.name}`}
+              disabled={pendingRemovalIds.has(hero.id)}
+            >
+              <X aria-hidden="true" size={18} />
+            </button>
+          ) : null}
         </article>
       ))}
+    </div>
+  )
+}
+
+function DeleteHeroConfirmation({ hero, isPending, error, onCancel, onConfirm }: {
+  hero: ProfileGridHero
+  isPending: boolean
+  error: string | null
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className={styles.modalBackdrop} role="presentation" onClick={() => { if (!isPending) onCancel() }}>
+      <section
+        className={styles.deleteHeroModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-hero-title"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className={styles.backgroundModalHeader}>
+          <div>
+            <p id="delete-hero-title">Delete {hero.name}?</p>
+            <span>Permanent database deletion</span>
+          </div>
+          <button type="button" className={styles.modalCloseButton} onClick={onCancel} aria-label="Close hero deletion confirmation" disabled={isPending}>
+            <X aria-hidden="true" size={16} />
+          </button>
+        </div>
+        <p className={styles.deleteHeroWarning}>
+          This permanently removes the character, its stats, abilities, comments, likes, and bookmarks. This action cannot be undone.
+        </p>
+        {error ? <p className={styles.deleteHeroError} role="alert">{error}</p> : null}
+        <div className={styles.backgroundModalActions}>
+          <button type="button" className={styles.backgroundCancelButton} onClick={onCancel} disabled={isPending}>Cancel</button>
+          <button type="button" className={styles.deleteHeroConfirmButton} onClick={onConfirm} disabled={isPending}>
+            <Trash2 aria-hidden="true" size={15} />
+            {isPending ? 'Deleting Character...' : 'Permanently Delete'}
+          </button>
+        </div>
+      </section>
     </div>
   )
 }
@@ -708,6 +767,11 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const [backgroundToast, setBackgroundToast] = useState<string | null>(null)
   const [backgroundSynced, setBackgroundSynced] = useState(false)
   const [bookmarkCards, setBookmarkCards] = useState<ProfileGridHero[]>(() => getBookmarkedHeroes(data.bookmarkedHeroes))
+  const [createdHeroCards, setCreatedHeroCards] = useState<ProfileGridHero[]>(() => getCreatedHeroes(data))
+  const [deletedHeroIds, setDeletedHeroIds] = useState<Set<string>>(new Set())
+  const [heroPendingDeletion, setHeroPendingDeletion] = useState<ProfileGridHero | null>(null)
+  const [pendingDeleteHeroId, setPendingDeleteHeroId] = useState<string | null>(null)
+  const [heroDeleteError, setHeroDeleteError] = useState<string | null>(null)
   const [bookmarkSort, setBookmarkSort] = useState<BookmarkSort>('newest')
   const [bookmarkRoleFilter, setBookmarkRoleFilter] = useState<BookmarkRoleFilter>('all')
   const [bookmarkCreatorFilter, setBookmarkCreatorFilter] = useState<BookmarkCreatorFilter>('all')
@@ -726,13 +790,9 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const [isFollowing, setIsFollowing] = useState(data.viewerFollowsUser)
   const [followerCount, setFollowerCount] = useState(data.followerCount)
   const [followStatus, setFollowStatus] = useState<string | null>(null)
-  const createdHeroes = useMemo(
-    () => getCreatedHeroes(data),
-    [data],
-  )
   const backgroundOptions = useMemo(
-    () => getBackgroundOptions(heroes, data.savedHeroes),
-    [data.savedHeroes, heroes],
+    () => getBackgroundOptions(heroes, data.savedHeroes.filter(hero => !deletedHeroIds.has(hero.id))),
+    [data.savedHeroes, deletedHeroIds, heroes],
   )
   const visibleBookmarkCards = useMemo(
     () => getSortedBookmarkCards(bookmarkCards, bookmarkSort, bookmarkRoleFilter, bookmarkCreatorFilter),
@@ -1140,6 +1200,64 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     }
   }
 
+  function openDeleteHeroConfirmation(hero: ProfileGridHero) {
+    setHeroDeleteError(null)
+    setHeroPendingDeletion(hero)
+  }
+
+  function closeDeleteHeroConfirmation() {
+    if (pendingDeleteHeroId) return
+
+    setHeroDeleteError(null)
+    setHeroPendingDeletion(null)
+  }
+
+  async function handleDeleteHero() {
+    const hero = heroPendingDeletion
+
+    if (!hero) return
+
+    setPendingDeleteHeroId(hero.id)
+    setHeroDeleteError(null)
+
+    try {
+      const response = await fetch(`/api/heroes/${encodeURIComponent(hero.id)}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      const body = await response.json() as { deleted?: boolean; error?: string }
+
+      if (!response.ok || !body.deleted) {
+        throw new Error(body.error || `Hero deletion failed with ${response.status}`)
+      }
+
+      setCreatedHeroCards(previous => previous.filter(card => card.id !== hero.id))
+      setBookmarkCards(previous => previous.filter(card => card.id !== hero.id))
+      setDeletedHeroIds(previous => new Set(previous).add(hero.id))
+
+      if (savedProfileBackground.id === `custom:${hero.id}`) {
+        const fallbackBackground: ProfileBackgroundVisual = {
+          id: `official:${data.preferredHero.slug}`,
+          label: data.preferredHero.displayName,
+          render: data.preferredHero.render,
+          accent: data.preferredHero.heroInfo.tagColor,
+          nameColor: data.preferredHero.heroInfo.nameColor,
+        }
+
+        setSavedProfileBackground(fallbackBackground)
+        setProfileBackground(fallbackBackground)
+      }
+
+      setHeroPendingDeletion(null)
+    } catch (error) {
+      setHeroDeleteError(error instanceof Error ? error.message : 'Unable to delete this character.')
+    } finally {
+      setPendingDeleteHeroId(null)
+    }
+  }
+
   return (
     <main className={styles.shell} style={themeStyle}>
       <Image
@@ -1224,7 +1342,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                 <div className={styles.sectionHeader}>
                   <div>
                     <p>Characters Created</p>
-                    <span>{createdHeroes.length} total</span>
+                    <span>{createdHeroCards.length} total</span>
                   </div>
                 </div>
                 {data.viewerIsOwner ? (
@@ -1245,7 +1363,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                     </button>
                   </section>
                 ) : null}
-                <ProfileHeroGrid heroes={createdHeroes} emptyMessage="No characters have been created yet." />
+                <ProfileHeroGrid heroes={createdHeroCards} emptyMessage="No characters have been created yet." onDelete={data.viewerIsOwner ? openDeleteHeroConfirmation : undefined} pendingRemovalIds={pendingDeleteHeroId ? new Set([pendingDeleteHeroId]) : undefined} />
               </section>
             ) : null}
 
@@ -1383,6 +1501,15 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
           onPreviewEnd={handleBackgroundPreviewEnd}
           onSelectDraft={handleBackgroundDraftSelect}
           onTabChange={setBackgroundPickerTab}
+        />
+      ) : null}
+      {heroPendingDeletion ? (
+        <DeleteHeroConfirmation
+          hero={heroPendingDeletion}
+          isPending={pendingDeleteHeroId === heroPendingDeletion.id}
+          error={heroDeleteError}
+          onCancel={closeDeleteHeroConfirmation}
+          onConfirm={handleDeleteHero}
         />
       ) : null}
       {backgroundToast ? <div className={styles.profileToast} role="status">{backgroundToast}</div> : null}

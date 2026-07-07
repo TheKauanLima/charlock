@@ -3,10 +3,24 @@ import { statSchema, type IPanelStat } from './WeaponStats'
 
 export interface IVitalityStats {
   heroId: Types.ObjectId
+  name?: string
   stats: IPanelStat[]
+  panels?: IVitalityPanelVariant[]
   createdAt: Date
   updatedAt: Date
 }
+
+export interface IVitalityPanelVariant {
+  id: string
+  name: string
+  stats: IPanelStat[]
+}
+
+const vitalityPanelVariantSchema = new Schema<IVitalityPanelVariant>({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  stats: [statSchema],
+}, { _id: false })
 
 const vitalityStatsSchema = new Schema<IVitalityStats>(
   {
@@ -17,7 +31,9 @@ const vitalityStatsSchema = new Schema<IVitalityStats>(
       unique: true,
       index: true,
     },
+    name: { type: String, trim: true, maxlength: 80 },
     stats: [statSchema],
+    panels: { type: [vitalityPanelVariantSchema], default: undefined },
   },
   {
     timestamps: true,

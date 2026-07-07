@@ -20,13 +20,39 @@ export interface WeaponStatsPayload {
   weaponMinRange: number
   weaponMaxRange: number
   stats: PanelStat[]
+  panels?: WeaponPanelVariant[]
+}
+
+export interface NamedStatPanel {
+  id: string
+  name: string
+}
+
+export interface WeaponPanelVariant extends NamedStatPanel {
+  bulletDPS: number
+  weaponMinRange: number
+  weaponMaxRange: number
+  stats: PanelStat[]
 }
 
 export interface VitalityStatsPayload {
+  name?: string
+  stats: PanelStat[]
+  panels?: VitalityPanelVariant[]
+}
+
+export interface VitalityPanelVariant extends NamedStatPanel {
   stats: PanelStat[]
 }
 
 export interface SpiritStatsPayload {
+  name?: string
+  topStats: PanelStat[]
+  spiritPowerStat: PanelStat
+  panels?: SpiritPanelVariant[]
+}
+
+export interface SpiritPanelVariant extends NamedStatPanel {
   topStats: PanelStat[]
   spiritPowerStat: PanelStat
 }
@@ -88,6 +114,7 @@ export function buildHeroStatsSource(hero: HeroDefinition): StatsRow {
     debuff_resist_percent: hash % 12,
     fire_rate_percent: hash % 26,
     heal_amp_percent: hash % 14,
+    lifesteal_effectiveness_percent: hash % 16,
     health_regen: roundStat(1 + (hash % 18) / 10),
     heavy_melee_damage: 108 + (hash % 24),
     light_melee_damage: 46 + (hash % 12),
@@ -135,9 +162,11 @@ export function buildEmptyHeroStats(hero: HeroDefinition): HeroStatsPayload {
       stats: buildWeaponStatsArray().map(normalizeEmptyStat),
     },
     vitality: {
+      name: 'Vitality',
       stats: buildVitalityStatsArray().map(normalizeEmptyStat),
     },
     spirit: {
+      name: 'Spirit',
       topStats: buildTopSpiritStatsArray().map(normalizeEmptyStat),
       spiritPowerStat: normalizeEmptyStat(buildSpiritPowerStat()),
     },
@@ -168,9 +197,11 @@ export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
       stats: buildWeaponStatsArray(statsSource).map(normalizeStat),
     },
     vitality: {
+      name: 'Vitality',
       stats: buildVitalityStatsArray(statsSource).map(normalizeStat),
     },
     spirit: {
+      name: 'Spirit',
       topStats: buildTopSpiritStatsArray(statsSource).map(normalizeStat),
       spiritPowerStat: normalizeStat(buildSpiritPowerStat(statsSource)),
     },

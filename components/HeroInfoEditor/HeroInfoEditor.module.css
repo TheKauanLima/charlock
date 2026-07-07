@@ -1010,6 +1010,7 @@
 
 .saveActionButton,
 .publishActionButton,
+.unpublishActionButton,
 .exportActionButton {
   border: 1px solid rgba(255, 239, 214, 0.3);
   border-radius: 4px;
@@ -1043,8 +1044,21 @@
   box-shadow: 0 0 15px rgba(47, 200, 144, 0.15);
 }
 
+.unpublishActionButton {
+  border-color: rgba(255, 144, 132, 0.52);
+  background: rgba(158, 28, 25, 0.16);
+  color: #ffb3aa;
+}
+
+.unpublishActionButton:hover {
+  border-color: #ff8f84;
+  background: rgba(158, 28, 25, 0.3);
+  box-shadow: 0 0 15px rgba(255, 92, 79, 0.14);
+}
+
 .saveActionButton:disabled,
-.publishActionButton:disabled {
+.publishActionButton:disabled,
+.unpublishActionButton:disabled {
   cursor: wait;
   opacity: 0.62;
 }

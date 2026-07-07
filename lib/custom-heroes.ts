@@ -12,16 +12,19 @@ import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HER
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
+import Comment from '@/lib/models/Comment'
 import CustomHero from '@/lib/models/CustomHero'
 import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import Like from '@/lib/models/Like'
+import Notification from '@/lib/models/Notification'
 import SpiritStats from '@/lib/models/SpiritStats'
 import User from '@/lib/models/User'
 import VitalityStats from '@/lib/models/VitalityStats'
 import WeaponStats from '@/lib/models/WeaponStats'
 import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
+import { normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
@@ -49,15 +52,27 @@ interface WeaponStatsRecord {
   weaponMinRange: number
   weaponMaxRange: number
   stats: IPanelStat[]
+  panels?: Array<{
+    id: string
+    name: string
+    bulletDPS: number
+    weaponMinRange: number
+    weaponMaxRange: number
+    stats: IPanelStat[]
+  }>
 }
 
 interface VitalityStatsRecord {
+  name?: string
   stats: IPanelStat[]
+  panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
 
 interface SpiritStatsRecord {
+  name?: string
   topStats: IPanelStat[]
   spiritPowerStat: IPanelStat
+  panels?: Array<{ id: string; name: string; topStats: IPanelStat[]; spiritPowerStat: IPanelStat }>
 }
 
 interface AbilityStatsRecord {
@@ -135,6 +150,56 @@ function normalizePanelStat(value: unknown): IPanelStat {
 
 function normalizeStats(value: unknown) {
   return Array.isArray(value) ? value.map(normalizePanelStat).filter(stat => stat.label) : []
+}
+
+function normalizeVitalityStats(value: unknown) {
+  return normalizeVitalityStatsArray(normalizeStats(value))
+}
+
+function normalizeWeaponPanels(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value.map((panel, index) => {
+    const record = isRecord(panel) ? panel : {}
+
+    return {
+      id: getString(record.id, `weapon-panel-${index + 1}`),
+      name: getString(record.name, `Weapon ${index + 2}`),
+      bulletDPS: getNumber(record.bulletDPS),
+      weaponMinRange: getNumber(record.weaponMinRange),
+      weaponMaxRange: getNumber(record.weaponMaxRange),
+      stats: normalizeStats(record.stats),
+    }
+  })
+}
+
+function normalizeVitalityPanels(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value.map((panel, index) => {
+    const record = isRecord(panel) ? panel : {}
+
+    return {
+      id: getString(record.id, `vitality-panel-${index + 1}`),
+      name: getString(record.name, `Vitality ${index + 2}`),
+      stats: normalizeVitalityStats(record.stats),
+    }
+  })
+}
+
+function normalizeSpiritPanels(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value.map((panel, index) => {
+    const record = isRecord(panel) ? panel : {}
+
+    return {
+      id: getString(record.id, `spirit-panel-${index + 1}`),
+      name: getString(record.name, `Spirit ${index + 2}`),
+      topStats: normalizeStats(record.topStats),
+      spiritPowerStat: normalizePanelStat(record.spiritPowerStat),
+    }
+  })
 }
 
 function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
@@ -216,13 +281,18 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
       weaponMinRange: getNumber(weaponRecord.weaponMinRange),
       weaponMaxRange: getNumber(weaponRecord.weaponMaxRange),
       stats: normalizeStats(weaponRecord.stats),
+      panels: normalizeWeaponPanels(weaponRecord.panels),
     },
     vitality: {
-      stats: normalizeStats(vitalityRecord.stats),
+      name: getString(vitalityRecord.name, 'Vitality'),
+      stats: normalizeVitalityStats(vitalityRecord.stats),
+      panels: normalizeVitalityPanels(vitalityRecord.panels),
     },
     spirit: {
+      name: getString(spiritRecord.name, 'Spirit'),
       topStats: normalizeStats(spiritRecord.topStats),
       spiritPowerStat: normalizePanelStat(spiritRecord.spiritPowerStat),
+      panels: normalizeSpiritPanels(spiritRecord.panels),
     },
     abilityStats: normalizeAbilityStats(abilityStatsRecord, {
       displayName: name,
@@ -396,11 +466,15 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
       weaponMinRange: bundle.weapon?.weaponMinRange ?? 0,
       weaponMaxRange: bundle.weapon?.weaponMaxRange ?? 0,
       stats: normalizeStats(bundle.weapon?.stats),
+      panels: normalizeWeaponPanels(bundle.weapon?.panels),
     },
     vitality: {
-      stats: normalizeStats(bundle.vitality?.stats),
+      name: bundle.vitality?.name ?? 'Vitality',
+      stats: normalizeVitalityStats(bundle.vitality?.stats),
+      panels: normalizeVitalityPanels(bundle.vitality?.panels),
     },
     spirit: {
+      name: bundle.spirit?.name ?? 'Spirit',
       topStats: normalizeStats(bundle.spirit?.topStats),
       spiritPowerStat: bundle.spirit?.spiritPowerStat ? normalizePanelStat(bundle.spirit.spiritPowerStat) : {
         label: 'Spirit Power',
@@ -410,6 +484,7 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
         scaling: 'none',
         scalingValue: '0',
       },
+      panels: normalizeSpiritPanels(bundle.spirit?.panels),
     },
   }
 
@@ -764,6 +839,44 @@ export async function getEditableCustomHero(id: string): Promise<CustomHeroDetai
   }
 
   return serializeDetail(await getHeroBundle(hero), actor)
+}
+
+export async function deleteCustomHero(id: string) {
+  const actor = await getActor()
+  enforceRateLimit({
+    key: `custom-hero-delete:user:${actor.storageUserId}`,
+    limit: 10,
+    windowMs: 60 * 1000,
+  })
+
+  await dbConnect()
+  await assertUserNotSuspended(actor.clerkId)
+
+  const objectId = getValidObjectId(id)
+  const hero = await CustomHero.findOne({
+    _id: objectId,
+    createdByUserId: { $in: actor.ownerIds },
+  }).select('_id').lean<{ _id: Types.ObjectId } | null>()
+
+  if (!hero) {
+    throw new CustomHeroError('Hero not found', 404)
+  }
+
+  await Promise.all([
+    CustomHero.deleteOne({ _id: objectId }),
+    HeroInfo.deleteMany({ heroId: objectId }),
+    WeaponStats.deleteMany({ heroId: objectId }),
+    VitalityStats.deleteMany({ heroId: objectId }),
+    SpiritStats.deleteMany({ heroId: objectId }),
+    AbilityStats.deleteMany({ heroId: objectId }),
+    Comment.deleteMany({ heroId: objectId }),
+    Like.deleteMany({ heroId: objectId }),
+    Notification.deleteMany({ $or: [{ targetId: objectId }, { relatedHeroId: objectId }] }),
+    User.updateMany({}, { $pull: { bookmarks: objectId } }),
+    User.updateMany({ profileBackground: `custom:${objectId.toString()}` }, { $set: { profileBackground: null } }),
+  ])
+
+  return { id: objectId.toString(), deleted: true as const }
 }
 
 export async function getPublishedCustomHero(id: string): Promise<CustomHeroDetail> {

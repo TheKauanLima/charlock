@@ -10,8 +10,8 @@ import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import { buildSpiritPowerStat } from '@/components/panels/spirit-stats-mapper'
-import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
-import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
+import { buildVitalityStatsArray, normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
+import { buildPelletCountStat, buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
 
 afterEach(() => {
   cleanup()
@@ -35,6 +35,7 @@ describe('hero stat mappers', () => {
 
   it('falls back to defaults when optional rows are omitted', () => {
     expect(buildVitalityStatsArray()[0]).toMatchObject({ label: 'Max Health', value: '810', scaling: 'none' })
+    expect(buildVitalityStatsArray()[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
     expect(buildSpiritPowerStat()).toMatchObject({ label: 'Spirit Power', value: '0', description: expect.stringContaining('Spirit Power') })
   })
 })
@@ -52,6 +53,22 @@ describe('migrated stat panels', () => {
     }
   })
 
+  it('repairs legacy vitality arrays without promoting Move Speed into the top section', () => {
+    const legacyStats = buildVitalityStatsArray().filter(stat => stat.label !== 'Lifesteal Effectiveness')
+    const normalizedStats = normalizeVitalityStatsArray(legacyStats)
+
+    expect(normalizedStats).toHaveLength(16)
+    expect(normalizedStats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%' })
+    expect(normalizedStats[10]).toMatchObject({ label: 'Move Speed' })
+
+    render(<HeroStatsVitalityPanel stats={legacyStats} />)
+
+    const lifestealCell = screen.getByRole('button', { name: 'Lifesteal Effectiveness: 0%' })
+    const moveSpeedCell = screen.getByRole('button', { name: /Move Speed/ })
+    expect(lifestealCell.parentElement?.parentElement?.className).toContain('topStats')
+    expect(moveSpeedCell.parentElement?.parentElement?.className).toContain('bottomStats')
+  })
+
   it('renders vitality and spirit defaults', () => {
     render(
       <>
@@ -62,6 +79,9 @@ describe('migrated stat panels', () => {
 
     expect(screen.getByTestId('hero-stats-vitality-panel')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Max Health: 810/ })).toBeInTheDocument()
+    const lifestealCell = screen.getByRole('button', { name: 'Lifesteal Effectiveness: 0%' })
+    expect(lifestealCell.parentElement?.parentElement?.className).toContain('topStats')
+    expect(within(lifestealCell).getByText('Lifesteal Effectiveness').parentElement?.previousElementSibling).toHaveStyle({ maskImage: "url('/panorama/images/icons/properties/health_steal.svg')" })
     expect(screen.getByTestId('hero-stats-spirit-panel')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Spirit Power Impact' })).toBeInTheDocument()
     expect(screen.getByText(/increases the effectiveness/i)).toBeInTheDocument()
@@ -83,6 +103,15 @@ describe('migrated stat panels', () => {
 
     const bulletDamageCell = screen.getByRole('group', { name: /Bullet Damage/ })
     expect(bulletDamageCell).toHaveAttribute('data-scaling', 'none')
+
+    const damageTypeButton = within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Bullet)' })
+
+    await user.click(damageTypeButton)
+    expect(within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Magic)' })).toBeInTheDocument()
+    await user.click(within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Magic)' }))
+    expect(within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Melee)' })).toBeInTheDocument()
+    await user.click(within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Melee)' }))
+    expect(within(bulletDamageCell).getByRole('button', { name: 'Change Bullet Damage type (Bullet)' })).toBeInTheDocument()
 
     await user.click(within(bulletDamageCell).getByRole('button', { name: 'Edit Bullet Damage scaling' }))
     expect(screen.getByRole('dialog', { name: 'Bullet Damage scaling controls' })).toBeInTheDocument()
@@ -110,6 +139,34 @@ describe('migrated stat panels', () => {
     expect(screen.queryByRole('dialog', { name: 'Bullet Damage scaling controls' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+  })
+
+  it('enables pellet count only for shotgun weapons', async () => {
+    const user = userEvent.setup()
+    const weaponStats = buildWeaponStatsArray()
+    const { rerender } = render(<WeaponPanel isEditable weaponStats={weaponStats} />)
+
+    const shotgunToggle = screen.getByLabelText('Shotgun Pellets')
+
+    expect(shotgunToggle).not.toBeChecked()
+    expect(screen.queryByLabelText('Pellet Count value')).not.toBeInTheDocument()
+
+    await user.click(shotgunToggle)
+
+    const pelletInput = screen.getByLabelText('Pellet Count value')
+
+    expect(pelletInput).toHaveValue('1')
+    await user.clear(pelletInput)
+    await user.type(pelletInput, '6')
+    expect(pelletInput).toHaveValue('6')
+
+    await user.click(shotgunToggle)
+    expect(screen.queryByLabelText('Pellet Count value')).not.toBeInTheDocument()
+
+    rerender(<WeaponPanel weaponStats={[...weaponStats, buildPelletCountStat(8)]} />)
+
+    expect(screen.getByRole('button', { name: 'Pellet Count: 8' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Shotgun Pellets')).not.toBeInTheDocument()
   })
 
   it('opens bottom weapon and spirit scaling menus above their buttons', async () => {

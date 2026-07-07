@@ -282,8 +282,11 @@
 }
 
 .mainEditorColumnPreview {
-  width: 100%;
+  box-sizing: border-box;
+  width: calc(100% + 72px);
   max-height: min(62dvh, calc(100dvh - 170px));
+  margin-right: -72px;
+  padding-right: 72px;
   overscroll-behavior: contain;
   pointer-events: auto;
 }
@@ -291,6 +294,20 @@
 .mainEditorColumnPreview .mainCell,
 .mainEditorColumnPreview .inlineStatEditorMain {
   overflow: visible;
+}
+
+/* Earlier main cells must paint above later siblings so their rightward
+   scaling values cannot disappear behind the next cell. */
+.mainEditorColumnPreview .mainCellGrid > .mainCell:nth-child(1) {
+  z-index: 3;
+}
+
+.mainEditorColumnPreview .mainCellGrid > .mainCell:nth-child(2) {
+  z-index: 2;
+}
+
+.mainEditorColumnPreview .mainCellGrid > .mainCell:nth-child(3) {
+  z-index: 1;
 }
 
 .mainEditorColumnPreview .mainCell {
@@ -315,7 +332,7 @@
 }
 
 .mainEditorColumnPreview .inlineStatEditorMain {
-  height: 94px;
+  height: auto;
   min-height: 94px;
   padding: 8px 24px 8px;
 }
@@ -355,17 +372,6 @@
 
 .mainEditorColumnPreview .inlineStatEditorMain .unitInputLabel {
   margin-top: 1px;
-}
-
-.mainEditorColumnPreview .inlineStatEditorMain .scalingValueWrap {
-  top: -13px;
-  right: -10px;
-  z-index: 4;
-  transform: none;
-}
-
-.mainEditorColumnPreview .inlineStatEditorMain .scalingValueWrap > span {
-  margin-right: 0;
 }
 
 .tooltipSurface {
@@ -1174,8 +1180,8 @@
 
 .inlineStatEditorMain .scalingValueWrap {
   position: absolute;
-  top: 50%;
-  right: 8px;
+  top: 0%;
+  right: -2px;
   transform: translateY(-50%);
   margin: 0;
 }
@@ -2496,4 +2502,59 @@
 
 .inlineStatEditorLower.inlineStatEditorHasScaling {
   grid-template-columns: 22px max-content max-content minmax(0, 1fr) 28px;
+}
+
+/* Preview details stay compact until their text reaches the available box
+   width, then wrap and grow vertically instead of escaping the tooltip. */
+.mainEditorColumnPreview .subStat {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.mainEditorColumnPreview .inlineStatEditorSub {
+  grid-template-columns: 18px max-content minmax(0, 1fr);
+  width: fit-content;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mainEditorColumnPreview .inlineStatEditorSub.inlineStatEditorHasScaling {
+  grid-template-columns: 18px max-content minmax(0, 1fr) 28px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorSub .unitInputLabel,
+.mainEditorColumnPreview .inlineStatEditorLower .statLabelInputLabel {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mainEditorColumnPreview .inlineStatEditorMain .unitInput,
+.mainEditorColumnPreview .inlineStatEditorSub .unitInput,
+.mainEditorColumnPreview .inlineStatEditorLower .statLabelInput {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Non-main preview rows reserve their scaling-value footprint in-grid. Main
+   cells keep the original right-edge icon anchor and use the preview gutter. */
+.mainEditorColumnPreview .scalingValueWrapExpanded {
+  width: 92px;
+  min-width: 92px;
+  flex-basis: 92px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorTiming.inlineStatEditorHasScaling:has(.scalingValueWrapExpanded) {
+  grid-template-columns: 18px max-content max-content max-content 92px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorSub.inlineStatEditorHasScaling:has(.scalingValueWrapExpanded) {
+  grid-template-columns: 18px max-content minmax(0, 1fr) 92px;
+}
+
+.mainEditorColumnPreview .inlineStatEditorLower.inlineStatEditorHasScaling:has(.scalingValueWrapExpanded) {
+  grid-template-columns: 22px max-content max-content minmax(0, 1fr) 92px;
 }

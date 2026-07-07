@@ -6,7 +6,7 @@ import type { ChangeEvent, CSSProperties, RefObject } from 'react'
 import { formatPanelValue } from '@/components/panels/scaling-utils'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
-import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
+import { buildVitalityStatsArray, normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 import cn from '@/lib/utilsd'
 import type { HeroDefinition } from '@/lib/hero-data'
@@ -44,6 +44,7 @@ const ICON_ASSETS: Record<string, IconAsset> = {
   debuffResist: { maskUrl: '/panorama/images/icons/properties/debuff_remove.svg' },
   healAmp: { maskUrl: '/panorama/images/icons/properties/healing_booster.svg' },
   healthRegen: { maskUrl: '/panorama/images/icons/properties/health_regen.svg' },
+  lifestealEffectiveness: { maskUrl: '/panorama/images/icons/properties/health_steal.svg' },
   maxHealth: { maskUrl: '/panorama/images/icons/properties/health.svg' },
   meleeResist: { url: '/panorama/images/icons/properties/armor_melee_color.svg' },
   moveSpeed: { maskUrl: '/panorama/images/icons/properties/move_speed.svg' },
@@ -160,11 +161,11 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
 
 export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable = false, showDetails = false, onStatsChange }: HeroStatsVitalityPanelProps) {
   const panelRef = useRef<HTMLElement | null>(null)
-  const sourceVitalityStats = stats ?? buildVitalityStatsArray(statsSource)
+  const sourceVitalityStats = stats ? normalizeVitalityStatsArray(stats) : buildVitalityStatsArray(statsSource)
   const [editedStats, setEditedStats] = useState<PanelStat[]>(() => sourceVitalityStats)
   const vitalityStats = isEditable && !onStatsChange ? editedStats : sourceVitalityStats
-  const topRows = splitRows(vitalityStats.slice(0, 9))
-  const bottomRows = splitRows(vitalityStats.slice(9))
+  const topRows = splitRows(vitalityStats.slice(0, 10))
+  const bottomRows = splitRows(vitalityStats.slice(10))
   const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
 
   function handleStatChange(index: number, updates: Partial<PanelStat>) {
@@ -205,7 +206,7 @@ export default function HeroStatsVitalityPanel({ statsSource, stats, isEditable 
         {bottomRows.map((row, rowIndex) => (
           <div key={`vitality-bottom-${rowIndex}`} className={styles.bottomRow}>
             {row.map((stat, statIndex) => (
-              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={updates => handleStatChange(9 + rowIndex * 2 + statIndex, updates)} />
+              <VitalityStatCell key={`vitality-bottom-${stat.label}`} {...stat} isBottom isEditable={isEditable} showDetails={showDetails} boundaryRef={panelRef} openScalingPickerId={openScalingPickerId} onOpenScalingPickerChange={setOpenScalingPickerId} onChange={updates => handleStatChange(10 + rowIndex * 2 + statIndex, updates)} />
             ))}
           </div>
         ))}

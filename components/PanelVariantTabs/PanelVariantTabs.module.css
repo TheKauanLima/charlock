@@ -1,0 +1,87 @@
+.shell {
+  --panel-tab-color: #26302d;
+  --panel-tab-active: #42504c;
+  --panel-tab-border: #788681;
+
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+  pointer-events: auto;
+}
+
+.shell[data-panel-kind='weapon'] {
+  --panel-tab-color: #8a571f;
+  --panel-tab-active: #c7802e;
+  --panel-tab-border: #ffc878;
+}
+
+.shell[data-panel-kind='vitality'] {
+  --panel-tab-color: #355c2f;
+  --panel-tab-active: #4d7c3e;
+  --panel-tab-border: #9bd88a;
+}
+
+.shell[data-panel-kind='spirit'] {
+  --panel-tab-color: #68446f;
+  --panel-tab-active: #9866a4;
+  --panel-tab-border: #e5aef0;
+}
+
+.tabs {
+  display: flex;
+  max-width: 100%;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab,
+.addButton,
+.renameButton,
+.namingRow button,
+.namingRow input {
+  min-height: 28px;
+  border: 1px solid var(--panel-tab-border);
+  border-radius: 3px;
+  background: var(--panel-tab-color);
+  color: #fff;
+  padding: 4px 9px;
+  font-size: 0.66rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.tab[aria-selected='true'] {
+  border-color: #fff;
+  color: #fff;
+  background: var(--panel-tab-active);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.addButton {
+  border-style: dashed;
+  color: #fff;
+}
+
+.renameButton {
+  color: #fff;
+}
+
+.namingRow {
+  display: flex;
+  gap: 5px;
+}
+
+.namingRow input {
+  width: min(220px, 100%);
+  min-width: 0;
+  outline: none;
+}
+
+.namingRow input:focus {
+  border-color: #fff;
+}
+
+.namingRow button:disabled {
+  opacity: 0.45;
+}

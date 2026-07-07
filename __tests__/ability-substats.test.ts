@@ -53,3 +53,58 @@ describe('ability sub-header stats', () => {
     }
   })
 })
+
+describe('ability lower stats', () => {
+  it('preserves intentionally empty lower stats while defaulting missing stats', () => {
+    const source = buildDefaultAbilityStats(HEROES[0])
+    const baseGrid = source.abilities[0].sections.find(section => section.type === 'grid')
+    const tierGrid = source.abilities[0].tiers[0].variant.sections.find(section => section.type === 'grid')
+    const missingGrid = source.abilities[1].sections.find(section => section.type === 'grid')
+
+    if (!baseGrid || !tierGrid || !missingGrid) {
+      throw new Error('Expected default grid sections')
+    }
+
+    baseGrid.lowerCells = []
+    tierGrid.lowerCells = []
+    delete (missingGrid as Partial<typeof missingGrid>).lowerCells
+
+    const normalized = normalizeAbilityStats(source, HEROES[0])
+    const normalizedBaseGrid = normalized.abilities[0].sections.find(section => section.type === 'grid')
+    const normalizedTierGrid = normalized.abilities[0].tiers[0].variant.sections.find(section => section.type === 'grid')
+    const normalizedMissingGrid = normalized.abilities[1].sections.find(section => section.type === 'grid')
+
+    expect(normalizedBaseGrid?.lowerCells).toEqual([])
+    expect(normalizedTierGrid?.lowerCells).toEqual([])
+    expect(normalizedMissingGrid?.lowerCells).toHaveLength(1)
+  })
+
+  it('accepts multiple customized lower stats at the save limit', () => {
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const grid = ability.sections.find(section => section.type === 'grid')
+
+    if (!grid) {
+      throw new Error('Expected default grid section')
+    }
+
+    grid.lowerCells = Array.from({ length: 24 }, (_, index) => ({
+      ...grid.lowerCells[0],
+      id: `${grid.id}-lower-${index + 1}`,
+      label: `Detail ${index + 1}`,
+    }))
+
+    const result = customHeroSaveSchema.safeParse({
+      name: 'Custom Hero',
+      status: 'private',
+      hero: { render: '/hero.png' },
+      abilityStats: { abilities: [ability] },
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      const savedGrid = result.data.abilityStats.abilities?.[0].sections?.find(section => section.type === 'grid')
+
+      expect(savedGrid?.lowerCells).toHaveLength(24)
+    }
+  })
+})

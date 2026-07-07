@@ -12,6 +12,8 @@ import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
+import { PELLET_COUNT_LABEL } from '@/components/panels/weapon-stats-mapper'
+import PanelVariantTabs, { BASE_PANEL_ID } from '@/components/PanelVariantTabs/PanelVariantTabs'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { SaveFailureBanner, SystemToast } from '@/components/system-feedback/SystemFeedback'
@@ -30,7 +32,7 @@ import {
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
 import { buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
-import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import { UploadButton } from '@/lib/uploadthing'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
@@ -46,6 +48,7 @@ interface HeroInfoEditorProps {
   renderSelection: EditorRenderSelection
   savedHeroId?: string | null
   savedHeroName?: string
+  savedHeroStatus?: CustomHeroStatus
   allowCopies?: boolean
   initialStats?: HeroStatsPayload | null
   initialAbilityStats?: AbilityStatsPayload | null
@@ -282,8 +285,10 @@ function formatCalculatedWeaponStat(label: string, value: number) {
 function calculateBulletDps(stats: PanelStat[]) {
   const bulletDamage = parseEditableNumber(stats.find(stat => stat.label === 'Bullet Damage')?.value)
   const bulletsPerSecond = parseEditableNumber(stats.find(stat => stat.label === 'Bullets per sec')?.value)
+  const pelletCountStat = stats.find(stat => stat.label === PELLET_COUNT_LABEL)
+  const pelletCount = pelletCountStat ? Math.max(1, Math.floor(parseEditableNumber(pelletCountStat.value))) : 1
 
-  return Math.floor(bulletDamage * bulletsPerSecond)
+  return Math.floor(bulletDamage * bulletsPerSecond * pelletCount)
 }
 
 function buildWeaponBaseValues(stats: PanelStat[]) {
@@ -292,6 +297,13 @@ function buildWeaponBaseValues(stats: PanelStat[]) {
 
     return baseValues
   }, {})
+}
+
+function buildWeaponPanelBaseValues(weapon: WeaponStatsPayload) {
+  return Object.fromEntries([
+    [BASE_PANEL_ID, buildWeaponBaseValues(weapon.stats)],
+    ...(weapon.panels ?? []).map(panel => [panel.id, buildWeaponBaseValues(panel.stats)]),
+  ])
 }
 
 function ColorField({ label, value, onChange }: ColorFieldProps) {
@@ -377,6 +389,7 @@ export default function HeroInfoEditor({
   renderSelection,
   savedHeroId = null,
   savedHeroName = '',
+  savedHeroStatus = 'private',
   allowCopies = false,
   initialStats = null,
   initialAbilityStats = null,
@@ -404,12 +417,16 @@ export default function HeroInfoEditor({
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
   const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizedInitialAbilityDraft)
   const [secondarySlotSelection, setSecondarySlotSelection] = useState<number[]>(() => normalizedInitialAbilityDraft.secondaryAbilitySlots ?? [])
-  const [weaponBaseValues, setWeaponBaseValues] = useState<Record<string, number>>(() => buildWeaponBaseValues(initialStatsDraft.weapon.stats))
+  const [activeWeaponPanelId, setActiveWeaponPanelId] = useState(BASE_PANEL_ID)
+  const [activeVitalityPanelId, setActiveVitalityPanelId] = useState(BASE_PANEL_ID)
+  const [activeSpiritPanelId, setActiveSpiritPanelId] = useState(BASE_PANEL_ID)
+  const [weaponBaseValuesByPanel, setWeaponBaseValuesByPanel] = useState<Record<string, Record<string, number>>>(() => buildWeaponPanelBaseValues(initialStatsDraft.weapon))
   const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
   const [heroPortraitInput, setHeroPortraitInput] = useState(hero.portrait)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isUnpublishConfirmOpen, setIsUnpublishConfirmOpen] = useState(false)
   const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null)
   const recoveryReadyRef = useRef(false)
 
@@ -423,7 +440,7 @@ export default function HeroInfoEditor({
         setStatsDraft(snapshot.stats)
         setAbilityStatsDraft(snapshot.abilityStats)
         setSecondarySlotSelection(snapshot.abilityStats.secondaryAbilitySlots ?? [])
-        setWeaponBaseValues(buildWeaponBaseValues(snapshot.stats.weapon.stats))
+        setWeaponBaseValuesByPanel(buildWeaponPanelBaseValues(snapshot.stats.weapon))
         setWeaponTagsInput(snapshot.stats.weapon.weaponAttributes.join(', '))
         setHeroNameInput(snapshot.heroName)
         setHeroPortraitInput(snapshot.portrait)
@@ -498,6 +515,16 @@ export default function HeroInfoEditor({
       })),
     [draft],
   )
+  const activeWeaponPanel = statsDraft.weapon.panels?.find(panel => panel.id === activeWeaponPanelId)
+  const activeVitalityPanel = statsDraft.vitality.panels?.find(panel => panel.id === activeVitalityPanelId)
+  const activeSpiritPanel = statsDraft.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
+  const activeWeaponStats = activeWeaponPanel?.stats ?? statsDraft.weapon.stats
+  const activeWeaponBulletDps = activeWeaponPanel?.bulletDPS ?? statsDraft.weapon.bulletDPS
+  const activeWeaponMinRange = activeWeaponPanel?.weaponMinRange ?? statsDraft.weapon.weaponMinRange
+  const activeWeaponMaxRange = activeWeaponPanel?.weaponMaxRange ?? statsDraft.weapon.weaponMaxRange
+  const activeVitalityStats = activeVitalityPanel?.stats ?? statsDraft.vitality.stats
+  const activeSpiritTopStats = activeSpiritPanel?.topStats ?? statsDraft.spirit.topStats
+  const activeSpiritPowerStat = activeSpiritPanel?.spiritPowerStat ?? statsDraft.spirit.spiritPowerStat
 
   function updateDraft(nextDraft: Partial<HeroInfoDefinition>) {
     onDraftChange({
@@ -542,7 +569,7 @@ export default function HeroInfoEditor({
     let calculatedStats = nextStats.map(stat => (stat.label === changedStat.label ? { ...stat, value: changedValue } : stat))
 
     if (modifierTarget) {
-      const baseValue = weaponBaseValues[modifierTarget] ?? parseEditableNumber(calculatedStats.find(stat => stat.label === modifierTarget)?.value)
+      const baseValue = weaponBaseValuesByPanel[activeWeaponPanelId]?.[modifierTarget] ?? parseEditableNumber(calculatedStats.find(stat => stat.label === modifierTarget)?.value)
       const modifierValue = parseEditableNumber(changedValue) / 100
       const calculatedValue = baseValue * (1 + modifierValue)
 
@@ -550,13 +577,16 @@ export default function HeroInfoEditor({
     } else if (WEAPON_BASE_LABELS.some(label => label === changedStat.label)) {
       const parsedValue = parseEditableNumber(changedValue)
 
-      setWeaponBaseValues(currentValues => ({
+      setWeaponBaseValuesByPanel(currentValues => ({
         ...currentValues,
-        [changedStat.label]: parsedValue,
+        [activeWeaponPanelId]: {
+          ...currentValues[activeWeaponPanelId],
+          [changedStat.label]: parsedValue,
+        },
       }))
     }
 
-    updateWeaponDraft({
+    updateActiveWeaponPanel({
       stats: calculatedStats,
       bulletDPS: calculateBulletDps(calculatedStats),
     })
@@ -565,10 +595,16 @@ export default function HeroInfoEditor({
   function handleVitalityStatsChange(nextStats: PanelStat[], changedStat: PanelStat) {
     const calculatedStats = nextStats.map(stat => (stat.label === changedStat.label ? { ...stat, value: sanitizeNumberInput(changedStat.value) } : stat))
 
+    if (!activeVitalityPanel) {
+      setStatsDraft(currentDraft => ({ ...currentDraft, vitality: { ...currentDraft.vitality, stats: calculatedStats } }))
+      return
+    }
+
     setStatsDraft(currentDraft => ({
       ...currentDraft,
       vitality: {
-        stats: calculatedStats,
+        ...currentDraft.vitality,
+        panels: (currentDraft.vitality.panels ?? []).map(panel => panel.id === activeVitalityPanel.id ? { ...panel, stats: calculatedStats } : panel),
       },
     }))
   }
@@ -578,23 +614,26 @@ export default function HeroInfoEditor({
 
     setStatsDraft(currentDraft => ({
       ...currentDraft,
-      spirit: {
-        ...currentDraft.spirit,
-        topStats: calculatedStats,
-      },
+      spirit: activeSpiritPanel
+        ? {
+          ...currentDraft.spirit,
+          panels: (currentDraft.spirit.panels ?? []).map(panel => panel.id === activeSpiritPanel.id ? { ...panel, topStats: calculatedStats } : panel),
+        }
+        : { ...currentDraft.spirit, topStats: calculatedStats },
     }))
   }
 
   function handleSpiritPowerStatChange(nextStat: PanelStat) {
+    const normalizedStat = { ...nextStat, value: sanitizeNumberInput(nextStat.value) }
+
     setStatsDraft(currentDraft => ({
       ...currentDraft,
-      spirit: {
-        ...currentDraft.spirit,
-        spiritPowerStat: {
-          ...nextStat,
-          value: sanitizeNumberInput(nextStat.value),
-        },
-      },
+      spirit: activeSpiritPanel
+        ? {
+          ...currentDraft.spirit,
+          panels: (currentDraft.spirit.panels ?? []).map(panel => panel.id === activeSpiritPanel.id ? { ...panel, spiritPowerStat: normalizedStat } : panel),
+        }
+        : { ...currentDraft.spirit, spiritPowerStat: normalizedStat },
     }))
   }
 
@@ -723,6 +762,113 @@ export default function HeroInfoEditor({
   function handleAbilitySave(nextAbility: AbilityDefinition) {
     commitAbilityDraft(nextAbility)
     setActiveAbilityTarget(null)
+  }
+
+  function updateActiveWeaponPanel(nextPanel: Partial<Pick<WeaponStatsPayload, 'stats' | 'bulletDPS' | 'weaponMinRange' | 'weaponMaxRange'>>) {
+    if (!activeWeaponPanel) {
+      updateWeaponDraft(nextPanel)
+      return
+    }
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      weapon: {
+        ...currentDraft.weapon,
+        panels: (currentDraft.weapon.panels ?? []).map(panel => panel.id === activeWeaponPanel.id ? { ...panel, ...nextPanel } : panel),
+      },
+    }))
+  }
+
+  function updateActiveWeaponName(name: string) {
+    if (!activeWeaponPanel) {
+      updateWeaponDraft({ weaponName: name })
+      return
+    }
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      weapon: {
+        ...currentDraft.weapon,
+        panels: (currentDraft.weapon.panels ?? []).map(panel => panel.id === activeWeaponPanel.id ? { ...panel, name } : panel),
+      },
+    }))
+  }
+
+  function addWeaponPanel(name: string) {
+    const id = `weapon-panel-${Date.now()}`
+    const stats = structuredClone(activeWeaponStats)
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      weapon: {
+        ...currentDraft.weapon,
+        panels: [...(currentDraft.weapon.panels ?? []), {
+          id,
+          name,
+          bulletDPS: activeWeaponBulletDps,
+          weaponMinRange: activeWeaponMinRange,
+          weaponMaxRange: activeWeaponMaxRange,
+          stats,
+        }],
+      },
+    }))
+    setWeaponBaseValuesByPanel(current => ({ ...current, [id]: buildWeaponBaseValues(stats) }))
+    setActiveWeaponPanelId(id)
+  }
+
+  function addVitalityPanel(name: string) {
+    const id = `vitality-panel-${Date.now()}`
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      vitality: {
+        ...currentDraft.vitality,
+        panels: [...(currentDraft.vitality.panels ?? []), { id, name, stats: structuredClone(activeVitalityStats) }],
+      },
+    }))
+    setActiveVitalityPanelId(id)
+  }
+
+  function renameVitalityPanel(id: string, name: string) {
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      vitality: id === BASE_PANEL_ID
+        ? { ...currentDraft.vitality, name }
+        : {
+          ...currentDraft.vitality,
+          panels: (currentDraft.vitality.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
+        },
+    }))
+  }
+
+  function addSpiritPanel(name: string) {
+    const id = `spirit-panel-${Date.now()}`
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      spirit: {
+        ...currentDraft.spirit,
+        panels: [...(currentDraft.spirit.panels ?? []), {
+          id,
+          name,
+          topStats: structuredClone(activeSpiritTopStats),
+          spiritPowerStat: structuredClone(activeSpiritPowerStat),
+        }],
+      },
+    }))
+    setActiveSpiritPanelId(id)
+  }
+
+  function renameSpiritPanel(id: string, name: string) {
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      spirit: id === BASE_PANEL_ID
+        ? { ...currentDraft.spirit, name }
+        : {
+          ...currentDraft.spirit,
+          panels: (currentDraft.spirit.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
+        },
+    }))
   }
 
   function handleAbilityModeToggle(currentAbility: AbilityDefinition) {
@@ -1228,35 +1374,52 @@ export default function HeroInfoEditor({
         <aside className={styles.statsAside}>
           {activeTabId === 'weapon' ? (
             <div className={styles.weaponStack}>
+              <PanelVariantTabs
+                baseName="Weapon"
+                baseTabName={statsDraft.weapon.weaponName}
+                variants={statsDraft.weapon.panels}
+                activeId={activeWeaponPanel?.id ?? BASE_PANEL_ID}
+                canAdd={!isPreviewMode}
+                onSelect={setActiveWeaponPanelId}
+                onAdd={addWeaponPanel}
+              />
               <WeaponPanel
-                key={isPreviewMode ? 'weapon-preview' : 'weapon-edit'}
+                key={`${isPreviewMode ? 'weapon-preview' : 'weapon-edit'}-${activeWeaponPanel?.id ?? BASE_PANEL_ID}`}
                 isEditable={!isPreviewMode}
                 showDetails={isPreviewMode}
-                weaponName={statsDraft.weapon.weaponName}
+                weaponName={activeWeaponPanel?.name ?? statsDraft.weapon.weaponName}
                 weaponDesc={statsDraft.weapon.weaponDesc}
                 gunImageSrc={statsDraft.weapon.gunImageSrc}
                 weaponAttributes={statsDraft.weapon.weaponAttributes}
-                weaponStats={statsDraft.weapon.stats}
-                bulletDPS={statsDraft.weapon.bulletDPS}
-                weaponMinRange={statsDraft.weapon.weaponMinRange}
-                weaponMaxRange={statsDraft.weapon.weaponMaxRange}
+                weaponStats={activeWeaponStats}
+                bulletDPS={activeWeaponBulletDps}
+                weaponMinRange={activeWeaponMinRange}
+                weaponMaxRange={activeWeaponMaxRange}
                 onStatsChange={handleWeaponStatsChange}
                 weaponAttributesText={weaponTagsInput}
-                onWeaponNameChange={value => updateWeaponDraft({ weaponName: value })}
+                onWeaponNameChange={updateActiveWeaponName}
                 onWeaponDescChange={value => updateWeaponDraft({ weaponDesc: value })}
                 onWeaponAttributesTextChange={handleWeaponTagChange}
-                onWeaponMinRangeChange={value => updateWeaponDraft({ weaponMinRange: parseEditableNumber(value) })}
-                onWeaponMaxRangeChange={value => updateWeaponDraft({ weaponMaxRange: parseEditableNumber(value) })}
+                onWeaponMinRangeChange={value => updateActiveWeaponPanel({ weaponMinRange: parseEditableNumber(value) })}
+                onWeaponMaxRangeChange={value => updateActiveWeaponPanel({ weaponMaxRange: parseEditableNumber(value) })}
                 onOpenWeaponAssetPicker={() => setIsWeaponAssetModalOpen(true)}
                 weaponImageUploadControl={<CloudUploadButton endpoint="weaponImage" label="Upload" onUploaded={handleWeaponImageUpload} />}
               />
             </div>
           ) : null}
 
-          {activeTabId === 'vitality' ? <HeroStatsVitalityPanel key={isPreviewMode ? 'vitality-preview' : 'vitality-edit'} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={statsDraft.vitality.stats} onStatsChange={handleVitalityStatsChange} /> : null}
+          {activeTabId === 'vitality' ? (
+            <div className={styles.weaponStack}>
+              <PanelVariantTabs baseName="Vitality" baseTabName={statsDraft.vitality.name ?? 'Vitality'} variants={statsDraft.vitality.panels} activeId={activeVitalityPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} onSelect={setActiveVitalityPanelId} onAdd={addVitalityPanel} onRename={renameVitalityPanel} />
+              <HeroStatsVitalityPanel key={`${isPreviewMode ? 'vitality-preview' : 'vitality-edit'}-${activeVitalityPanel?.id ?? BASE_PANEL_ID}`} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={activeVitalityStats} onStatsChange={handleVitalityStatsChange} />
+            </div>
+          ) : null}
 
           {activeTabId === 'spirit' ? (
-          <HeroStatsSpiritPanel key={isPreviewMode ? 'spirit-preview' : 'spirit-edit'} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={statsDraft.spirit.topStats} spiritPowerStat={statsDraft.spirit.spiritPowerStat} onStatsChange={handleSpiritTopStatsChange} onSpiritPowerStatChange={handleSpiritPowerStatChange} />
+            <div className={styles.weaponStack}>
+              <PanelVariantTabs baseName="Spirit" baseTabName={statsDraft.spirit.name ?? 'Spirit'} variants={statsDraft.spirit.panels} activeId={activeSpiritPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} onSelect={setActiveSpiritPanelId} onAdd={addSpiritPanel} onRename={renameSpiritPanel} />
+              <HeroStatsSpiritPanel key={`${isPreviewMode ? 'spirit-preview' : 'spirit-edit'}-${activeSpiritPanel?.id ?? BASE_PANEL_ID}`} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={activeSpiritTopStats} spiritPowerStat={activeSpiritPowerStat} onStatsChange={handleSpiritTopStatsChange} onSpiritPowerStatChange={handleSpiritPowerStatChange} />
+            </div>
           ) : null}
         </aside>
       ) : null}
@@ -1489,22 +1652,45 @@ export default function HeroInfoEditor({
             <span aria-hidden="true" />
             <strong>Allow Copies</strong>
           </label>
-          <button
-            type="button"
-            className={styles.saveActionButton}
-            disabled={isSaving}
-            onClick={() => handleGlobalSave('private')}
-          >
-            Save Private
-          </button>
-          <button
-            type="button"
-            className={styles.publishActionButton}
-            disabled={isSaving}
-            onClick={() => handleGlobalSave('published')}
-          >
-            Publish
-          </button>
+          {savedHeroStatus === 'published' ? (
+            <>
+              <button
+                type="button"
+                className={styles.publishActionButton}
+                disabled={isSaving}
+                onClick={() => handleGlobalSave('published')}
+              >
+                Save Published Changes
+              </button>
+              <button
+                type="button"
+                className={styles.unpublishActionButton}
+                disabled={isSaving}
+                onClick={() => setIsUnpublishConfirmOpen(true)}
+              >
+                Unpublish Hero
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.saveActionButton}
+                disabled={isSaving}
+                onClick={() => handleGlobalSave('private')}
+              >
+                Save Private
+              </button>
+              <button
+                type="button"
+                className={styles.publishActionButton}
+                disabled={isSaving}
+                onClick={() => handleGlobalSave('published')}
+              >
+                Publish
+              </button>
+            </>
+          )}
           <CharacterExportButton payload={exportPayload} className={styles.exportActionButton} />
           {saveError ? <p className={styles.saveError} role="alert">{saveError}</p> : null}
           {saveFailure && onRetrySave ? <SaveFailureBanner reason={saveFailure} onRetry={onRetrySave} /> : null}
@@ -1512,6 +1698,43 @@ export default function HeroInfoEditor({
           {recoveryStatus && !saveStatusMessage ? <SystemToast message={recoveryStatus} /> : null}
         </div>
       </div>
+
+      {isUnpublishConfirmOpen ? (
+        <div className={styles.secondSetModalBackdrop} role="presentation">
+          <section
+            className={styles.secondSetModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unpublish-hero-modal-title"
+          >
+            <div className={styles.secondSetModalHeader}>
+              <h2 id="unpublish-hero-modal-title">Unpublish Hero?</h2>
+              <button type="button" className={styles.secondSetModalClose} aria-label="Close unpublish confirmation" onClick={() => setIsUnpublishConfirmOpen(false)}>
+                X
+              </button>
+            </div>
+            <p className={styles.secondSetModalCopy}>
+              This hero will be removed from Browse and returned to your private saves. You can publish it again later.
+            </p>
+            <div className={styles.secondSetConfirmActions}>
+              <button type="button" className={styles.secondSetCancelButton} onClick={() => setIsUnpublishConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.secondSetDeleteButton}
+                disabled={isSaving}
+                onClick={() => {
+                  setIsUnpublishConfirmOpen(false)
+                  handleGlobalSave('private')
+                }}
+              >
+                Confirm Unpublish
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {secondAbilitySetModal ? (
         <div className={styles.secondSetModalBackdrop} role="presentation">

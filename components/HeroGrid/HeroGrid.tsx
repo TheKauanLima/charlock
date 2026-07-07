@@ -558,10 +558,12 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }
 
   async function handleSaveHero(payload: CustomHeroSavePayload) {
+    const isUnpublishing = editingCustomHero?.status === 'published' && payload.status === 'private'
+
     setIsSavingHero(true)
     setLastSavePayload(payload)
     setSaveFailure(null)
-    setSaveStatusMessage(payload.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
+    setSaveStatusMessage(isUnpublishing ? 'Unpublishing hero...' : payload.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
 
     try {
       if (navigator.onLine === false) {
@@ -596,7 +598,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       })
       clearEditorRecovery()
       setLastSavePayload(null)
-      setSaveStatusMessage(body.hero.status === 'published' ? 'Hero published to Browse.' : 'Private hero saved to your profile.')
+      if (isUnpublishing) {
+        setBrowseHeroes(currentHeroes => currentHeroes.filter(hero => hero.id !== body.hero?.id))
+        setBookmarkedHeroes(currentHeroes => currentHeroes.filter(hero => hero.id !== body.hero?.id))
+      }
+      setSaveStatusMessage(isUnpublishing ? 'Hero unpublished and moved to your private saves.' : body.hero.status === 'published' ? 'Hero published to Browse.' : 'Private hero saved to your profile.')
     } catch (error) {
       const requestError = getNetworkRequestError(error, 'Failed to save hero.')
 
@@ -1049,6 +1055,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           renderSelection={editorRenderSelection}
           savedHeroId={editingCustomHero?.id ?? null}
           savedHeroName={editingCustomHero?.displayName ?? ''}
+          savedHeroStatus={editingCustomHero?.status ?? 'private'}
           allowCopies={editingCustomHero?.allowCopies ?? false}
           initialStats={editingHeroStats}
           initialAbilityStats={editingAbilityStats}

@@ -97,7 +97,16 @@ describe('getHeroStatsBySlug stat normalization', () => {
         stats: [
           { label: 'Bullet Damage', value: '18', unit: '', icon: 'damage', scaling: 'none', scalingValue: '0' },
           { label: 'Ammo', value: '12', unit: '', icon: 'ammo', scaling: 'none', scalingValue: '0' },
+          { label: 'Pellet Count', value: '6', unit: '', icon: 'bulletDamage', scaling: 'none', scalingValue: '0' },
         ],
+        panels: [{
+          id: 'weapon-alt',
+          name: 'Shotgun',
+          bulletDPS: 120,
+          weaponMinRange: 8,
+          weaponMaxRange: 24,
+          stats: [{ label: 'Bullet Damage', value: '20', unit: '', icon: 'damage', scaling: 'none', scalingValue: '0' }],
+        }],
       }),
     )
     vitalityFindOneMock.mockReturnValueOnce(
@@ -106,6 +115,11 @@ describe('getHeroStatsBySlug stat normalization', () => {
           { label: 'Max Health', value: '450', unit: '', icon: 'health', scaling: 'none', scalingValue: '0' },
           { label: 'Stamina', value: '4', unit: '', icon: 'stamina', scaling: 'none', scalingValue: '0' },
         ],
+        panels: [{
+          id: 'vitality-alt',
+          name: 'Tank',
+          stats: [{ label: 'Max Health', value: '999', unit: '', icon: 'health', scaling: 'none', scalingValue: '0' }],
+        }],
       }),
     )
     spiritFindOneMock.mockReturnValueOnce(
@@ -115,13 +129,19 @@ describe('getHeroStatsBySlug stat normalization', () => {
           { label: 'Burst Damage', value: '120', unit: '', icon: 'spirit_damage', scaling: 'spirit', scalingValue: '1.4' },
         ],
         spiritPowerStat: { label: 'Spirit Power', value: '0', unit: '', icon: 'spirit', scaling: 'none', scalingValue: '0' },
+        panels: [{
+          id: 'spirit-alt',
+          name: 'Caster',
+          topStats: [{ label: 'Ability Range', value: '30', unit: '%', icon: 'range', scaling: 'none', scalingValue: '0' }],
+          spiritPowerStat: { label: 'Spirit Power', value: '80', unit: '', icon: 'spirit', scaling: 'none', scalingValue: '0' },
+        }],
       }),
     )
     abilityStatsFindOneMock.mockReturnValueOnce(createQueryMock(null))
 
     const stats = await getHeroStatsBySlug('apollo')
 
-    expect(stats?.weapon.stats).toHaveLength(14)
+    expect(stats?.weapon.stats).toHaveLength(15)
     expect(stats?.weapon.stats.map(stat => stat.label)).toEqual([
       'Bullet Damage',
       'Weapon Damage',
@@ -137,8 +157,9 @@ describe('getHeroStatsBySlug stat normalization', () => {
       'Crit Bonus Scale',
       'Light Melee',
       'Heavy Melee',
+      'Pellet Count',
     ])
-    expect(stats?.vitality.stats).toHaveLength(15)
+    expect(stats?.vitality.stats).toHaveLength(16)
     expect(stats?.spirit.topStats.map(stat => stat.label)).toEqual([
       'Ability Cooldown',
       'Ability Duration',
@@ -148,7 +169,12 @@ describe('getHeroStatsBySlug stat normalization', () => {
       'Charge Cooldown',
     ])
     expect(stats?.weapon.stats[0]).toMatchObject({ value: '18', icon: 'bulletDamage' })
-    expect(stats?.vitality.stats[14]).toMatchObject({ label: 'Dash Speed', value: '0' })
+    expect(stats?.weapon.stats[14]).toMatchObject({ label: 'Pellet Count', value: '6' })
+    expect(stats?.vitality.stats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
+    expect(stats?.vitality.stats[15]).toMatchObject({ label: 'Dash Speed', value: '0' })
+    expect(stats?.weapon.panels?.[0]).toMatchObject({ name: 'Shotgun', bulletDPS: 120, stats: expect.arrayContaining([expect.objectContaining({ label: 'Bullet Damage', value: '20' })]) })
+    expect(stats?.vitality.panels?.[0]).toMatchObject({ name: 'Tank', stats: expect.arrayContaining([expect.objectContaining({ label: 'Max Health', value: '999' })]) })
+    expect(stats?.spirit.panels?.[0]).toMatchObject({ name: 'Caster', spiritPowerStat: expect.objectContaining({ value: '80' }) })
   })
 
   it('returns generated official hero stats when MongoDB is unavailable', async () => {

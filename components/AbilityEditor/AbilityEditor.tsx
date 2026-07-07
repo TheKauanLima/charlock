@@ -145,6 +145,7 @@ type ActiveTier = 0 | AbilityTierLevel
 type SectionDropPosition = 'before' | 'after'
 const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
 const TIER_TEXT_APPROX_CHARS_PER_LINE = 16
+const MAX_LOWER_GRID_CELLS = 24
 
 type RichTextEffect =
   | { type: 'bold' }
@@ -211,6 +212,18 @@ function createGridCell(id: string, label = 'New Stat'): AbilityGridCell {
     id,
     ...createStat(label),
   }
+}
+
+function getNextGridCellId(section: AbilityGridSection, cellType: 'main' | 'lower') {
+  const cells = cellType === 'main' ? section.mainCells : section.lowerCells
+  const existingIds = new Set(cells.map(cell => cell.id))
+  let index = 1
+
+  while (existingIds.has(`${section.id}-${cellType}-${index}`)) {
+    index += 1
+  }
+
+  return `${section.id}-${cellType}-${index}`
 }
 
 function escapeHtml(value: string) {
@@ -1403,7 +1416,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             ) : renderStatText(styles.statLabelInput, stat.label)}
           </label>
         ) : null}
-        <span className={styles.scalingValueWrap}>
+        <span className={cn(styles.scalingValueWrap, variant !== 'main' && !capabilities.canEditStats && showDetails && stat.scaling !== 'none' && styles.scalingValueWrapExpanded)}>
           {capabilities.canEditStats ? (
             <ScalingPicker
               label={label}
@@ -1572,8 +1585,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                       section={section}
                       readOnly={!capabilities.canEditStats}
                       renderInlineStat={renderInlineStat}
-                      onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createGridCell(`${current.id}-main-${current.mainCells.length + 1}`, 'Value')].slice(0, 3) } : current, { cascadeToHigher: true })}
-                      onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: [...current.lowerCells, createGridCell(`${current.id}-lower-${current.lowerCells.length + 1}`, 'Detail')] } : current, { cascadeToHigher: true })}
+                      onAddMainCell={() => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: [...current.mainCells, createGridCell(getNextGridCellId(current, 'main'), 'Value')].slice(0, 3) } : current, { cascadeToHigher: true })}
+                      onAddLowerCell={() => updateSection(section.id, current => current.type === 'grid' && current.lowerCells.length < MAX_LOWER_GRID_CELLS ? { ...current, lowerCells: [...current.lowerCells, createGridCell(getNextGridCellId(current, 'lower'), 'Detail')] } : current, { cascadeToHigher: true })}
                       onMainCellChange={(index, cell) => updateGridCell(section.id, 'mainCells', index, cell)}
                       onLowerCellChange={(index, cell) => updateGridCell(section.id, 'lowerCells', index, cell)}
                       onMainCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, mainCells: current.mainCells.filter((_, cellIndex) => cellIndex !== index) } : current, { cascadeToHigher: true })}
@@ -2553,7 +2566,7 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
       {!readOnly ? (
         <div className={styles.gridActions}>
         <button type="button" onClick={onAddMainCell} disabled={section.mainCells.length >= 3}>Add Main Cell</button>
-        <button type="button" onClick={onAddLowerCell}>Add Lower Cell</button>
+        <button type="button" onClick={onAddLowerCell} disabled={section.lowerCells.length >= MAX_LOWER_GRID_CELLS}>Add Lower Cell</button>
         </div>
       ) : null}
       <div

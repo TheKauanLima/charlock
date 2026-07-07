@@ -31,6 +31,30 @@ export const panelStatSchema = z.object({
   description: z.string().max(1000).optional(),
 }).strict()
 
+const namedPanelSchema = {
+  id: z.string().trim().min(1).max(160),
+  name: z.string().trim().min(1).max(80),
+}
+
+const weaponPanelVariantSchema = z.object({
+  ...namedPanelSchema,
+  bulletDPS: z.number().optional(),
+  weaponMinRange: z.number().optional(),
+  weaponMaxRange: z.number().optional(),
+  stats: z.array(panelStatSchema).max(40),
+}).strict()
+
+const vitalityPanelVariantSchema = z.object({
+  ...namedPanelSchema,
+  stats: z.array(panelStatSchema).max(40),
+}).strict()
+
+const spiritPanelVariantSchema = z.object({
+  ...namedPanelSchema,
+  topStats: z.array(panelStatSchema).max(40),
+  spiritPowerStat: panelStatSchema,
+}).strict()
+
 const abilityRichTextSectionSchema = z.object({
   id: z.string().max(160).optional(),
   type: z.literal('richText'),
@@ -125,13 +149,18 @@ export const customHeroSaveSchema = z.object({
     weaponMinRange: z.number().optional(),
     weaponMaxRange: z.number().optional(),
     stats: z.array(panelStatSchema).max(40).optional(),
+    panels: z.array(weaponPanelVariantSchema).max(8).optional(),
   }).strict().default({}),
   vitality: z.object({
+    name: z.string().trim().min(1).max(80).optional(),
     stats: z.array(panelStatSchema).max(40).optional(),
+    panels: z.array(vitalityPanelVariantSchema).max(8).optional(),
   }).strict().default({}),
   spirit: z.object({
+    name: z.string().trim().min(1).max(80).optional(),
     topStats: z.array(panelStatSchema).max(40).optional(),
     spiritPowerStat: panelStatSchema.optional(),
+    panels: z.array(spiritPanelVariantSchema).max(8).optional(),
   }).strict().default({}),
   abilityStats: z.object({
     abilities: z.array(abilityDefinitionSchema).max(4).optional(),

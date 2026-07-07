@@ -51,9 +51,18 @@ interface WeaponStatsRecord {
   critBonusScale?: IPanelStat
   lightMelee?: IPanelStat
   heavyMelee?: IPanelStat
+  panels?: Array<{
+    id: string
+    name: string
+    bulletDPS: number
+    weaponMinRange: number
+    weaponMaxRange: number
+    stats: IPanelStat[]
+  }>
 }
 
 interface VitalityStatsRecord {
+  name?: string
   stats?: IPanelStat[]
   maxHealth?: IPanelStat
   healthRegen?: IPanelStat
@@ -70,9 +79,11 @@ interface VitalityStatsRecord {
   staminaRecovery?: IPanelStat
   stamina?: IPanelStat
   dashSpeed?: IPanelStat
+  panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
 
 interface SpiritStatsRecord {
+  name?: string
   topStats?: IPanelStat[]
   spiritPower?: IPanelStat
   abilityCooldown?: IPanelStat
@@ -82,6 +93,7 @@ interface SpiritStatsRecord {
   maxChargesIncrease?: IPanelStat
   chargeCooldown?: IPanelStat
   spiritPowerStat?: IPanelStat
+  panels?: Array<{ id: string; name: string; topStats: IPanelStat[]; spiritPowerStat: IPanelStat }>
 }
 
 interface AbilityStatsRecord {
@@ -122,11 +134,16 @@ const STANDARD_WEAPON_STATS: StandardStatDefinition[] = [
   { label: 'Heavy Melee', unit: '', icon: 'melee', legacyKey: 'heavyMelee' },
 ]
 
+const OPTIONAL_WEAPON_STATS: StandardStatDefinition[] = [
+  { label: 'Pellet Count', unit: '', icon: 'bulletDamage' },
+]
+
 const STANDARD_VITALITY_STATS: StandardStatDefinition[] = [
   { label: 'Max Health', unit: '', icon: 'maxHealth', legacyKey: 'maxHealth' },
   { label: 'Health Regen', unit: '', icon: 'healthRegen', legacyKey: 'healthRegen' },
   { label: 'Heal Amp', unit: '%', icon: 'healAmp', legacyKey: 'healAmp' },
   { label: 'Non-Combat Regen', unit: '', icon: 'healthRegen', legacyKey: 'nonCombatRegen' },
+  { label: 'Lifesteal Effectiveness', unit: '%', icon: 'lifestealEffectiveness' },
   { label: 'Bullet Resist', unit: '%', icon: 'bulletResist', legacyKey: 'bulletResist' },
   { label: 'Spirit Resist', unit: '%', icon: 'spiritResist', legacyKey: 'spiritResist' },
   { label: 'Melee Resist', unit: '%', icon: 'meleeResist', legacyKey: 'meleeResist' },
@@ -162,11 +179,16 @@ function isPanelStat(stat: IPanelStat | undefined): stat is IPanelStat {
 }
 
 function buildStandardStat(definition: StandardStatDefinition, stat?: IPanelStat): PanelStat {
+  const bulletDamageIcons = ['bulletDamage', 'damage_bullet_color', 'damage_magic_color', 'damage_melee_color']
+  const icon = definition.label === 'Bullet Damage' && stat?.icon && bulletDamageIcons.includes(stat.icon)
+    ? stat.icon
+    : definition.icon
+
   return {
     label: definition.label,
     value: stat?.value ?? '0',
     unit: definition.unit,
-    icon: definition.icon,
+    icon,
     scaling: stat?.scaling ?? 'none',
     scalingValue: stat?.scalingValue ?? '0',
     ...(stat?.description || definition.description ? { description: stat?.description ?? definition.description } : {}),
@@ -187,6 +209,23 @@ function normalizeStoredStats(
 
     return buildStandardStat(definition, sourceStat)
   })
+}
+
+function normalizeOptionalStoredStats(stats: IPanelStat[] | undefined, definitions: StandardStatDefinition[]): PanelStat[] {
+  const statsByLabel = new Map((stats ?? []).filter(isPanelStat).map(stat => [stat.label, stat]))
+
+  return definitions.flatMap(definition => {
+    const sourceStat = statsByLabel.get(definition.label)
+
+    return sourceStat ? [buildStandardStat(definition, sourceStat)] : []
+  })
+}
+
+function normalizeStoredWeaponStats(stats: IPanelStat[] | undefined, record: object): PanelStat[] {
+  return [
+    ...normalizeStoredStats(stats, STANDARD_WEAPON_STATS, record),
+    ...normalizeOptionalStoredStats(stats, OPTIONAL_WEAPON_STATS),
+  ]
 }
 
 function serializeStoredHeroInfo(heroInfo: HeroInfoRecord): HeroInfoDefinition {
@@ -245,9 +284,9 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
     HeroInfo.findOne({ heroId: hero._id })
       .select('nameType nameValue nameColor nameFontSize nameFontFamily nameFontWeight tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
       .lean<HeroInfoRecord | null>(),
-    WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
-    VitalityStats.findOne({ heroId: hero._id }).select('stats maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
-    SpiritStats.findOne({ heroId: hero._id }).select('topStats spiritPower spiritPowerStat abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
+    WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats panels bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
+    VitalityStats.findOne({ heroId: hero._id }).select('name stats panels maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
+    SpiritStats.findOne({ heroId: hero._id }).select('name topStats spiritPower spiritPowerStat panels abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
     AbilityStats.findOne({ heroId: hero._id }).lean<AbilityStatsRecord | null>(),
   ])
 
@@ -279,14 +318,35 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
       bulletDPS: weapon.bulletDPS,
       weaponMinRange: weapon.weaponMinRange,
       weaponMaxRange: weapon.weaponMaxRange,
-      stats: normalizeStoredStats(weapon.stats, STANDARD_WEAPON_STATS, weapon),
+      stats: normalizeStoredWeaponStats(weapon.stats, weapon),
+      panels: (weapon.panels ?? []).map(panel => ({
+        id: panel.id,
+        name: panel.name,
+        bulletDPS: panel.bulletDPS,
+        weaponMinRange: panel.weaponMinRange,
+        weaponMaxRange: panel.weaponMaxRange,
+        stats: normalizeStoredWeaponStats(panel.stats, panel),
+      })),
     },
     vitality: {
+      name: vitality.name ?? 'Vitality',
       stats: normalizeStoredStats(vitality.stats, STANDARD_VITALITY_STATS, vitality),
+      panels: (vitality.panels ?? []).map(panel => ({
+        id: panel.id,
+        name: panel.name,
+        stats: normalizeStoredStats(panel.stats, STANDARD_VITALITY_STATS, panel),
+      })),
     },
     spirit: {
+      name: spirit.name ?? 'Spirit',
       topStats: normalizeStoredStats(spirit.topStats, STANDARD_SPIRIT_STATS, spirit),
       spiritPowerStat: buildStandardStat(STANDARD_SPIRIT_POWER_STAT, spirit.spiritPowerStat ?? spirit.spiritPower),
+      panels: (spirit.panels ?? []).map(panel => ({
+        id: panel.id,
+        name: panel.name,
+        topStats: normalizeStoredStats(panel.topStats, STANDARD_SPIRIT_STATS, panel),
+        spiritPowerStat: buildStandardStat(STANDARD_SPIRIT_POWER_STAT, panel.spiritPowerStat),
+      })),
     },
   }
 }

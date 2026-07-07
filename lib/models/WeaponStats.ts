@@ -22,8 +22,18 @@ export interface IWeaponStats {
   weaponMinRange: number
   weaponMaxRange: number
   stats: IPanelStat[]
+  panels?: IWeaponPanelVariant[]
   createdAt: Date
   updatedAt: Date
+}
+
+export interface IWeaponPanelVariant {
+  id: string
+  name: string
+  bulletDPS: number
+  weaponMinRange: number
+  weaponMaxRange: number
+  stats: IPanelStat[]
 }
 
 export const statSchema = new Schema<IPanelStat>({
@@ -40,6 +50,15 @@ export const statSchema = new Schema<IPanelStat>({
   },
   scalingValue: { type: String, default: '0' },
   description: { type: String },
+}, { _id: false })
+
+const weaponPanelVariantSchema = new Schema<IWeaponPanelVariant>({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  bulletDPS: { type: Number, default: 0 },
+  weaponMinRange: { type: Number, default: 0 },
+  weaponMaxRange: { type: Number, default: 0 },
+  stats: [statSchema],
 }, { _id: false })
 
 const weaponStatsSchema = new Schema<IWeaponStats>(
@@ -59,6 +78,7 @@ const weaponStatsSchema = new Schema<IWeaponStats>(
     weaponMinRange: { type: Number, default: 0 },
     weaponMaxRange: { type: Number, default: 0 },
     stats: [statSchema],
+    panels: { type: [weaponPanelVariantSchema], default: undefined },
   },
   {
     timestamps: true,

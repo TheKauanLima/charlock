@@ -335,6 +335,15 @@ describe('AbilityEditor', () => {
 
   it('renders preview grid cells without empty detail titles and exposes scaling values', () => {
     const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+    const abilityStyles = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const previewMainRule = [...abilityStyles.matchAll(/\.mainEditorColumnPreview \.inlineStatEditorMain\s*\{([^}]*)\}/g)].at(-1)?.[1]
+    const previewSubRule = abilityStyles.match(/\.mainEditorColumnPreview \.inlineStatEditorSub\s*\{([^}]*)\}/)?.[1]
+    const previewDetailRule = abilityStyles.match(/\.mainEditorColumnPreview \.inlineStatEditorMain \.unitInput,[\s\S]*?\{([^}]*)\}/)?.[1]
+    const previewColumnRule = abilityStyles.match(/\.mainEditorColumnPreview\s*\{([^}]*)\}/)?.[1]
+    const mainScalingRule = abilityStyles.match(/\.inlineStatEditorMain \.scalingValueWrap\s*\{([^}]*)\}/)?.[1]
+    const firstMainCellStackRule = abilityStyles.match(/\.mainEditorColumnPreview \.mainCellGrid > \.mainCell:nth-child\(1\)\s*\{([^}]*)\}/)?.[1]
+    const secondMainCellStackRule = abilityStyles.match(/\.mainEditorColumnPreview \.mainCellGrid > \.mainCell:nth-child\(2\)\s*\{([^}]*)\}/)?.[1]
+    const thirdMainCellStackRule = abilityStyles.match(/\.mainEditorColumnPreview \.mainCellGrid > \.mainCell:nth-child\(3\)\s*\{([^}]*)\}/)?.[1]
 
     ability.sections = [
       {
@@ -347,7 +356,7 @@ describe('AbilityEditor', () => {
             id: 'preview-main-cell',
             label: 'Damage',
             value: '12',
-            unit: 'Missing Health as Damage',
+            unit: 'MissingHealthAsDamageThatSurpassesTheStatBoxLimit',
             append: '+very-long-append',
             scaling: 'spirit',
             scalingValue: '0.15',
@@ -367,7 +376,7 @@ describe('AbilityEditor', () => {
           {
             ...ability.cooldown,
             id: 'preview-lower-cell',
-            label: 'Very Long Lower Stat Label',
+            label: 'VeryLongLowerStatLabelThatSurpassesTheStatBoxLimit',
             value: '203',
             unit: '',
             append: 'm/s',
@@ -391,7 +400,7 @@ describe('AbilityEditor', () => {
 
     const mainStat = screen.getByTestId('ability-stat-main-damage')
     const titledMainStat = screen.getByTestId('ability-stat-main-alt-cast')
-    const lowerStat = screen.getByTestId('ability-stat-lower-very-long-lower-stat-label')
+    const lowerStat = screen.getByTestId('ability-stat-lower-verylonglowerstatlabelthatsurpassesthestatboxlimit')
     const mainCell = mainStat.closest('[class*="mainCell"]')
     const titledMainCell = titledMainStat.closest('[class*="mainCell"]')
     const mainRow = mainStat.querySelector('[class*="mainRow"]')
@@ -401,12 +410,28 @@ describe('AbilityEditor', () => {
     expect(screen.getByLabelText('Main cell 2 title')).toHaveValue('Alt Cast')
     expect(titledMainCell?.querySelector('[class*="mainCellTitleLabel"]')).toBeInTheDocument()
     expect(mainRow).toBeInTheDocument()
-    expect(within(mainStat).getByLabelText('spirit scaling value x0.15')).toBeInTheDocument()
-    expect(within(mainStat).getByText('Missing Health as Damage').className).toContain('readonlyStatText')
+    const scalingValue = within(mainStat).getByLabelText('spirit scaling value x0.15')
+
+    expect(scalingValue).toBeInTheDocument()
+    expect(scalingValue.parentElement?.className).not.toContain('rootValueLeft')
+    expect(scalingValue.parentElement?.parentElement?.className).not.toContain('scalingValueWrapExpanded')
+    expect(mainScalingRule).toMatch(/position:\s*absolute/)
+    expect(previewColumnRule).toMatch(/width:\s*calc\(100% \+ 72px\)/)
+    expect(previewColumnRule).toMatch(/padding-right:\s*72px/)
+    expect(previewColumnRule).toMatch(/margin-right:\s*-72px/)
+    expect(firstMainCellStackRule).toMatch(/z-index:\s*3/)
+    expect(secondMainCellStackRule).toMatch(/z-index:\s*2/)
+    expect(thirdMainCellStackRule).toMatch(/z-index:\s*1/)
+    expect(within(mainStat).getByText('MissingHealthAsDamageThatSurpassesTheStatBoxLimit').className).toContain('readonlyStatText')
     expect(within(mainStat).getByText('+very-long-append').className).toContain('readonlyStatText')
     expect(within(mainStat).getByText('+very-long-append').className).toContain('readonlyStatTextNoWrap')
-    expect(within(mainStat).getByText('Missing Health as Damage').className).not.toContain('readonlyStatTextNoWrap')
-    expect(within(lowerStat).getByText('Very Long Lower Stat Label').className).toContain('readonlyStatText')
+    expect(within(mainStat).getByText('MissingHealthAsDamageThatSurpassesTheStatBoxLimit').className).not.toContain('readonlyStatTextNoWrap')
+    expect(within(lowerStat).getByText('VeryLongLowerStatLabelThatSurpassesTheStatBoxLimit').className).toContain('readonlyStatText')
+    expect(previewMainRule).toMatch(/height:\s*auto/)
+    expect(previewMainRule).toMatch(/min-height:\s*94px/)
+    expect(previewSubRule).toMatch(/max-width:\s*100%/)
+    expect(previewDetailRule).toMatch(/white-space:\s*normal/)
+    expect(previewDetailRule).toMatch(/overflow-wrap:\s*anywhere/)
   })
 
   it('keeps tier box line breaks in one vertical text flow', async () => {
@@ -1279,6 +1304,67 @@ describe('AbilityEditor', () => {
       append: '%',
       scaling: 'spirit',
     }))
+  })
+
+  it('keeps lower-stat IDs unique after removing and adding rows', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+    const grid = ability.sections.find(section => section.type === 'grid')
+
+    if (!grid) {
+      throw new Error('Expected default grid section')
+    }
+
+    grid.lowerCells.push(
+      { ...grid.lowerCells[0], id: `${grid.id}-lower-2`, label: 'Second' },
+      { ...grid.lowerCells[0], id: `${grid.id}-lower-3`, label: 'Third' },
+    )
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Remove lower cell 2' }))
+    await user.click(screen.getByRole('button', { name: 'Add Lower Cell' }))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
+    const savedIds = savedGrid?.lowerCells.map(cell => cell.id) ?? []
+
+    expect(savedIds).toHaveLength(3)
+    expect(new Set(savedIds).size).toBe(savedIds.length)
+  })
+
+  it('disables adding lower stats at the save limit', () => {
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+    const grid = ability.sections.find(section => section.type === 'grid')
+
+    if (!grid) {
+      throw new Error('Expected default grid section')
+    }
+
+    grid.lowerCells = Array.from({ length: 24 }, (_, index) => ({
+      ...grid.lowerCells[0],
+      id: `${grid.id}-lower-${index + 1}`,
+    }))
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'Add Lower Cell' })).toBeDisabled()
   })
 
   it('keeps intrinsic-color inline icons from being tinted by rich text colors', async () => {

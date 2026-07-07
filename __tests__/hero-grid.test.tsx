@@ -66,6 +66,7 @@ vi.mock('@/lib/uploadthing', () => ({
 afterEach(() => {
   cleanup()
   window.localStorage.clear()
+  window.history.replaceState({}, '', '/')
 })
 
 beforeEach(() => {
@@ -304,7 +305,7 @@ describe('HeroGrid', () => {
 
     await user.click(screen.getByRole('button', { name: 'Select character Grey Talon' }))
 
-    expect(await screen.findByText('Grey Talon Weapon')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('weapon-panel')).toHaveAccessibleName('Grey Talon Weapon weapon stats'))
     expect(screen.getByTestId('weapon-panel')).not.toHaveTextContent('Abrams Weapon')
   })
 
@@ -729,6 +730,81 @@ describe('HeroGrid', () => {
 
     expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('0.0')
     expect(screen.getByText('DPS')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Bullet Damage value'))
+    await user.type(screen.getByLabelText('Bullet Damage value'), '10')
+    await user.clear(screen.getByLabelText('Bullets per sec value'))
+    await user.type(screen.getByLabelText('Bullets per sec value'), '2')
+
+    const dpsValue = screen.getByText('DPS').parentElement
+
+    expect(dpsValue).toHaveTextContent('20DPS')
+
+    await user.click(screen.getByLabelText('Shotgun Pellets'))
+    await user.clear(screen.getByLabelText('Pellet Count value'))
+    await user.type(screen.getByLabelText('Pellet Count value'), '6')
+
+    expect(dpsValue).toHaveTextContent('120DPS')
+
+    await user.click(screen.getByLabelText('Shotgun Pellets'))
+    expect(dpsValue).toHaveTextContent('20DPS')
+  })
+
+  it('adds named Weapon, Vitality, and Spirit panels with independent values', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+    await openEmptyCreateEditor(user)
+
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+    const baseWeaponName = (screen.getByLabelText('Weapon name') as HTMLInputElement).value
+
+    await user.click(screen.getByRole('button', { name: 'Add Weapon panel' }))
+    await user.type(screen.getByLabelText('New Weapon panel name'), 'Shotgun')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByLabelText('Weapon name')).toHaveValue('Shotgun')
+    await user.clear(screen.getByLabelText('Weapon name'))
+    await user.type(screen.getByLabelText('Weapon name'), 'Scattergun')
+    expect(screen.getByRole('tab', { name: 'Scattergun' })).toBeInTheDocument()
+    await user.clear(screen.getByLabelText('Bullet Damage value'))
+    await user.type(screen.getByLabelText('Bullet Damage value'), '12')
+    await user.click(screen.getByRole('tab', { name: baseWeaponName, exact: true }))
+    expect(screen.getByLabelText('Weapon name')).toHaveValue(baseWeaponName)
+    expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('0')
+    await user.click(screen.getByRole('tab', { name: 'Scattergun' }))
+    expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('12')
+
+    await user.click(screen.getByRole('tab', { name: 'Vitality stats' }))
+    await user.click(screen.getByRole('button', { name: 'Rename active Vitality panel' }))
+    await user.clear(screen.getByLabelText('Rename Vitality panel'))
+    await user.type(screen.getByLabelText('Rename Vitality panel'), 'Fortitude')
+    await user.click(screen.getByRole('button', { name: 'Save Name' }))
+    expect(screen.getByRole('tab', { name: 'Fortitude' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add Vitality panel' }))
+    await user.type(screen.getByLabelText('New Vitality panel name'), 'Tank')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.clear(screen.getByLabelText('Max Health value'))
+    await user.type(screen.getByLabelText('Max Health value'), '999')
+    await user.click(screen.getByRole('tab', { name: 'Fortitude', exact: true }))
+    expect(screen.getByLabelText('Max Health value')).toHaveValue('0')
+    await user.click(screen.getByRole('tab', { name: 'Tank' }))
+    expect(screen.getByLabelText('Max Health value')).toHaveValue('999')
+
+    await user.click(screen.getByRole('tab', { name: 'Spirit stats' }))
+    await user.click(screen.getByRole('button', { name: 'Add Spirit panel' }))
+    await user.type(screen.getByLabelText('New Spirit panel name'), 'Caster')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.clear(screen.getByLabelText('Spirit Power value'))
+    await user.type(screen.getByLabelText('Spirit Power value'), '80')
+    await user.click(screen.getByRole('tab', { name: 'Spirit', exact: true }))
+    expect(screen.getByLabelText('Spirit Power value')).toHaveValue('0')
+    await user.click(screen.getByRole('tab', { name: 'Caster' }))
+    expect(screen.getByLabelText('Spirit Power value')).toHaveValue('80')
+    await user.click(screen.getByRole('button', { name: 'Rename active Spirit panel' }))
+    await user.clear(screen.getByLabelText('Rename Spirit panel'))
+    await user.type(screen.getByLabelText('Rename Spirit panel'), 'Mystic')
+    await user.click(screen.getByRole('button', { name: 'Save Name' }))
+    expect(screen.getByRole('tab', { name: 'Mystic' })).toBeInTheDocument()
   })
 
   it('saves the full create draft from the global action bar', async () => {
@@ -780,6 +856,11 @@ describe('HeroGrid', () => {
     render(<HeroGrid />)
 
     await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+    await user.click(screen.getByLabelText('Shotgun Pellets'))
+    await user.click(screen.getByRole('button', { name: 'Change Bullet Damage type (Bullet)' }))
+    await user.clear(screen.getByLabelText('Pellet Count value'))
+    await user.type(screen.getByLabelText('Pellet Count value'), '7')
     await user.click(screen.getByTestId('uploadthing-heroPortrait'))
     await user.clear(screen.getByPlaceholderText('Name this save'))
     await user.type(screen.getByPlaceholderText('Name this save'), 'Arc Light')
@@ -803,7 +884,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string; ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }; weapon: { stats: unknown[] }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string; ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }; weapon: { stats: Array<{ label: string; value: string }> }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
@@ -818,6 +899,8 @@ describe('HeroGrid', () => {
       },
     })
     expect(requestBody.weapon.stats.length).toBeGreaterThan(0)
+    expect(requestBody.weapon.stats).toContainEqual(expect.objectContaining({ label: 'Pellet Count', value: '7' }))
+    expect(requestBody.weapon.stats).toContainEqual(expect.objectContaining({ label: 'Bullet Damage', icon: 'damage_magic_color' }))
     expect([
       requestBody.heroInfo.ability1Icon,
       requestBody.heroInfo.ability2Icon,
@@ -832,6 +915,83 @@ describe('HeroGrid', () => {
     expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
     expect(await screen.findByRole('status')).toHaveTextContent('Private hero saved')
     expect(screen.getByRole('button', { name: 'Edit Secondary Ability 1' })).toBeInTheDocument()
+  })
+
+  it('lets an owner confirm unpublishing a hero and returns it to private saves', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const savedStats = buildHeroStatsSeed(abrams)
+    const savedAbilityStats = buildDefaultAbilityStats(abrams)
+    const publishedHero = {
+      id: 'owner_published_hero',
+      slug: 'owner-published-hero',
+      assetSlug: 'owner-published-hero',
+      displayName: 'Owner Published Hero',
+      portrait: abrams.portrait,
+      render: abrams.render,
+      background: abrams.render,
+      heroInfo: {
+        ...abrams.heroInfo,
+        nameType: 'text' as const,
+        nameValue: 'Owner Published Hero',
+      },
+      status: 'published' as const,
+      likesCount: 0,
+      likedByCurrentUser: false,
+      allowCopies: true,
+      viewerCanEdit: true,
+      publishedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      updatedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      stats: savedStats,
+      abilityStats: savedAbilityStats,
+    }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+
+      if (url === '/api/heroes?id=owner_published_hero') {
+        return Promise.resolve(Response.json({ hero: publishedHero }))
+      }
+
+      if (url === '/api/heroes' && init?.method === 'POST') {
+        return Promise.resolve(Response.json({
+          hero: {
+            ...publishedHero,
+            status: 'private',
+            publishedAt: null,
+          },
+        }, { status: 201 }))
+      }
+
+      return Promise.resolve(Response.json(savedStats))
+    })
+
+    window.history.replaceState({}, '', '/?heroId=owner_published_hero')
+    render(<HeroGrid />)
+
+    expect(await screen.findByRole('button', { name: 'Unpublish Hero' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save Published Changes' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Private' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Unpublish Hero' }))
+
+    const confirmation = screen.getByRole('dialog', { name: 'Unpublish Hero?' })
+
+    expect(within(confirmation).getByText(/removed from Browse/i)).toBeInTheDocument()
+    await user.click(within(confirmation).getByRole('button', { name: 'Confirm Unpublish' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
+
+    const unpublishCall = fetchMock.mock.calls.find(([input, init]) => String(input) === '/api/heroes' && init?.method === 'POST')
+    const requestBody = JSON.parse(String(unpublishCall?.[1]?.body)) as { id: string; status: string }
+
+    expect(requestBody).toMatchObject({
+      id: 'owner_published_hero',
+      status: 'private',
+    })
+    expect(await screen.findByRole('status')).toHaveTextContent('Hero unpublished and moved to your private saves.')
+    expect(screen.getByRole('button', { name: 'Save Private' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Unpublish Hero' })).not.toBeInTheDocument()
   })
 
   it('loads and likes published heroes in the Browse tab', async () => {

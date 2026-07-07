@@ -369,6 +369,14 @@ describe('HeroInfoCluster', () => {
       scaling: 'spirit',
       scalingValue: '0.2',
     }
+    stats.weapon.panels = [{
+      id: 'shotgun-panel',
+      name: 'Shotgun',
+      bulletDPS: 180,
+      weaponMinRange: 8,
+      weaponMaxRange: 22,
+      stats: stats.weapon.stats.map(stat => stat.label === 'Bullet Damage' ? { ...stat, value: '99' } : stat),
+    }]
 
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(stats), {
@@ -384,6 +392,12 @@ describe('HeroInfoCluster', () => {
 
     expect(screen.getByTitle('spirit scaling 0.2')).toBeInTheDocument()
     expect(screen.getByLabelText('spirit scaling value x0.2').className).not.toContain('valueWrapVisible')
+
+    await user.click(screen.getByRole('tab', { name: 'Shotgun' }))
+    expect(screen.getByTestId('weapon-panel')).toHaveAccessibleName('Shotgun weapon stats')
+    expect(screen.getByRole('button', { name: /Bullet Damage: 99/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: stats.weapon.weaponName, exact: true }))
+    expect(screen.getByRole('button', { name: /Bullet Damage: / })).not.toHaveAccessibleName(/99/)
 
     rerender(<HeroInfoCluster hero={hero} showDetails />)
 

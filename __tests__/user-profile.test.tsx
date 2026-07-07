@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
+
 import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -254,7 +256,7 @@ describe('UserProfile', () => {
     expect(screen.getByRole('link', { name: /open character asasvc/i })).toHaveAttribute('href', '/?tab=create&heroId=hero_1')
 
     await user.click(screen.getByRole('tab', { name: /my custom characters/i }))
-    await user.click(screen.getByRole('button', { name: /asasvc/i }))
+    await user.click(screen.getByRole('button', { name: 'Asasvc', exact: true }))
     await user.click(screen.getByRole('button', { name: /confirm background/i }))
 
     await waitFor(() => expect(updateProfileBackground).toHaveBeenCalledWith('custom:hero_1'))
@@ -310,6 +312,43 @@ describe('UserProfile', () => {
     expect(screen.getByRole('button', { name: /retry connection/i })).toBeInTheDocument()
 
     fetchMock.mockRestore()
+  })
+
+  it('requires confirmation before permanently deleting an owned character', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ id: 'hero_1', deleted: true }))
+
+    render(<UserProfile data={profileData} heroes={HEROES} />)
+
+    const deleteButton = screen.getByRole('button', { name: 'Delete character Asasvc' })
+    expect(deleteButton).toHaveTextContent('')
+    expect(deleteButton.querySelector('.lucide-x')).toBeInTheDocument()
+    expect(deleteButton.className).toContain('cardDeleteButton')
+    const stylesheet = readFileSync('components/UserProfile/UserProfile.module.css', 'utf8')
+    expect(stylesheet).toMatch(/\.cardDeleteButton\s*\{[\s\S]*background:\s*#a52222/)
+    expect(stylesheet).toMatch(/\.cardDeleteButton\s*\{[\s\S]*top:\s*10px;[\s\S]*left:\s*10px;[\s\S]*z-index:\s*100/)
+    expect(stylesheet).toMatch(/\.cardDeleteButton\s*\{[\s\S]*width:\s*36px;[\s\S]*height:\s*36px/)
+    expect(stylesheet).toMatch(/\.profileHeroCard:hover \.cardDeleteButton[\s\S]*opacity:\s*1/)
+
+    await user.hover(screen.getByRole('link', { name: 'Open character Asasvc' }))
+    await user.click(deleteButton)
+    expect(screen.getByRole('dialog', { name: 'Delete Asasvc?' })).toBeInTheDocument()
+    expect(screen.getByText(/cannot be undone/i)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog', { name: 'Delete Asasvc?' })).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Delete character Asasvc' }))
+    await user.click(screen.getByRole('button', { name: 'Permanently Delete' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes/hero_1', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    expect(screen.queryByRole('link', { name: 'Open character Asasvc' })).not.toBeInTheDocument()
+    expect(screen.getByText('0 total')).toBeInTheDocument()
   })
 
   it('restores a hash-linked profile tab after mount without changing the initial render', async () => {
@@ -386,7 +425,7 @@ describe('UserProfile', () => {
 
     await user.click(screen.getByRole('button', { name: /change background/i }))
     await user.click(screen.getByRole('tab', { name: /my custom characters/i }))
-    await user.click(screen.getByRole('button', { name: /asasvc/i }))
+    await user.click(screen.getByRole('button', { name: 'Asasvc', exact: true }))
     await user.click(screen.getByRole('button', { name: /confirm background/i }))
 
     expect(screen.getAllByText(/committing memory core/i).length).toBeGreaterThan(0)

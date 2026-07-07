@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { describe, expect, it, vi } from 'vitest'
 
 const serviceMocks = vi.hoisted(() => ({
+  deleteCustomHero: vi.fn(),
   getEditableCustomHero: vi.fn(),
   likeCustomHero: vi.fn(),
   listBookmarkedCustomHeroPage: vi.fn(),
@@ -11,6 +12,7 @@ const serviceMocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/custom-heroes', () => ({
+  deleteCustomHero: serviceMocks.deleteCustomHero,
   CustomHeroError: class CustomHeroError extends Error {
     status: number
 
@@ -28,6 +30,7 @@ vi.mock('@/lib/custom-heroes', () => ({
 }))
 
 import { GET, POST, PUT } from '@/app/api/heroes/route'
+import { DELETE as DELETE_HERO } from '@/app/api/heroes/[slug]/route'
 import { POST as POST_COPY } from '@/app/api/heroes/[slug]/copy/route'
 import { POST as POST_LIKE } from '@/app/api/heroes/[slug]/like/route'
 
@@ -148,5 +151,17 @@ describe('heroes API route', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ ok: true })
     expect(serviceMocks.recordCustomHeroCopy).toHaveBeenCalledWith('copied_hero')
+  })
+
+  it('permanently deletes an owned hero through the dynamic route', async () => {
+    serviceMocks.deleteCustomHero.mockResolvedValueOnce({ id: 'hero_4', deleted: true })
+
+    const response = await DELETE_HERO(buildMutationRequest('http://localhost/api/heroes/hero_4', { method: 'DELETE' }), {
+      params: Promise.resolve({ slug: 'hero_4' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ id: 'hero_4', deleted: true })
+    expect(serviceMocks.deleteCustomHero).toHaveBeenCalledWith('hero_4')
   })
 })

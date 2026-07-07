@@ -371,6 +371,43 @@
   padding: 16px;
 }
 
+.shotgunToggle {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: rgba(255, 239, 215, 0.82);
+  cursor: pointer;
+  font-family: sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shotgunToggle input {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: #ff9100;
+}
+
+.pelletBand {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255, 145, 0, 0.24);
+  border-radius: 3px;
+  background: rgba(255, 145, 0, 0.08);
+}
+
+.pelletBand:has([data-scaling-picker-menu]) {
+  z-index: 10000;
+}
+
 .rows:has([data-scaling-picker-menu]),
 .bottomBand:has([data-scaling-picker-menu]),
 .row:has([data-scaling-picker-menu]),
@@ -433,6 +470,26 @@
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
+}
+
+.damageTypeButton {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.damageTypeButton:hover,
+.damageTypeButton:focus-visible {
+  border-color: rgba(255, 239, 215, 0.58);
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
 }
 
 .statContent {

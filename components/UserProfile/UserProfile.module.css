@@ -495,6 +495,66 @@
   padding: 24px;
 }
 
+.deleteHeroModal {
+  display: grid;
+  gap: 20px;
+  width: min(560px, 100%);
+  border: 1px solid rgba(255, 92, 92, 0.62);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 72, 72, 0.035) 0 1px, transparent 1px 8px),
+    #100a09;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.78);
+  padding: 24px;
+}
+
+.deleteHeroWarning,
+.deleteHeroError {
+  margin: 0;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+
+.deleteHeroWarning {
+  color: rgba(255, 239, 214, 0.76);
+}
+
+.deleteHeroError {
+  border: 1px solid rgba(255, 92, 92, 0.54);
+  background: rgba(89, 10, 10, 0.42);
+  color: #ffaaa0;
+  padding: 10px 12px;
+}
+
+.deleteHeroConfirmButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border: 1px solid #ff6868;
+  background: #9e2424;
+  color: #fff;
+  cursor: pointer;
+  padding: 9px 14px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.deleteHeroConfirmButton:hover,
+.deleteHeroConfirmButton:focus-visible {
+  background: #c83232;
+  outline: none;
+}
+
+.deleteHeroConfirmButton:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .backgroundModalHeader {
   display: flex;
   align-items: start;
@@ -1211,6 +1271,49 @@
 .cardIconButton:focus-visible {
   border-color: var(--profile-name);
   outline: none;
+}
+
+.cardDeleteButton {
+  top: 10px;
+  right: auto;
+  bottom: auto;
+  left: 10px;
+  z-index: 100;
+  display: grid;
+  width: 36px;
+  min-width: 0;
+  height: 36px;
+  border-color: #ff7770;
+  border-radius: 3px;
+  background: #a52222;
+  color: #fff;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(5px);
+  transition: opacity 150ms ease-out, transform 150ms ease-out, background 150ms ease-out;
+}
+
+.profileHeroCard:hover .cardDeleteButton,
+.profileHeroCard:focus-within .cardDeleteButton,
+.cardDeleteButton:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.cardDeleteButton:hover,
+.cardDeleteButton:focus-visible {
+  border-color: #fff;
+  background: #d12f2f;
+}
+
+@media (hover: none) {
+  .cardDeleteButton {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
 }
 
 .removingCard {

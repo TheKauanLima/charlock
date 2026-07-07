@@ -15,6 +15,7 @@ const STAT_DEFINITIONS: StatDefinition[] = [
   { label: 'Health Regen', valueField: 'health_regen', fallback: 1.5, unit: '', icon: 'healthRegen', scalingBase: 'health_regen' },
   { label: 'Heal Amp', valueField: 'heal_amp_percent', fallback: 0, unit: '%', icon: 'healAmp', scalingBase: 'heal_amp_percent' },
   { label: 'Non-Combat Regen', valueField: 'non_combat_regen', fallback: 0, unit: '', icon: 'healthRegen', scalingBase: 'non_combat_regen' },
+  { label: 'Lifesteal Effectiveness', valueField: 'lifesteal_effectiveness_percent', fallback: 0, unit: '%', icon: 'lifestealEffectiveness', scalingBase: 'lifesteal_effectiveness_percent' },
   { label: 'Bullet Resist', valueField: 'bullet_resist_percent', fallback: 0, unit: '%', icon: 'bulletResist', scalingBase: 'bullet_resist_percent' },
   { label: 'Spirit Resist', valueField: 'spirit_resist_percent', fallback: 0, unit: '%', icon: 'spiritResist', scalingBase: 'spirit_resist_percent' },
   { label: 'Melee Resist', valueField: 'melee_resist_percent', fallback: 0, unit: '%', icon: 'meleeResist', scalingBase: 'melee_resist_percent' },
@@ -36,4 +37,21 @@ export function buildVitalityStatsArray(row?: StatsRow): PanelStat[] {
     icon: definition.icon,
     ...mapStatScaling(row, definition.scalingBase),
   }))
+}
+
+export function normalizeVitalityStatsArray(stats?: PanelStat[]): PanelStat[] {
+  const statsByLabel = new Map((stats ?? []).map(stat => [stat.label, stat]))
+
+  return buildVitalityStatsArray().map(defaultStat => {
+    const storedStat = statsByLabel.get(defaultStat.label)
+
+    return {
+      ...defaultStat,
+      value: '0',
+      ...storedStat,
+      label: defaultStat.label,
+      unit: defaultStat.unit,
+      icon: defaultStat.icon,
+    }
+  })
 }

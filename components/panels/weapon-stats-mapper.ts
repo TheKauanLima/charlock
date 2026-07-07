@@ -10,6 +10,19 @@ interface StatDefinition {
   scalingBase: string
 }
 
+export const PELLET_COUNT_LABEL = 'Pellet Count'
+
+export function buildPelletCountStat(value: string | number = 1): PanelStat {
+  return {
+    label: PELLET_COUNT_LABEL,
+    value: String(value),
+    unit: '',
+    icon: 'bulletDamage',
+    scaling: 'none',
+    scalingValue: '0',
+  }
+}
+
 const STAT_DEFINITIONS: StatDefinition[] = [
   { label: 'Bullet Damage', valueField: 'bullet_damage', fallback: 0, unit: '', icon: 'bulletDamage', scalingBase: 'bullet_damage' },
   { label: 'Weapon Damage', valueField: 'weapon_damage_percent', fallback: 0, unit: '%', icon: 'bulletDamage', scalingBase: 'weapon_damage_percent' },

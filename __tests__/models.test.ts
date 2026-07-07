@@ -9,7 +9,9 @@ import Comment from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import Like from '@/lib/models/Like'
 import Notification from '@/lib/models/Notification'
-import { statSchema } from '@/lib/models/WeaponStats'
+import SpiritStats from '@/lib/models/SpiritStats'
+import VitalityStats from '@/lib/models/VitalityStats'
+import WeaponStats, { statSchema } from '@/lib/models/WeaponStats'
 
 describe('Mongoose model schemas', () => {
   it('allows melee scaling on panel stats', () => {
@@ -61,6 +63,19 @@ describe('Mongoose model schemas', () => {
     expect(secondaryAbilitySlotsPath).toBeDefined()
     expect(secondaryAbilityAnchorPath).toBeDefined()
     expect(abilitiesPath).toHaveProperty('schema.options._id', false)
+  })
+
+  it('stores named panel variants for every stat category', () => {
+    expect(WeaponStats.schema.path('panels')).toBeDefined()
+    expect(WeaponStats.schema.path('panels.name')).toBeDefined()
+    expect(WeaponStats.schema.path('panels.stats')).toBeDefined()
+    expect(VitalityStats.schema.path('panels')).toBeDefined()
+    expect(VitalityStats.schema.path('name')).toBeDefined()
+    expect(VitalityStats.schema.path('panels.stats')).toBeDefined()
+    expect(SpiritStats.schema.path('panels')).toBeDefined()
+    expect(SpiritStats.schema.path('name')).toBeDefined()
+    expect(SpiritStats.schema.path('panels.topStats')).toBeDefined()
+    expect(SpiritStats.schema.path('panels.spiritPowerStat')).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

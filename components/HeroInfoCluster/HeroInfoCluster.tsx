@@ -13,6 +13,7 @@ import ReportDialog from '@/components/Moderation/ReportDialog'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
+import PanelVariantTabs, { BASE_PANEL_ID } from '@/components/PanelVariantTabs/PanelVariantTabs'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
@@ -89,6 +90,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [bookmarkOverride, setBookmarkOverride] = useState<{ heroId: string; value: boolean } | null>(null)
   const [selectedAbilityTarget, setSelectedAbilityTarget] = useState<AbilityIconTarget | null>(null)
+  const [activeWeaponPanelId, setActiveWeaponPanelId] = useState(BASE_PANEL_ID)
+  const [activeVitalityPanelId, setActiveVitalityPanelId] = useState(BASE_PANEL_ID)
+  const [activeSpiritPanelId, setActiveSpiritPanelId] = useState(BASE_PANEL_ID)
   const statsRequestKey = heroId ?? hero.slug
   const fallbackStats = useMemo(() => heroId ? buildEmptyHeroStats(hero) : buildHeroStatsSeed(hero), [hero, heroId])
   const [statsState, setStatsState] = useState<HeroStatsState>(() => ({
@@ -114,6 +118,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
     ? bookmarkOverride.value
     : Boolean((hero as SocialHeroDefinition).bookmarkedByCurrentUser)
   const visibleComments = commentsHeroId === heroId ? comments : []
+  const activeWeaponPanel = statsData.weapon.panels?.find(panel => panel.id === activeWeaponPanelId)
+  const activeVitalityPanel = statsData.vitality.panels?.find(panel => panel.id === activeVitalityPanelId)
+  const activeSpiritPanel = statsData.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -385,15 +392,16 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         hidden={activeTabId !== 'weapon'}
         className={cn(activeTabId === 'weapon' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
+        <PanelVariantTabs baseName="Weapon" baseTabName={statsData.weapon.weaponName} variants={statsData.weapon.panels} activeId={activeWeaponPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveWeaponPanelId} />
         <WeaponPanel
-          weaponName={statsData.weapon.weaponName}
+          weaponName={activeWeaponPanel?.name ?? statsData.weapon.weaponName}
           weaponDesc={statsData.weapon.weaponDesc}
           gunImageSrc={statsData.weapon.gunImageSrc}
           weaponAttributes={statsData.weapon.weaponAttributes}
-          weaponStats={statsData.weapon.stats}
-          bulletDPS={statsData.weapon.bulletDPS}
-          weaponMinRange={statsData.weapon.weaponMinRange}
-          weaponMaxRange={statsData.weapon.weaponMaxRange}
+          weaponStats={activeWeaponPanel?.stats ?? statsData.weapon.stats}
+          bulletDPS={activeWeaponPanel?.bulletDPS ?? statsData.weapon.bulletDPS}
+          weaponMinRange={activeWeaponPanel?.weaponMinRange ?? statsData.weapon.weaponMinRange}
+          weaponMaxRange={activeWeaponPanel?.weaponMaxRange ?? statsData.weapon.weaponMaxRange}
           showDetails={showDetails}
         />
       </div>
@@ -405,7 +413,8 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         hidden={activeTabId !== 'vitality'}
         className={cn(activeTabId === 'vitality' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
-        <HeroStatsVitalityPanel hero={hero} stats={statsData.vitality.stats} showDetails={showDetails} />
+        <PanelVariantTabs baseName="Vitality" baseTabName={statsData.vitality.name ?? 'Vitality'} variants={statsData.vitality.panels} activeId={activeVitalityPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveVitalityPanelId} />
+        <HeroStatsVitalityPanel hero={hero} stats={activeVitalityPanel?.stats ?? statsData.vitality.stats} showDetails={showDetails} />
       </div>
 
       <div
@@ -415,7 +424,8 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         hidden={activeTabId !== 'spirit'}
         className={cn(activeTabId === 'spirit' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
-        <HeroStatsSpiritPanel hero={hero} stats={statsData.spirit.topStats} spiritPowerStat={statsData.spirit.spiritPowerStat} showDetails={showDetails} />
+        <PanelVariantTabs baseName="Spirit" baseTabName={statsData.spirit.name ?? 'Spirit'} variants={statsData.spirit.panels} activeId={activeSpiritPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveSpiritPanelId} />
+        <HeroStatsSpiritPanel hero={hero} stats={activeSpiritPanel?.topStats ?? statsData.spirit.topStats} spiritPowerStat={activeSpiritPanel?.spiritPowerStat ?? statsData.spirit.spiritPowerStat} showDetails={showDetails} />
       </div>
 
         {heroId ? (
