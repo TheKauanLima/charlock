@@ -7,7 +7,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
-import { buildDefaultAbilityStats } from '@/lib/ability-editor-types'
+import { buildDefaultAbilityStats, normalizeAbilityStats } from '@/lib/ability-editor-types'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import { HEROES } from '@/lib/hero-data'
 
@@ -16,6 +16,24 @@ afterEach(() => {
 })
 
 describe('AbilityEditor', () => {
+  it('uses the cast property art for default charge stats', () => {
+    const abilities = buildDefaultAbilityStats(HEROES[0]).abilities
+
+    expect(abilities.every(ability => ability.charges.icon === '/panorama/images/upgrades/property_cast_psd.png')).toBe(true)
+    expect(abilities.every(ability => ability.tiers.every(tier => tier.variant.charges.icon === '/panorama/images/upgrades/property_cast_psd.png'))).toBe(true)
+
+    const legacy = {
+      ...buildDefaultAbilityStats(HEROES[0]),
+      abilities: abilities.map(ability => ({
+        ...ability,
+        charges: { ...ability.charges, icon: '/panorama/images/icons/properties/charge.svg' },
+      })),
+    }
+    const normalized = normalizeAbilityStats(legacy, HEROES[0])
+
+    expect(normalized.abilities.every(ability => ability.charges.icon === '/panorama/images/upgrades/property_cast_psd.png')).toBe(true)
+  })
+
   it('uses the shared ability-circle gap and places pair swap controls below both circles', () => {
     const sharedStyles = readFileSync('components/HeroAbilityIconRow/HeroAbilityIconRow.module.css', 'utf8')
     const editorStyles = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
@@ -506,6 +524,9 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByLabelText('Charges'))
     expect(screen.getByLabelText('Choose Recharge Time icon')).toBeInTheDocument()
+    const chargesIcon = within(screen.getByTestId('ability-stat-timing-charges')).getByRole('button', { name: 'Choose Charges icon' }).querySelector('[aria-hidden="true"]')
+    expect(chargesIcon).toHaveStyle({ backgroundImage: "url('/panorama/images/upgrades/property_cast_psd.png')" })
+    expect(chargesIcon?.getAttribute('style')).not.toContain('mask-image')
     await user.click(within(screen.getByTestId('ability-stat-timing-charges')).getByRole('button', { name: 'Edit Charges scaling' }))
     expect(screen.getByRole('dialog', { name: 'Charges scaling controls' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Range scaling controls' })).not.toBeInTheDocument()

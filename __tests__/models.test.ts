@@ -18,7 +18,7 @@ describe('Mongoose model schemas', () => {
   it('allows melee scaling on panel stats', () => {
     const scalingPath = statSchema.path('scaling')
 
-    expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
+    expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee'])
     expect(statSchema.path('iconColor')).toBeDefined()
     expect(statSchema.path('append')).toBeDefined()
     expect(statSchema.options._id).toBe(false)
@@ -78,6 +78,8 @@ describe('Mongoose model schemas', () => {
     expect(SpiritStats.schema.path('panels.topStats')).toBeDefined()
     expect(SpiritStats.schema.path('panels.spiritPowerStat')).toBeDefined()
     expect(BoonStats.schema.path('stats')).toBeDefined()
+    expect(BoonStats.schema.path('stats.scaling')).toHaveProperty('enumValues', ['boon'])
+    expect(BoonStats.schema.path('stats.scalingValue')).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

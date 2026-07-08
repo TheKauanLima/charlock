@@ -80,13 +80,15 @@ function roundStat(value: number, decimals = 1) {
 }
 
 function normalizeStat(stat: PanelStat): PanelStat {
+  const scaling = stat.scaling === 'boon' ? 'none' : stat.scaling ?? 'none'
+
   return {
     label: stat.label,
     value: String(stat.value),
     unit: stat.unit ?? '',
     icon: stat.icon ?? 'dot',
-    scaling: stat.scaling ?? 'none',
-    scalingValue: stat.scalingValue ?? '0',
+    scaling,
+    scalingValue: scaling === 'none' ? '0' : stat.scalingValue ?? '0',
     ...(stat.description ? { description: stat.description } : {}),
   }
 }

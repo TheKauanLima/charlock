@@ -10,6 +10,7 @@ import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsBoonPanel from '@/components/panels/hero-stats-boon-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
+import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 import { buildSpiritPowerStat } from '@/components/panels/spirit-stats-mapper'
 import { buildVitalityStatsArray, normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { buildPelletCountStat, buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
@@ -19,6 +20,13 @@ afterEach(() => {
 })
 
 describe('hero stat mappers', () => {
+  it('stores every boon reward as an explicit boon scaling value', () => {
+    const stats = buildBoonStatsArray()
+
+    expect(stats).toHaveLength(4)
+    expect(stats.every(stat => stat.scaling === 'boon' && stat.scalingValue === String(stat.value))).toBe(true)
+  })
+
   it('maps row values and scaling metadata into weapon stats', () => {
     const stats = buildWeaponStatsArray({
       bullet_damage: 13.5,
@@ -44,17 +52,39 @@ describe('hero stat mappers', () => {
 describe('migrated stat panels', () => {
   it('renders and edits the four boon rewards', async () => {
     let changedValue = ''
+    let changedScaling = ''
+    let changedScalingValue = ''
 
-    render(<HeroStatsBoonPanel heroName="Victor" isEditable onStatsChange={stats => { changedValue = String(stats[0].value) }} />)
+    render(<HeroStatsBoonPanel heroName="Victor" isEditable onStatsChange={stats => {
+      changedValue = String(stats[0].value)
+      changedScaling = stats[0].scaling
+      changedScalingValue = stats[0].scalingValue
+    }} />)
 
     expect(screen.getByRole('heading', { name: 'Boon Rewards' })).toBeInTheDocument()
     expect(screen.getByText('At each threshold, Victor gains:')).toBeInTheDocument()
     expect(screen.getByText('Abilities unlock at Boons 0, 2, 4 and 6')).toBeInTheDocument()
+    expect(screen.getByTestId('boon-unlock-icon')).toBeInTheDocument()
+    expect(screen.getByTestId('boon-ap-icon')).toBeInTheDocument()
+    expect(screen.getByTestId('boon-base-health-icon')).toBeInTheDocument()
     expect(screen.getAllByLabelText(/value$/)).toHaveLength(4)
+
+    const boonStyles = readFileSync('components/panels/HeroStatsBoonPanel.module.css', 'utf8')
+    expect(boonStyles).toMatch(/\.header\s*\{[^}]*background:\s*#11130e/)
+    expect(boonStyles).not.toMatch(/\.header\s*\{[^}]*gradient/)
+    expect(boonStyles).not.toMatch(/\.unlockIcon\s*\{[^}]*mask:/)
+    expect(boonStyles).toMatch(/\.apIcon\s*\{[^}]*background:\s*#e6cafc/)
+    expect(boonStyles).toMatch(/\.healthIcon\s*\{[^}]*background:\s*#01fe9c/)
+
+    const unlockIcon = readFileSync('public/panorama/images/hud/unlock_icon.svg', 'utf8')
+    expect(unlockIcon).toContain('path[fill="white"] { fill: #e6cafc; }')
+    expect(unlockIcon).toContain('fill="#1A1A1A"')
 
     const bulletDamage = screen.getByLabelText('Base Bullet Damage value')
     fireEvent.change(bulletDamage, { target: { value: '0.42' } })
     expect(changedValue).toBe('0.42')
+    expect(changedScaling).toBe('boon')
+    expect(changedScalingValue).toBe('0.42')
   })
 
   it('raises any panel row that contains an open scaling menu', () => {
@@ -217,8 +247,9 @@ describe('migrated stat panels', () => {
     expect(within(maxHealthCell).getByLabelText('Max Health value')).toHaveAttribute('placeholder', '0')
 
     await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
-    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to boon' }))
-    expect(maxHealthCell).toHaveAttribute('data-scaling', 'boon')
+    expect(screen.queryByRole('button', { name: 'Set Max Health scaling to boon' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to spirit' }))
+    expect(maxHealthCell).toHaveAttribute('data-scaling', 'spirit')
     await user.clear(screen.getByLabelText('Max Health scaling value'))
     await user.type(screen.getByLabelText('Max Health scaling value'), '0.8759')
     expect(screen.getByLabelText('Max Health scaling value')).toHaveValue('0.8759')
@@ -251,5 +282,21 @@ describe('migrated stat panels', () => {
     rerender(<WeaponPanel weaponStats={weaponStats} isEditable />)
 
     expect(screen.getByRole('button', { name: 'Edit Bullet Damage scaling' })).toBeInTheDocument()
+  })
+
+  it('does not expose or display legacy boon scaling in ordinary stat panels', async () => {
+    const user = userEvent.setup()
+    const legacyStats = [
+      { label: 'Bullet Damage', value: '13.5', unit: '', icon: 'bulletDamage', scaling: 'boon' as const, scalingValue: '0.12' },
+    ]
+
+    render(<WeaponPanel weaponStats={legacyStats} isEditable showDetails />)
+
+    const bulletDamageCell = screen.getByRole('group', { name: /Bullet Damage/ })
+    expect(bulletDamageCell).toHaveAttribute('data-scaling', 'none')
+    expect(screen.queryByLabelText('boon scaling value x0.12')).not.toBeInTheDocument()
+
+    await user.click(within(bulletDamageCell).getByRole('button', { name: 'Edit Bullet Damage scaling' }))
+    expect(screen.queryByRole('button', { name: 'Set Bullet Damage scaling to boon' })).not.toBeInTheDocument()
   })
 })

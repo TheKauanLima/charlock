@@ -20,6 +20,7 @@ interface ScalingPickerProps extends ScalingState {
   openPickerId: string | null
   className?: string
   menuPosition?: 'above' | 'below'
+  allowedScalingTypes?: readonly ScalingType[]
   onChange: (updates: ScalingState) => void
   onOpenPickerChange: (pickerId: string | null) => void
 }
@@ -30,7 +31,7 @@ function getScalingButtonIconStyle(scaling: ScalingType): CSSProperties | undefi
   return icon ? { backgroundImage: `url('${icon}')` } : undefined
 }
 
-export default function ScalingPicker({ label, scaling, scalingValue, boundaryRef, openPickerId, className, menuPosition = 'below', onChange, onOpenPickerChange }: ScalingPickerProps) {
+export default function ScalingPicker({ label, scaling, scalingValue, boundaryRef, openPickerId, className, menuPosition = 'below', allowedScalingTypes = SCALING_TYPES, onChange, onOpenPickerChange }: ScalingPickerProps) {
   const pickerId = useId()
   const pickerRef = useRef<HTMLSpanElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
@@ -144,7 +145,7 @@ export default function ScalingPicker({ label, scaling, scalingValue, boundaryRe
       {isOpen ? (
         <span className={styles.menu} data-scaling-picker-menu="true" role="dialog" aria-label={`${label} scaling controls`}>
           <span className={styles.typeRow}>
-            {SCALING_TYPES.map(nextScaling => {
+            {allowedScalingTypes.map(nextScaling => {
               const scalingIconStyle = getScalingButtonIconStyle(nextScaling)
               const scalingLabel = SCALING_LABELS[nextScaling]
 

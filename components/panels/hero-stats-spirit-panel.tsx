@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, RefObject } from 'react'
 
 import { buildSpiritPowerStat, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'
-import { formatPanelValue } from '@/components/panels/scaling-utils'
+import { formatPanelValue, normalizePanelScaling, PANEL_SCALING_TYPES } from '@/components/panels/scaling-utils'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
@@ -74,6 +74,8 @@ function getIconStyle(icon = 'dot'): CSSProperties {
 }
 
 function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: SpiritStatCellProps) {
+  const panelScaling = normalizePanelScaling(scaling, scalingValue)
+
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
   }
@@ -104,16 +106,17 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
       {isEditable && onOpenScalingPickerChange ? (
         <ScalingPicker
           label={label}
-          scaling={scaling}
-          scalingValue={scalingValue}
+          scaling={panelScaling.scaling}
+          scalingValue={panelScaling.scalingValue}
           boundaryRef={boundaryRef}
           menuPosition={isPower ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
+          allowedScalingTypes={PANEL_SCALING_TYPES}
           onChange={updates => onChange?.(updates)}
           onOpenPickerChange={onOpenScalingPickerChange}
         />
       ) : (
-        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
       )}
     </>
   )
@@ -122,7 +125,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
     return (
       <div
         className={cn(styles.cell, styles.editableCell, isPower && styles.powerCell)}
-        data-scaling={scaling}
+        data-scaling={panelScaling.scaling}
         role="group"
         aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
       >
@@ -138,7 +141,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
         styles.cell,
         isPower && styles.powerCell,
       )}
-      data-scaling={scaling}
+      data-scaling={panelScaling.scaling}
       aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
     >
       {content}

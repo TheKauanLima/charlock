@@ -113,14 +113,15 @@ describe('HeroGrid', () => {
     const maxHealthCell = within(vitalityPanel).getByRole('group', { name: /Max Health/ })
 
     await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
-    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to boon' }))
+    expect(screen.queryByRole('button', { name: 'Set Max Health scaling to boon' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to spirit' }))
     await user.click(screen.getByRole('button', { name: 'Preview Mode' }))
     await user.click(screen.getByRole('tab', { name: 'Vitality stats' }))
 
     expect(screen.getByRole('button', { name: 'Edit Mode' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: 'Edit Max Health scaling' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Max Health value')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('boon scaling value x0').className).toContain('valueWrapVisible')
+    expect(screen.getByLabelText('spirit scaling value x0').className).toContain('valueWrapVisible')
 
     await user.click(screen.getByRole('button', { name: 'Preview Ability 1' }))
 
@@ -886,7 +887,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
-    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string; ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }; weapon: { stats: Array<{ label: string; value: string }> }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { name: string; status: string; allowCopies: boolean; hero: { background: string; portrait: string }; heroInfo: { nameValue: string; ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }; boon: { stats: Array<{ label: string; value: string; scaling: string; scalingValue: string }> }; weapon: { stats: Array<{ label: string; value: string }> }; abilityStats: { abilities: Array<{ name: string }>; secondaryAbilities?: Array<{ name: string }>; secondaryAbilitySlots?: number[]; secondaryAbilityAnchorIndex?: number } }
 
     expect(requestBody).toMatchObject({
       name: 'Arc Light',
@@ -901,6 +902,8 @@ describe('HeroGrid', () => {
       },
     })
     expect(requestBody.weapon.stats.length).toBeGreaterThan(0)
+    expect(requestBody.boon.stats).toHaveLength(4)
+    expect(requestBody.boon.stats.every(stat => stat.scaling === 'boon' && stat.scalingValue === stat.value)).toBe(true)
     expect(requestBody.weapon.stats).toContainEqual(expect.objectContaining({ label: 'Pellet Count', value: '7' }))
     expect(requestBody.weapon.stats).toContainEqual(expect.objectContaining({ label: 'Bullet Damage', icon: 'damage_magic_color' }))
     expect([

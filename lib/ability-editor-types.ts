@@ -70,6 +70,8 @@ interface AbilityHeroLike {
 }
 
 const DEFAULT_PROPERTY_ICON = '/panorama/images/icons/properties/cooldown.svg'
+const DEFAULT_CHARGES_ICON = '/panorama/images/upgrades/property_cast_psd.png'
+const LEGACY_DEFAULT_CHARGES_ICON = '/panorama/images/icons/properties/charge.svg'
 const DEFAULT_GRID_ICON = '/panorama/images/icons/properties/damage_magic_color.svg'
 const DEFAULT_HEAL_ICON = '/panorama/images/icons/properties/heal.svg'
 export const DEFAULT_SECONDARY_ABILITY_ANCHOR_INDEX = 3
@@ -175,6 +177,14 @@ function normalizeStatArray(value: unknown, fallback: AbilityStat[], limit?: num
   return typeof limit === 'number' ? nextStats.slice(0, limit) : nextStats
 }
 
+function normalizeChargesStat(value: unknown, fallback: AbilityStat): AbilityStat {
+  const charges = normalizeAbilityStat(value, fallback)
+
+  return charges.icon === LEGACY_DEFAULT_CHARGES_ICON
+    ? { ...charges, icon: DEFAULT_CHARGES_ICON, iconColor: '' }
+    : charges
+}
+
 function getAbilityIcon(heroInfo: AbilityHeroLike['heroInfo'], slot: number) {
   if (slot === 1) {
     return heroInfo.ability1Icon
@@ -208,7 +218,7 @@ function buildDefaultAbilityVariant(slot: number, hero: AbilityHeroLike, idPrefi
     charges: buildAbilityStat({
       label: 'Charges',
       value: '1',
-      icon: '/panorama/images/icons/properties/charge.svg',
+      icon: DEFAULT_CHARGES_ICON,
     }),
     rechargeTime: buildAbilityStat({
       label: 'Recharge Time',
@@ -340,7 +350,7 @@ export function normalizeAbilityDefinition(value: unknown, fallback: AbilityDefi
       cooldown: normalizeAbilityStat(variantRecord.cooldown, fallbackVariant.cooldown),
       hasCooldown: getBoolean(variantRecord.hasCooldown, fallbackVariant.hasCooldown),
       hasCharges: getBoolean(variantRecord.hasCharges, fallbackVariant.hasCharges),
-      charges: normalizeAbilityStat(variantRecord.charges, fallbackVariant.charges),
+      charges: normalizeChargesStat(variantRecord.charges, fallbackVariant.charges),
       rechargeTime: normalizeAbilityStat(variantRecord.rechargeTime, fallbackVariant.rechargeTime),
       subStats: normalizeStatArray(variantRecord.subStats, fallbackVariant.subStats),
       sections,

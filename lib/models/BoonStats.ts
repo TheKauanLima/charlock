@@ -1,6 +1,6 @@
 import { Schema, model, models, type Model, type Types } from 'mongoose'
 
-import { statSchema, type IPanelStat } from './WeaponStats'
+import type { IPanelStat } from './WeaponStats'
 
 export interface IBoonStats {
   heroId: Types.ObjectId
@@ -17,7 +17,17 @@ const boonStatsSchema = new Schema<IBoonStats>({
     unique: true,
     index: true,
   },
-  stats: { type: [statSchema], default: [] },
+  stats: {
+    type: [new Schema<IPanelStat>({
+      label: { type: String, required: true },
+      value: { type: String, required: true },
+      unit: { type: String, default: '' },
+      icon: { type: String, default: 'dot' },
+      scaling: { type: String, enum: ['boon'], default: 'boon' },
+      scalingValue: { type: String, required: true },
+    }, { _id: false })],
+    default: [],
+  },
 }, { timestamps: true })
 
 const BoonStats: Model<IBoonStats> = models.BoonStats || model<IBoonStats>('BoonStats', boonStatsSchema)

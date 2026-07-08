@@ -149,8 +149,8 @@ function normalizePanelStat(value: unknown): IPanelStat {
     unit: getString(record.unit),
     append: getString(record.append),
     icon: getString(record.icon, 'dot'),
-    scaling: ['spirit', 'courage', 'melee', 'boon'].includes(getString(record.scaling)) ? getString(record.scaling) as IPanelStat['scaling'] : 'none',
-    scalingValue: getString(record.scalingValue, '0'),
+    scaling: ['spirit', 'courage', 'melee'].includes(getString(record.scaling)) ? getString(record.scaling) as IPanelStat['scaling'] : 'none',
+    scalingValue: ['spirit', 'courage', 'melee'].includes(getString(record.scaling)) ? getString(record.scalingValue, '0') : '0',
     ...(getString(record.description) ? { description: getString(record.description) } : {}),
   }
 }
@@ -164,7 +164,20 @@ function normalizeVitalityStats(value: unknown) {
 }
 
 function normalizeBoonStats(value: unknown) {
-  return buildBoonStatsArray(normalizeStats(value))
+  const stats = Array.isArray(value) ? value.map(stat => {
+    const record = isRecord(stat) ? stat : {}
+
+    return {
+      label: getString(record.label),
+      value: getString(record.value, '0'),
+      unit: '',
+      icon: getString(record.icon, 'dot'),
+      scaling: getString(record.scaling) === 'boon' ? 'boon' as const : 'none' as const,
+      scalingValue: getString(record.scalingValue, '0'),
+    }
+  }).filter(stat => stat.label) : []
+
+  return buildBoonStatsArray(stats)
 }
 
 function normalizeWeaponPanels(value: unknown) {

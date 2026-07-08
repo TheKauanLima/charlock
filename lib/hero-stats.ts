@@ -185,14 +185,15 @@ function buildStandardStat(definition: StandardStatDefinition, stat?: IPanelStat
   const icon = definition.label === 'Bullet Damage' && stat?.icon && bulletDamageIcons.includes(stat.icon)
     ? stat.icon
     : definition.icon
+  const scaling = stat?.scaling === 'boon' ? 'none' : stat?.scaling ?? 'none'
 
   return {
     label: definition.label,
     value: stat?.value ?? '0',
     unit: definition.unit,
     icon,
-    scaling: stat?.scaling ?? 'none',
-    scalingValue: stat?.scalingValue ?? '0',
+    scaling,
+    scalingValue: scaling === 'none' ? '0' : stat?.scalingValue ?? '0',
     ...(stat?.description || definition.description ? { description: stat?.description ?? definition.description } : {}),
   }
 }

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, RefObject } from 'react'
 
-import { formatPanelValue } from '@/components/panels/scaling-utils'
+import { formatPanelValue, normalizePanelScaling, PANEL_SCALING_TYPES } from '@/components/panels/scaling-utils'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import { buildVitalityStatsArray, normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
@@ -86,6 +86,8 @@ function getIconStyle(icon = 'dot'): CSSProperties {
 }
 
 function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: VitalityStatCellProps) {
+  const panelScaling = normalizePanelScaling(scaling, scalingValue)
+
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
   }
@@ -117,15 +119,16 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
         {isEditable && onOpenScalingPickerChange ? (
           <ScalingPicker
             label={label}
-            scaling={scaling}
-            scalingValue={scalingValue}
+            scaling={panelScaling.scaling}
+            scalingValue={panelScaling.scalingValue}
             boundaryRef={boundaryRef}
             openPickerId={openScalingPickerId}
+            allowedScalingTypes={PANEL_SCALING_TYPES}
             onChange={updates => onChange?.(updates)}
             onOpenPickerChange={onOpenScalingPickerChange}
           />
         ) : (
-          <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+          <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
         )}
       </span>
     </>
@@ -135,7 +138,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
     return (
       <div
         className={cn(styles.cell, styles.editableCell, isBottom && styles.bottomCell)}
-        data-scaling={scaling}
+        data-scaling={panelScaling.scaling}
         role="group"
         aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
       >
@@ -151,7 +154,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
         styles.cell,
         isBottom && styles.bottomCell,
       )}
-      data-scaling={scaling}
+      data-scaling={panelScaling.scaling}
       aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
     >
       {content}

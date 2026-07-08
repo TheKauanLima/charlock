@@ -2,6 +2,8 @@ export const SCALING_TYPES = ['none', 'spirit', 'courage', 'melee', 'boon'] as c
 
 export type ScalingType = (typeof SCALING_TYPES)[number]
 
+export const PANEL_SCALING_TYPES = ['none', 'spirit', 'courage', 'melee'] as const satisfies readonly ScalingType[]
+
 export const SCALING_LABELS: Record<ScalingType, string> = {
   none: 'None',
   spirit: 'Spirit',
@@ -61,6 +63,12 @@ export function getNextScaling(currentScaling?: ScalingType | string | null): Sc
   const nextIndex = (currentIndex + 1) % SCALING_TYPES.length
 
   return SCALING_TYPES[nextIndex]
+}
+
+export function normalizePanelScaling(scaling: ScalingType, scalingValue: string): ScalingState {
+  return scaling === 'boon'
+    ? { scaling: 'none', scalingValue: '0' }
+    : { scaling, scalingValue }
 }
 
 export function formatPanelValue(value: string | number | null | undefined) {
@@ -149,8 +157,6 @@ export function mapStatScaling(row: StatsRow | undefined, base: string): Scaling
   const spirit = parseScalingValue(row[`${base}_spirit_scaling`])
   const weapon = parseScalingValue(row[`${base}_weapon_scaling`])
   const melee = parseScalingValue(row[`${base}_melee_scaling`] ?? (base.includes('melee') ? row[`${base}_weapon_scaling`] : undefined))
-  const boon = parseScalingValue(row[`${base}_boon_scaling`])
-
   if (spirit !== null) {
     return { scaling: 'spirit', scalingValue: String(spirit) }
   }
@@ -161,10 +167,6 @@ export function mapStatScaling(row: StatsRow | undefined, base: string): Scaling
 
   if (weapon !== null) {
     return { scaling: 'courage', scalingValue: String(weapon) }
-  }
-
-  if (boon !== null) {
-    return { scaling: 'boon', scalingValue: String(boon) }
   }
 
   return { scaling: 'none', scalingValue: '0' }

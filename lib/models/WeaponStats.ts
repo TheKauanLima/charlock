@@ -45,7 +45,7 @@ export const statSchema = new Schema<IPanelStat>({
   iconColor: { type: String, default: '' },
   scaling: {
     type: String,
-    enum: ['none', 'spirit', 'courage', 'melee', 'boon'],
+    enum: ['none', 'spirit', 'courage', 'melee'],
     default: 'none',
   },
   scalingValue: { type: String, default: '0' },

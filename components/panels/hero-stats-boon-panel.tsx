@@ -1,6 +1,5 @@
 'use client'
 
-import { LockKeyhole } from 'lucide-react'
 import Image from 'next/image'
 import type { ChangeEvent } from 'react'
 
@@ -28,7 +27,7 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
 
   function handleChange(index: number, event: ChangeEvent<HTMLInputElement>) {
     onStatsChange?.(normalizedStats.map((stat, statIndex) => (
-      statIndex === index ? { ...stat, value: event.target.value } : stat
+      statIndex === index ? { ...stat, value: event.target.value, scaling: 'boon', scalingValue: event.target.value } : stat
     )))
   }
 
@@ -38,9 +37,9 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
         <h2 className={styles.title}>Boon Rewards</h2>
         <p className={styles.thresholdCopy}>At each threshold, {heroName} gains:</p>
         <div className={styles.unlockRow}>
-          <span className={styles.unlockIcon}><LockKeyhole aria-hidden="true" /></span>
+          <Image className={styles.unlockIcon} src="/panorama/images/hud/unlock_icon.svg" alt="" width={32} height={32} data-testid="boon-unlock-icon" />
           <span className={styles.orText}>or</span>
-          <Image className={styles.apIcon} src="/panorama/images/hud/ap_icon.svg" alt="" width={31} height={31} />
+          <span className={styles.apIcon} data-testid="boon-ap-icon" aria-hidden="true" />
           <span className={styles.unlockCopy}>
             <strong>Ability Unlock or AP</strong>
             <em>Abilities unlock at Boons 0, 2, 4 and 6</em>
@@ -55,7 +54,11 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
           {normalizedStats.map((stat, index) => (
             <div className={styles.stat} key={stat.label}>
               <span className={styles.valueRow}>
-                <Image src={ICON_PATHS[stat.icon ?? '']} alt="" width={23} height={23} />
+                {stat.icon === 'health' ? (
+                  <span className={styles.healthIcon} data-testid="boon-base-health-icon" aria-hidden="true" />
+                ) : (
+                  <Image src={ICON_PATHS[stat.icon ?? '']} alt="" width={23} height={23} />
+                )}
                 <span aria-hidden="true">+</span>
                 {isEditable ? (
                   <input aria-label={`${stat.label} value`} value={stat.value} onChange={event => handleChange(index, event)} />

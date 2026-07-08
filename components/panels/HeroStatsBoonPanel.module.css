@@ -2,7 +2,7 @@
   overflow: hidden;
   border: 1px solid rgba(143, 177, 112, 0.16);
   border-radius: 3px;
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.98);
   color: #fff8ec;
   font-family: "Valve_Pulp", var(--font-geist-sans), sans-serif;
   text-align: center;
@@ -11,7 +11,7 @@
 }
 
 .header {
-  background: linear-gradient(135deg, rgba(38, 55, 33, 0.92), rgba(13, 22, 17, 0.9));
+  background: #11130e;
   padding: 14px 20px 18px;
 }
 
@@ -46,20 +46,9 @@
 }
 
 .unlockIcon {
-  display: inline-flex;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border: 3px dotted #d99cff;
-  border-radius: 50%;
-  color: #f0c4ff;
-}
-
-.unlockIcon svg {
-  width: 18px;
-  height: 18px;
 }
 
 .orText {
@@ -71,6 +60,9 @@
   width: 31px;
   height: 31px;
   flex: 0 0 auto;
+  background: #e6cafc;
+  mask: url('/panorama/images/hud/ap_icon.svg') center / contain no-repeat;
+  -webkit-mask: url('/panorama/images/hud/ap_icon.svg') center / contain no-repeat;
 }
 
 .unlockCopy {
@@ -82,6 +74,7 @@
 }
 
 .unlockCopy strong {
+  color: #e6cafc;
   font-size: 1.1rem;
   line-height: 1.05;
 }
@@ -137,6 +130,15 @@
   width: 23px;
   height: 23px;
   object-fit: contain;
+}
+
+.healthIcon {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  background: #01fe9c;
+  mask: url('/panorama/images/icons/properties/health.svg') center / contain no-repeat;
+  -webkit-mask: url('/panorama/images/icons/properties/health.svg') center / contain no-repeat;
 }
 
 .valueRow input {

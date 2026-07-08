@@ -158,7 +158,9 @@ function getIconName(path: string) {
 }
 
 function isIntrinsicColorPropertyIcon(pathOrName: string) {
-  return getIconName(pathOrName).toLowerCase().includes('color')
+  const fileName = pathOrName.split('/').at(-1)?.toLowerCase() ?? pathOrName.toLowerCase()
+
+  return fileName.includes('color') || fileName.endsWith('.png')
 }
 
 function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties {

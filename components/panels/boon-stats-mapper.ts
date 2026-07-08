@@ -10,14 +10,17 @@ export const BOON_STAT_DEFINITIONS = [
 export function buildBoonStatsArray(stats?: PanelStat[]): PanelStat[] {
   return BOON_STAT_DEFINITIONS.map(definition => {
     const stored = stats?.find(stat => stat.label === definition.label)
+    const scalingValue = stored?.scaling === 'boon'
+      ? String(stored.scalingValue)
+      : String(stored?.value ?? definition.value)
 
     return {
       label: definition.label,
-      value: stored?.value ?? definition.value,
+      value: scalingValue,
       unit: '',
       icon: definition.icon,
-      scaling: 'none',
-      scalingValue: '0',
+      scaling: 'boon',
+      scalingValue,
     }
   })
 }

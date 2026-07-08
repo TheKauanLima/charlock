@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, CSSProperties, KeyboardEvent, ReactNode, RefObject } from 'react'
 
-import { formatPanelValue } from '@/components/panels/scaling-utils'
+import { formatPanelValue, normalizePanelScaling, PANEL_SCALING_TYPES } from '@/components/panels/scaling-utils'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
@@ -136,10 +136,11 @@ const DEFAULT_WEAPON_STATS: PanelStat[] = [
 ]
 
 function normalizeStat(stat: PanelStat): PanelStat {
+  const scaling = normalizePanelScaling(stat.scaling ?? 'none', stat.scalingValue ?? '0')
+
   return {
     ...stat,
-    scaling: stat.scaling ?? 'none',
-    scalingValue: stat.scalingValue ?? '0',
+    ...scaling,
   }
 }
 
@@ -218,6 +219,7 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
 function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, openScalingAbove = false, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
   const bulletDamageType = getBulletDamageType(icon)
+  const panelScaling = normalizePanelScaling(scaling, scalingValue)
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
@@ -257,16 +259,17 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
       {isEditable && onOpenScalingPickerChange ? (
         <ScalingPicker
           label={label}
-          scaling={scaling}
-          scalingValue={scalingValue}
+          scaling={panelScaling.scaling}
+          scalingValue={panelScaling.scalingValue}
           boundaryRef={boundaryRef}
           menuPosition={openScalingAbove ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
+          allowedScalingTypes={PANEL_SCALING_TYPES}
           onChange={updates => onChange?.(updates)}
           onOpenPickerChange={onOpenScalingPickerChange}
         />
       ) : (
-        <ScalingValueEditor scaling={scaling} scalingValue={scalingValue} showValue={showDetails} position="raised" />
+        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
       )}
     </>
   )
@@ -275,7 +278,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
     return (
       <div
         className={cn(styles.statCell, styles.editableCell)}
-        data-scaling={scaling}
+        data-scaling={panelScaling.scaling}
         role="group"
         aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
       >
@@ -288,7 +291,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
     <button
       type="button"
       className={styles.statCell}
-      data-scaling={scaling}
+      data-scaling={panelScaling.scaling}
       aria-label={`${label}: ${formatPanelValue(value)}${unit}`}
     >
       {content}
