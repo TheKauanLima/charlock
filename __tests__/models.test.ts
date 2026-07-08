@@ -10,6 +10,7 @@ import Follow from '@/lib/models/Follow'
 import Like from '@/lib/models/Like'
 import Notification from '@/lib/models/Notification'
 import SpiritStats from '@/lib/models/SpiritStats'
+import BoonStats from '@/lib/models/BoonStats'
 import VitalityStats from '@/lib/models/VitalityStats'
 import WeaponStats, { statSchema } from '@/lib/models/WeaponStats'
 
@@ -76,6 +77,7 @@ describe('Mongoose model schemas', () => {
     expect(SpiritStats.schema.path('name')).toBeDefined()
     expect(SpiritStats.schema.path('panels.topStats')).toBeDefined()
     expect(SpiritStats.schema.path('panels.spiritPowerStat')).toBeDefined()
+    expect(BoonStats.schema.path('stats')).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

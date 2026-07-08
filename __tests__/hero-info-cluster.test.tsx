@@ -17,6 +17,27 @@ afterEach(() => {
 })
 
 describe('HeroInfoCluster', () => {
+  it('opens boon rewards from the information tab and dismisses panels on outside click', async () => {
+    const user = userEvent.setup()
+    const hero = {
+      slug: 'greytalon', assetSlug: 'grey_talon', displayName: 'Grey Talon', portrait: '/portrait.png', render: '/render.png',
+      heroInfo: {
+        nameType: 'text', nameValue: 'Grey Talon', nameColor: '#fff', tag1Text: 'A', tag2Text: 'B', tag3Text: 'C', tagColor: '#000', tagTextColor: '#fff',
+        tag1Tilt: 0, tag2Tilt: 0, tag3Tilt: 0, tag1OffsetY: 0, tag2OffsetY: 0, tag3OffsetY: 0,
+        ability1Icon: '/1.png', ability2Icon: '/2.png', ability3Icon: '/3.png', ability4Icon: '/4.png', abilityCircleColor: '#000', abilityIconColor: '#fff',
+      },
+    } satisfies HeroDefinition
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(buildHeroStatsSeed(hero)), { status: 200 }))
+    render(<HeroInfoCluster hero={hero} />)
+
+    expect(screen.getByTestId('boon-rewards-panel')).toBeInTheDocument()
+    await user.click(document.body)
+    expect(screen.queryByTestId('boon-rewards-panel')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    expect(screen.getByTestId('boon-rewards-panel')).toHaveAccessibleName('Grey Talon boon rewards')
+  })
+
   it('does not use hero tags or generated stats as a custom hero weapon fallback', async () => {
     const user = userEvent.setup()
     const hero = {

@@ -16,6 +16,7 @@ vi.mock('next/image', () => ({
 
     delete imageProps.fill
     delete imageProps.priority
+    delete (imageProps as Record<string, unknown>).preload
 
     return React.createElement('img', imageProps)
   },
@@ -114,6 +115,7 @@ describe('HeroGrid', () => {
     await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
     await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to boon' }))
     await user.click(screen.getByRole('button', { name: 'Preview Mode' }))
+    await user.click(screen.getByRole('tab', { name: 'Vitality stats' }))
 
     expect(screen.getByRole('button', { name: 'Edit Mode' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: 'Edit Max Health scaling' })).not.toBeInTheDocument()
@@ -1177,7 +1179,7 @@ describe('HeroGrid', () => {
 
     await user.click(screen.getByRole('button', { name: 'Load More' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Select character Filtered Arc Light 2' })).toBeInTheDocument())
-    expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=trending&limit=24&offset=1')
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=trending&limit=12&offset=1')
   })
 
   it('edits weapon scaling from the dropdown and edits weapon header assets in create mode', async () => {

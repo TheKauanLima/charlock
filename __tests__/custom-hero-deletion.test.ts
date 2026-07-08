@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   heroFindOne: vi.fn(),
   heroDeleteOne: vi.fn(),
   heroInfoDeleteMany: vi.fn(),
+  boonDeleteMany: vi.fn(),
   weaponDeleteMany: vi.fn(),
   vitalityDeleteMany: vi.fn(),
   spiritDeleteMany: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/user-suspension', () => ({ assertUserNotSuspended: mocks.assertUs
 vi.mock('@/lib/notifications', () => ({ createNotification: vi.fn(), resolveRecipientClerkId: vi.fn() }))
 vi.mock('@/lib/models/CustomHero', () => ({ default: { findOne: mocks.heroFindOne, deleteOne: mocks.heroDeleteOne } }))
 vi.mock('@/lib/models/HeroInfo', () => ({ default: { deleteMany: mocks.heroInfoDeleteMany } }))
+vi.mock('@/lib/models/BoonStats', () => ({ default: { deleteMany: mocks.boonDeleteMany } }))
 vi.mock('@/lib/models/WeaponStats', () => ({ default: { deleteMany: mocks.weaponDeleteMany } }))
 vi.mock('@/lib/models/VitalityStats', () => ({ default: { deleteMany: mocks.vitalityDeleteMany } }))
 vi.mock('@/lib/models/SpiritStats', () => ({ default: { deleteMany: mocks.spiritDeleteMany } }))
@@ -62,6 +64,7 @@ describe('custom hero deletion', () => {
 
     for (const deleteMany of [
       mocks.heroInfoDeleteMany,
+      mocks.boonDeleteMany,
       mocks.weaponDeleteMany,
       mocks.vitalityDeleteMany,
       mocks.spiritDeleteMany,

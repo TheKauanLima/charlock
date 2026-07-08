@@ -6,6 +6,7 @@ import type { PanelStat } from '@/components/panels/scaling-utils'
 import { buildSpiritPowerStat, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'
 import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
+import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 
 import type { HeroTemplateDefinition, HeroTemplateId } from './types'
 
@@ -111,6 +112,7 @@ function buildEmptyStats(hero: HeroDefinition): HeroStatsPayload {
       render: hero.render,
     },
     heroInfo: hero.heroInfo,
+    boon: { stats: buildBoonStatsArray() },
     weapon: {
       weaponName: 'WEAPON NAME',
       weaponDesc: 'Weapon description.',

@@ -12,6 +12,7 @@ import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HER
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
+import BoonStats from '@/lib/models/BoonStats'
 import Comment from '@/lib/models/Comment'
 import CustomHero from '@/lib/models/CustomHero'
 import Follow from '@/lib/models/Follow'
@@ -25,6 +26,7 @@ import WeaponStats from '@/lib/models/WeaponStats'
 import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
 import { normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
+import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
@@ -75,6 +77,10 @@ interface SpiritStatsRecord {
   panels?: Array<{ id: string; name: string; topStats: IPanelStat[]; spiritPowerStat: IPanelStat }>
 }
 
+interface BoonStatsRecord {
+  stats: IPanelStat[]
+}
+
 interface AbilityStatsRecord {
   abilities: AbilityStatsPayload['abilities']
   secondaryAbilities?: AbilityStatsPayload['secondaryAbilities']
@@ -85,6 +91,7 @@ interface AbilityStatsRecord {
 interface HeroBundle {
   hero: HeroRecord
   heroInfo: HeroInfoRecord | null
+  boon: BoonStatsRecord | null
   weapon: WeaponStatsRecord | null
   vitality: VitalityStatsRecord | null
   spirit: SpiritStatsRecord | null
@@ -154,6 +161,10 @@ function normalizeStats(value: unknown) {
 
 function normalizeVitalityStats(value: unknown) {
   return normalizeVitalityStatsArray(normalizeStats(value))
+}
+
+function normalizeBoonStats(value: unknown) {
+  return buildBoonStatsArray(normalizeStats(value))
 }
 
 function normalizeWeaponPanels(value: unknown) {
@@ -237,6 +248,7 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
 function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
   const value = customHeroSaveSchema.parse(stripDatabaseMetadata(rawValue))
   const heroRecord = value.hero
+  const boonRecord = value.boon
   const weaponRecord = value.weapon
   const vitalityRecord = value.vitality
   const spiritRecord = value.spirit
@@ -272,6 +284,7 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
     },
     allowCopies,
     heroInfo,
+    boon: { stats: normalizeBoonStats(boonRecord.stats) },
     weapon: {
       weaponName: getString(weaponRecord.weaponName, `${name} Weapon`),
       weaponDesc: getString(weaponRecord.weaponDesc),
@@ -457,6 +470,7 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
       render: summary.render,
     },
     heroInfo: summary.heroInfo,
+    boon: { stats: normalizeBoonStats(bundle.boon?.stats) },
     weapon: {
       weaponName: bundle.weapon?.weaponName ?? `${summary.displayName} Weapon`,
       weaponDesc: bundle.weapon?.weaponDesc ?? '',
@@ -639,8 +653,9 @@ async function getActorBookmarkSet(actor: Actor | null) {
 }
 
 async function getHeroBundle(hero: HeroRecord): Promise<HeroBundle> {
-  const [heroInfo, weapon, vitality, spirit, abilityStats] = await Promise.all([
+  const [heroInfo, boon, weapon, vitality, spirit, abilityStats] = await Promise.all([
     HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>(),
+    BoonStats.findOne({ heroId: hero._id }).lean<BoonStatsRecord | null>(),
     WeaponStats.findOne({ heroId: hero._id }).lean<WeaponStatsRecord | null>(),
     VitalityStats.findOne({ heroId: hero._id }).lean<VitalityStatsRecord | null>(),
     SpiritStats.findOne({ heroId: hero._id }).lean<SpiritStatsRecord | null>(),
@@ -650,6 +665,7 @@ async function getHeroBundle(hero: HeroRecord): Promise<HeroBundle> {
   return {
     hero,
     heroInfo,
+    boon,
     weapon,
     vitality,
     spirit,
@@ -865,6 +881,7 @@ export async function deleteCustomHero(id: string) {
   await Promise.all([
     CustomHero.deleteOne({ _id: objectId }),
     HeroInfo.deleteMany({ heroId: objectId }),
+    BoonStats.deleteMany({ heroId: objectId }),
     WeaponStats.deleteMany({ heroId: objectId }),
     VitalityStats.deleteMany({ heroId: objectId }),
     SpiritStats.deleteMany({ heroId: objectId }),
@@ -1035,6 +1052,11 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
         heroId: hero._id,
         createdByUserId: hero.createdByUserId,
       },
+      { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
+    ),
+    BoonStats.findOneAndUpdate(
+      { heroId: hero._id },
+      { ...payload.boon, heroId: hero._id },
       { upsert: true, returnDocument: 'after', runValidators: true, setDefaultsOnInsert: true },
     ),
     WeaponStats.findOneAndUpdate(

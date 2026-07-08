@@ -1,6 +1,6 @@
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
-import type { HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
+import type { BoonStatsPayload, HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import type { ModerationStatus } from '@/lib/moderation-types'
 
 export type CustomHeroStatus = 'private' | 'published'
@@ -37,6 +37,7 @@ export interface CustomHeroSavePayload {
   }
   allowCopies: boolean
   heroInfo: HeroInfoDefinition
+  boon: BoonStatsPayload
   weapon: WeaponStatsPayload
   vitality: VitalityStatsPayload
   spirit: SpiritStatsPayload

@@ -9,6 +9,7 @@ import dbConnect from '@/lib/dbConnect'
 import type { ContentReportRequest, ModerationResolveRequest } from '@/lib/moderation-schemas'
 import type { ContentReport, ModerationQueue, ModerationQueueItem, ReportReason } from '@/lib/moderation-types'
 import AbilityStats from '@/lib/models/AbilityStats'
+import BoonStats from '@/lib/models/BoonStats'
 import Comment from '@/lib/models/Comment'
 import type { IComment } from '@/lib/models/Comment'
 import CustomHero from '@/lib/models/CustomHero'
@@ -224,6 +225,7 @@ async function deleteHero(heroId: Types.ObjectId) {
   await Promise.all([
     CustomHero.deleteOne({ _id: heroId }),
     HeroInfo.deleteMany({ heroId }),
+    BoonStats.deleteMany({ heroId }),
     WeaponStats.deleteMany({ heroId }),
     VitalityStats.deleteMany({ heroId }),
     SpiritStats.deleteMany({ heroId }),

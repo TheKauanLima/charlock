@@ -12,6 +12,7 @@ import type { AbilityIconTarget } from '@/components/HeroAbilityIconRow/HeroAbil
 import ReportDialog from '@/components/Moderation/ReportDialog'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
+import HeroStatsBoonPanel from '@/components/panels/hero-stats-boon-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import PanelVariantTabs, { BASE_PANEL_ID } from '@/components/PanelVariantTabs/PanelVariantTabs'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
@@ -80,7 +81,7 @@ function formatNoteTime(value: string) {
 }
 
 export default function HeroInfoCluster({ hero, showDetails = false, onCreateFromHero }: HeroInfoClusterProps) {
-  const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
+  const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>('overview')
   const heroId = getCustomHeroId(hero)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [comments, setComments] = useState<CommentItem[]>([])
@@ -121,6 +122,22 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
   const activeWeaponPanel = statsData.weapon.panels?.find(panel => panel.id === activeWeaponPanelId)
   const activeVitalityPanel = statsData.vitality.panels?.find(panel => panel.id === activeVitalityPanelId)
   const activeSpiritPanel = statsData.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
+
+  useEffect(() => {
+    if (!activeTabId) return undefined
+
+    function handlePanelClickAway(event: globalThis.PointerEvent) {
+      if (event.target instanceof Element && event.target.closest('[data-testid="hero-sidebar-tabs"], [data-hero-stat-panel="true"], [role="dialog"]')) return
+      setActiveTabId(null)
+    }
+
+    document.addEventListener('pointerdown', handlePanelClickAway)
+    return () => document.removeEventListener('pointerdown', handlePanelClickAway)
+  }, [activeTabId])
+
+  function handleTabSelect(tabId: SidebarTabId) {
+    setActiveTabId(current => current === tabId ? null : tabId)
+  }
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -332,10 +349,11 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         data-testid="hero-info-cluster"
         aria-label={`${hero.displayName} information cluster`}
       >
-        <SidebarTabs activeTabId={activeTabId} onSelect={setActiveTabId} />
+        <SidebarTabs activeTabId={activeTabId} onSelect={handleTabSelect} />
 
-      {activeTabId === 'overview' ? (
-        <div id="hero-panel-overview" role="tabpanel" aria-label={`${hero.displayName} overview`} className={styles.panelContents}>
+      {activeTabId === 'overview' || activeTabId === null ? (
+        <div id="hero-panel-overview" role="tabpanel" aria-label={`${hero.displayName} overview`} className={styles.panelContents} data-hero-stat-panel="true">
+          {activeTabId === 'overview' ? <HeroStatsBoonPanel heroName={hero.displayName} stats={statsData.boon.stats} /> : null}
           <div className={styles.nameRow}>
             {heroInfo.nameType === 'image' ? (
               <span
@@ -387,6 +405,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
 
       <div
         id="hero-panel-weapon"
+        data-hero-stat-panel="true"
         role="tabpanel"
         aria-label={`${hero.displayName} weapon stats`}
         hidden={activeTabId !== 'weapon'}
@@ -408,6 +427,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
 
       <div
         id="hero-panel-vitality"
+        data-hero-stat-panel="true"
         role="tabpanel"
         aria-label={`${hero.displayName} vitality stats`}
         hidden={activeTabId !== 'vitality'}
@@ -419,6 +439,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
 
       <div
         id="hero-panel-spirit"
+        data-hero-stat-panel="true"
         role="tabpanel"
         aria-label={`${hero.displayName} spirit stats`}
         hidden={activeTabId !== 'spirit'}

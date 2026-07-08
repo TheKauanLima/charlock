@@ -1,0 +1,182 @@
+.panel {
+  overflow: hidden;
+  border: 1px solid rgba(143, 177, 112, 0.16);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff8ec;
+  font-family: "Valve_Pulp", var(--font-geist-sans), sans-serif;
+  text-align: center;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(7px);
+}
+
+.header {
+  background: linear-gradient(135deg, rgba(38, 55, 33, 0.92), rgba(13, 22, 17, 0.9));
+  padding: 14px 20px 18px;
+}
+
+.title,
+.rewards h3,
+.thresholdCopy,
+.rewards p {
+  margin: 0;
+}
+
+.title {
+  font-size: 1.55rem;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.thresholdCopy {
+  margin-top: 7px;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.unlockRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.unlockIcon {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 3px dotted #d99cff;
+  border-radius: 50%;
+  color: #f0c4ff;
+}
+
+.unlockIcon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.orText {
+  color: rgba(255, 248, 236, 0.68);
+  font-weight: 800;
+}
+
+.apIcon {
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+}
+
+.unlockCopy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.unlockCopy strong {
+  font-size: 1.1rem;
+  line-height: 1.05;
+}
+
+.unlockCopy em {
+  margin-top: 4px;
+  color: rgba(255, 248, 236, 0.6);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.rewards {
+  padding: 20px 24px 24px;
+}
+
+.rewards h3 {
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+
+.rewards p {
+  margin-top: 4px;
+  color: rgba(255, 248, 236, 0.55);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px 18px;
+  margin-top: 28px;
+}
+
+.stat {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+
+.valueRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.valueRow img {
+  width: 23px;
+  height: 23px;
+  object-fit: contain;
+}
+
+.valueRow input {
+  width: 58px;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px dashed rgba(255, 248, 236, 0.62);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  padding: 0 2px;
+}
+
+.valueRow input:focus {
+  border-color: #91d56d;
+}
+
+.statLabel {
+  max-width: 100%;
+  margin-top: 4px;
+  color: rgba(255, 248, 236, 0.78);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.05;
+  overflow-wrap: break-word;
+}
+
+@media (max-width: 520px) {
+  .header,
+  .rewards {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .unlockRow {
+    gap: 7px;
+  }
+
+  .unlockCopy strong {
+    font-size: 0.92rem;
+  }
+}

@@ -106,7 +106,7 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
         '--settings-name': preferredHero.heroInfo.nameColor,
       } as CSSProperties}
     >
-      <Image src={preferredHero.render} alt="" fill priority sizes="100vw" className={styles.backgroundRender} />
+      <Image src={preferredHero.render} alt="" fill preload sizes="100vw" className={styles.backgroundRender} />
       <div className={styles.noiseLayer} aria-hidden="true" />
 
       <div className={styles.content}>

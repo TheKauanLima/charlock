@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const heroFindOneMock = vi.hoisted(() => vi.fn())
 const heroInfoFindOneMock = vi.hoisted(() => vi.fn())
+const boonFindOneMock = vi.hoisted(() => vi.fn())
 const weaponFindOneMock = vi.hoisted(() => vi.fn())
 const vitalityFindOneMock = vi.hoisted(() => vi.fn())
 const spiritFindOneMock = vi.hoisted(() => vi.fn())
@@ -37,6 +38,10 @@ vi.mock('@/lib/models/HeroInfo', () => ({
   default: {
     findOne: heroInfoFindOneMock,
   },
+}))
+
+vi.mock('@/lib/models/BoonStats', () => ({
+  default: { findOne: boonFindOneMock },
 }))
 
 vi.mock('@/lib/models/WeaponStats', async importOriginal => {
@@ -76,6 +81,8 @@ describe('getHeroStatsBySlug stat normalization', () => {
     dbConnectMock.mockResolvedValue(undefined)
     heroFindOneMock.mockReset()
     heroInfoFindOneMock.mockReset()
+    boonFindOneMock.mockReset()
+    boonFindOneMock.mockReturnValue(createQueryMock(null))
     weaponFindOneMock.mockReset()
     vitalityFindOneMock.mockReset()
     spiritFindOneMock.mockReset()

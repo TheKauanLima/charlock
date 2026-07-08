@@ -17,6 +17,8 @@ import { clearEditorRecovery } from '@/lib/editor-recovery'
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll'
+import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
 import { HERO_TEMPLATES, type HeroTemplateDefinition } from '@/templates'
 
 import styles from './HeroGrid.module.css'
@@ -39,7 +41,8 @@ const TAB_ITEMS: TabItem[] = [
 ]
 
 const GRID_SIZE = 40
-const BROWSE_PAGE_SIZE = 24
+const INITIAL_BROWSE_PAGE_SIZE = 24
+const NEXT_BROWSE_PAGE_SIZE = 12
 const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
 const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
 const HERO_BACKGROUND_SLUG_OVERRIDES: Record<string, string> = {
@@ -369,11 +372,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     return undefined
   }, [loadSavedHero])
 
-  const getBrowseUrl = useCallback((offset: number) => {
+  const getBrowseUrl = useCallback((offset: number, limit = offset === 0 ? INITIAL_BROWSE_PAGE_SIZE : NEXT_BROWSE_PAGE_SIZE) => {
     const searchParams = new URLSearchParams({
       status: 'published',
       sort: browseSort,
-      limit: String(BROWSE_PAGE_SIZE),
+      limit: String(limit),
       offset: String(offset),
     })
     const trimmedSearch = browseSearch.trim()
@@ -385,10 +388,10 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     return `/api/heroes?${searchParams.toString()}`
   }, [browseSearch, browseSort])
 
-  const getBookmarksUrl = useCallback((offset: number) => {
+  const getBookmarksUrl = useCallback((offset: number, limit = offset === 0 ? INITIAL_BROWSE_PAGE_SIZE : NEXT_BROWSE_PAGE_SIZE) => {
     const searchParams = new URLSearchParams({
       bookmarked: 'true',
-      limit: String(BROWSE_PAGE_SIZE),
+      limit: String(limit),
       offset: String(offset),
     })
     const trimmedSearch = browseSearch.trim()
@@ -644,7 +647,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     }
   }
 
-  async function handleLoadMoreBrowseHeroes() {
+  const handleLoadMoreBrowseHeroes = useCallback(async () => {
     if (!browsePagination?.hasMore || isBrowseLoadingMore) {
       return
     }
@@ -669,9 +672,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     } finally {
       setIsBrowseLoadingMore(false)
     }
-  }
+  }, [browseHeroes.length, browsePagination?.hasMore, getBrowseUrl, isBrowseLoadingMore])
 
-  async function handleLoadMoreBookmarkedHeroes() {
+  const handleLoadMoreBookmarkedHeroes = useCallback(async () => {
     if (!bookmarksPagination?.hasMore || isBookmarksLoadingMore) {
       return
     }
@@ -696,7 +699,18 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     } finally {
       setIsBookmarksLoadingMore(false)
     }
-  }
+  }, [bookmarkedHeroes.length, bookmarksPagination?.hasMore, getBookmarksUrl, isBookmarksLoadingMore])
+
+  const browseScrollRef = useInfiniteScroll({
+    hasMore: activeTab === 'Browse' && Boolean(browsePagination?.hasMore),
+    isLoading: isBrowseLoadingMore,
+    onLoadMore: handleLoadMoreBrowseHeroes,
+  })
+  const bookmarksScrollRef = useInfiniteScroll({
+    hasMore: activeTab === 'Bookmarks' && Boolean(bookmarksPagination?.hasMore),
+    isLoading: isBookmarksLoadingMore,
+    onLoadMore: handleLoadMoreBookmarkedHeroes,
+  })
 
   async function recordTemplateCopy(heroId: string) {
     try {
@@ -759,6 +773,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       const nextStats: HeroStatsPayload = {
         hero: body.hero ?? fallbackStats.hero,
         heroInfo: body.heroInfo ?? fallbackStats.heroInfo,
+        boon: body.boon ?? fallbackStats.boon,
         weapon: body.weapon ?? fallbackStats.weapon,
         vitality: body.vitality ?? fallbackStats.vitality,
         spirit: body.spirit ?? fallbackStats.spirit,
@@ -907,7 +922,14 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
               {feedItems.map(item => (
                 <article key={item.id} className={styles.activityItem}>
                   <span className={styles.activityPortrait}>
-                    <Image src={item.heroPortrait} alt="" fill sizes="72px" />
+                    <Image
+                      src={getThumbnailUrl(item.heroPortrait, 144, 144)}
+                      alt=""
+                      fill
+                      sizes="72px"
+                      placeholder="blur"
+                      blurDataURL={IMAGE_BLUR_DATA_URL}
+                    />
                   </span>
                   <div>
                     <p>{item.type === 'published_hero' ? 'New Publication' : 'Comment'}</p>
@@ -968,11 +990,14 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                         <span className={styles.browseBackground} data-testid="browse-card-background" style={{ backgroundImage: `url('${hero.background}')` }} aria-hidden="true" />
                         <span className={styles.heroPortraitWrap}>
                           <Image
-                            src={hero.portrait}
+                            src={getThumbnailUrl(hero.portrait, 260, 420)}
                             alt={hero.displayName}
                             fill
                             className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
                             sizes="(max-width: 1024px) 25vw, 12vw"
+                            preload={index < 8}
+                            placeholder="blur"
+                            blurDataURL={IMAGE_BLUR_DATA_URL}
                           />
                         </span>
                         <span className={styles.heroBorder} />
@@ -1020,6 +1045,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                         fill
                         className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
                         sizes="(max-width: 1024px) 25vw, 12vw"
+                        preload={index < 8}
+                        placeholder="blur"
+                        blurDataURL={IMAGE_BLUR_DATA_URL}
                       />
                     </span>
                     <span className={styles.heroBorder} />
@@ -1032,12 +1060,12 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
               })}
             </section>
             {activeTab === 'Browse' && browsePagination?.hasMore ? (
-              <button type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBrowseHeroes} disabled={isBrowseLoadingMore}>
+              <button ref={browseScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBrowseHeroes} disabled={isBrowseLoadingMore}>
                 {isBrowseLoadingMore ? 'Loading...' : 'Load More'}
               </button>
             ) : null}
             {activeTab === 'Bookmarks' && bookmarksPagination?.hasMore ? (
-              <button type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBookmarkedHeroes} disabled={isBookmarksLoadingMore}>
+              <button ref={bookmarksScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBookmarkedHeroes} disabled={isBookmarksLoadingMore}>
                 {isBookmarksLoadingMore ? 'Loading...' : 'Load More'}
               </button>
             ) : null}

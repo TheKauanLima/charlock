@@ -20,6 +20,7 @@ vi.mock('next/image', () => ({
 
     delete imageProps.fill
     delete imageProps.priority
+    delete (imageProps as Record<string, unknown>).preload
 
     return React.createElement('img', imageProps)
   },

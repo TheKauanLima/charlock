@@ -8,11 +8,12 @@ import type { CSSProperties } from 'react'
 import { useClerk } from '@clerk/nextjs'
 
 import { updateProfileBackground } from '@/app/profile/actions'
+import heroGridStyles from '@/components/HeroGrid/HeroGrid.module.css'
 import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroDefinition } from '@/lib/hero-data'
+import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
 import type { ProfileCommentsLedger, ProfileCommentItem, ProfileLikeItem } from '@/lib/profile-ledger-types'
 import type { ProfileBackgroundVisual, UserProfileData } from '@/lib/profile'
-import heroGridStyles from '@/components/HeroGrid/HeroGrid.module.css'
 
 import { ProfileSettingsPanel } from './ProfileSettings'
 import styles from './UserProfile.module.css'
@@ -254,11 +255,13 @@ function ProfileHeroGrid({
             <span className={heroGridStyles.browseBackground} style={{ backgroundImage: `url('${hero.background}')` }} aria-hidden="true" />
             <span className={heroGridStyles.heroPortraitWrap}>
               <Image
-                src={hero.portrait}
+                src={getThumbnailUrl(hero.portrait, 260, 420)}
                 alt={hero.name}
                 fill
                 className={heroGridStyles.heroPortrait}
                 sizes="(max-width: 1024px) 25vw, 12vw"
+                placeholder="blur"
+                blurDataURL={IMAGE_BLUR_DATA_URL}
               />
             </span>
             <span className={heroGridStyles.heroBorder} />
@@ -717,7 +720,7 @@ function ProfileBackgroundModal({
                     <span className={styles.backgroundOptionWash} aria-hidden="true" />
                   </span>
                   <span className={styles.backgroundOptionPortrait}>
-                    <Image src={option.portrait} alt="" fill sizes="76px" className={styles.backgroundOptionPortraitImage} />
+                    <Image src={getThumbnailUrl(option.portrait, 152, 246)} alt="" fill sizes="76px" className={styles.backgroundOptionPortraitImage} placeholder="blur" blurDataURL={IMAGE_BLUR_DATA_URL} />
                   </span>
                   <span className={styles.backgroundOptionLabel}>{option.label}</span>
                 </button>
@@ -1264,7 +1267,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
         src={profileBackground.render}
         alt=""
         fill
-        priority
+        preload
         sizes="100vw"
         className={styles.backgroundRender}
         data-testid="profile-background-render"

@@ -2,11 +2,12 @@
 
 import { readFileSync } from 'node:fs'
 
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
+import HeroStatsBoonPanel from '@/components/panels/hero-stats-boon-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import { buildSpiritPowerStat } from '@/components/panels/spirit-stats-mapper'
@@ -41,6 +42,21 @@ describe('hero stat mappers', () => {
 })
 
 describe('migrated stat panels', () => {
+  it('renders and edits the four boon rewards', async () => {
+    let changedValue = ''
+
+    render(<HeroStatsBoonPanel heroName="Victor" isEditable onStatsChange={stats => { changedValue = String(stats[0].value) }} />)
+
+    expect(screen.getByRole('heading', { name: 'Boon Rewards' })).toBeInTheDocument()
+    expect(screen.getByText('At each threshold, Victor gains:')).toBeInTheDocument()
+    expect(screen.getByText('Abilities unlock at Boons 0, 2, 4 and 6')).toBeInTheDocument()
+    expect(screen.getAllByLabelText(/value$/)).toHaveLength(4)
+
+    const bulletDamage = screen.getByLabelText('Base Bullet Damage value')
+    fireEvent.change(bulletDamage, { target: { value: '0.42' } })
+    expect(changedValue).toBe('0.42')
+  })
+
   it('raises any panel row that contains an open scaling menu', () => {
     const stylesheets = [
       'components/panels/HeroStatsVitalityPanel.module.css',

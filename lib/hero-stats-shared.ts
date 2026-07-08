@@ -1,6 +1,7 @@
 import { buildSpiritPowerStat, buildTopSpiritStatsArray } from '@/components/panels/spirit-stats-mapper'
 import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
+import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 import { HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 
@@ -57,9 +58,14 @@ export interface SpiritPanelVariant extends NamedStatPanel {
   spiritPowerStat: PanelStat
 }
 
+export interface BoonStatsPayload {
+  stats: PanelStat[]
+}
+
 export interface HeroStatsPayload {
   hero: HeroStatsHero
   heroInfo?: HeroInfoDefinition
+  boon: BoonStatsPayload
   weapon: WeaponStatsPayload
   vitality: VitalityStatsPayload
   spirit: SpiritStatsPayload
@@ -151,6 +157,7 @@ export function buildEmptyHeroStats(hero: HeroDefinition): HeroStatsPayload {
       render: hero.render,
     },
     heroInfo: hero.heroInfo,
+    boon: { stats: buildBoonStatsArray() },
     weapon: {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: '',
@@ -186,6 +193,7 @@ export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
       render: hero.render,
     },
     heroInfo: hero.heroInfo,
+    boon: { stats: buildBoonStatsArray() },
     weapon: {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: `${hero.displayName} pressure profile generated from the seeded hero stat table.`,

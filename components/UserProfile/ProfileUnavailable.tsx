@@ -48,7 +48,7 @@ export default function ProfileUnavailable({ reason = 'temporary' }: { reason?: 
         src={fallbackHero.render}
         alt=""
         fill
-        priority
+        preload
         sizes="100vw"
         className={styles.backgroundRender}
       />

@@ -5,6 +5,7 @@ import { Types } from 'mongoose'
 import dbConnect from '@/lib/dbConnect'
 import CustomHero from '@/lib/models/CustomHero'
 import AbilityStats from '@/lib/models/AbilityStats'
+import BoonStats from '@/lib/models/BoonStats'
 import OfficialHero from '@/lib/models/Hero'
 import HeroInfo from '@/lib/models/HeroInfo'
 import SpiritStats from '@/lib/models/SpiritStats'
@@ -17,6 +18,7 @@ import { buildFallbackHeroStatsBySlug } from '@/lib/hero-stats-shared'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 export { buildFallbackHeroStatsBySlug, buildHeroStatsSeed, buildHeroStatsSource } from '@/lib/hero-stats-shared'
 export type { HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
 
@@ -211,6 +213,10 @@ function normalizeStoredStats(
   })
 }
 
+interface BoonStatsRecord {
+  stats?: IPanelStat[]
+}
+
 function normalizeOptionalStoredStats(stats: IPanelStat[] | undefined, definitions: StandardStatDefinition[]): PanelStat[] {
   const statsByLabel = new Map((stats ?? []).filter(isPanelStat).map(stat => [stat.label, stat]))
 
@@ -280,10 +286,11 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
     return null
   }
 
-  const [heroInfo, weapon, vitality, spirit, abilityStats] = await Promise.all([
+  const [heroInfo, boon, weapon, vitality, spirit, abilityStats] = await Promise.all([
     HeroInfo.findOne({ heroId: hero._id })
       .select('nameType nameValue nameColor nameFontSize nameFontFamily nameFontWeight tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
       .lean<HeroInfoRecord | null>(),
+    BoonStats.findOne({ heroId: hero._id }).select('stats').lean<BoonStatsRecord | null>(),
     WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats panels bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
     VitalityStats.findOne({ heroId: hero._id }).select('name stats panels maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
     SpiritStats.findOne({ heroId: hero._id }).select('name topStats spiritPower spiritPowerStat panels abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
@@ -310,6 +317,7 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
         heroInfo: heroInfoPayload,
       }),
     } : {}),
+    boon: { stats: buildBoonStatsArray(boon?.stats) },
     weapon: {
       weaponName: weapon.weaponName,
       weaponDesc: weapon.weaponDesc,

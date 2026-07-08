@@ -25,7 +25,7 @@ interface SidebarTabImageItem extends SidebarTabBaseItem {
 export type SidebarTabItem = SidebarTabComponentItem | SidebarTabImageItem
 
 interface SidebarTabsProps {
-  activeTabId: SidebarTabId
+  activeTabId: SidebarTabId | null
   onSelect: (tabId: SidebarTabId) => void
   overviewLabel?: string
 }

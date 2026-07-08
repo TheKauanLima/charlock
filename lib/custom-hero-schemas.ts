@@ -140,6 +140,9 @@ export const customHeroSaveSchema = z.object({
   }).strict(),
   allowCopies: z.boolean().default(false),
   heroInfo: heroInfoSchema.default({}),
+  boon: z.object({
+    stats: z.array(panelStatSchema).max(4).optional(),
+  }).strict().default({}),
   weapon: z.object({
     weaponName: z.string().max(120).optional(),
     weaponDesc: z.string().max(3000).optional(),

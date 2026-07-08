@@ -10,6 +10,7 @@ import EditorAssetModal from '@/components/EditorAssetModal/EditorAssetModal'
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
+import HeroStatsBoonPanel from '@/components/panels/hero-stats-boon-panel'
 import type { PanelStat } from '@/components/panels/scaling-utils'
 import WeaponPanel from '@/components/panels/weapon-panel'
 import { PELLET_COUNT_LABEL } from '@/components/panels/weapon-stats-mapper'
@@ -402,7 +403,7 @@ export default function HeroInfoEditor({
   onDraftChange,
   onSaveHero,
 }: HeroInfoEditorProps) {
-  const [activeTabId, setActiveTabId] = useState<SidebarTabId>('overview')
+  const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>('overview')
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [activeAbilityTarget, setActiveAbilityTarget] = useState<ActiveAbilityTarget | null>(null)
   const [abilityEditorRevision, setAbilityEditorRevision] = useState(0)
@@ -479,6 +480,7 @@ export default function HeroInfoEditor({
   const nameSizeControlValue = getNameSizeControlValue(draft.nameFontSize)
   const selectedBackgroundOption = backgroundOptions.find(option => option.path === selectedBackground) ?? backgroundOptions[0]
   const exportHeroName = getDraftName() || heroNamePreview
+  const boonHeroName = getDraftName() || hero.displayName
   const exportPayload = buildCharacterExportPayload(
     {
       ...hero,
@@ -494,6 +496,7 @@ export default function HeroInfoEditor({
         render: getRenderPath(),
       },
       heroInfo: restoreRequiredAbilityIcons(draft),
+      boon: statsDraft.boon,
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
@@ -525,6 +528,22 @@ export default function HeroInfoEditor({
   const activeVitalityStats = activeVitalityPanel?.stats ?? statsDraft.vitality.stats
   const activeSpiritTopStats = activeSpiritPanel?.topStats ?? statsDraft.spirit.topStats
   const activeSpiritPowerStat = activeSpiritPanel?.spiritPowerStat ?? statsDraft.spirit.spiritPowerStat
+
+  useEffect(() => {
+    if (!activeTabId) return undefined
+
+    function handlePanelClickAway(event: globalThis.PointerEvent) {
+      if (event.target instanceof Element && event.target.closest('[data-testid="hero-sidebar-tabs"], [data-hero-stat-panel="true"], [role="dialog"]')) return
+      setActiveTabId(null)
+    }
+
+    document.addEventListener('pointerdown', handlePanelClickAway)
+    return () => document.removeEventListener('pointerdown', handlePanelClickAway)
+  }, [activeTabId])
+
+  function handleTabSelect(tabId: SidebarTabId) {
+    setActiveTabId(current => current === tabId ? null : tabId)
+  }
 
   function updateDraft(nextDraft: Partial<HeroInfoDefinition>) {
     onDraftChange({
@@ -716,6 +735,7 @@ export default function HeroInfoEditor({
       },
       allowCopies: allowCopiesInput,
       heroInfo: restoreRequiredAbilityIcons(draft),
+      boon: statsDraft.boon,
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
@@ -1223,7 +1243,7 @@ export default function HeroInfoEditor({
       data-testid="hero-info-editor"
       aria-label="Character editor"
     >
-      <SidebarTabs activeTabId={activeTabId} onSelect={setActiveTabId} overviewLabel="Hero render" />
+      <SidebarTabs activeTabId={activeTabId} onSelect={handleTabSelect} overviewLabel="Hero render" />
 
       <div className={styles.previewStage}>
             <div className={styles.nameRow}>
@@ -1370,8 +1390,16 @@ export default function HeroInfoEditor({
             />
       </div>
 
-      {activeTabId !== 'overview' ? (
-        <aside className={styles.statsAside}>
+      {activeTabId ? (
+        <aside className={styles.statsAside} data-hero-stat-panel="true">
+          {activeTabId === 'overview' ? (
+            <HeroStatsBoonPanel
+              heroName={boonHeroName}
+              stats={statsDraft.boon.stats}
+              isEditable={!isPreviewMode}
+              onStatsChange={stats => setStatsDraft(current => ({ ...current, boon: { stats } }))}
+            />
+          ) : null}
           {activeTabId === 'weapon' ? (
             <div className={styles.weaponStack}>
               <PanelVariantTabs
@@ -1441,7 +1469,7 @@ export default function HeroInfoEditor({
         </div>
 
         <div className={styles.railContent}>
-          {activeTabId === 'overview' ? (
+          {activeTabId === 'overview' || activeTabId === null ? (
             <div className={styles.sectionGroup}>
               <span className={styles.sectionTitle}>Hero Render</span>
               <div className={styles.renderModeGrid}>
