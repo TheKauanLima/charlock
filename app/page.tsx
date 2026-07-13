@@ -39,6 +39,7 @@ export default async function Home({ searchParams }: HomeProps = {}) {
   }
 
   const resolvedSearchParams = await searchParams
+  const initialTab = getInitialTab(resolvedSearchParams?.tab)
 
-  return <HeroGrid initialTab={getInitialTab(resolvedSearchParams?.tab)} />
+  return <HeroGrid key={initialTab} initialTab={initialTab} />
 }

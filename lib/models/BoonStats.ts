@@ -5,9 +5,31 @@ import type { IPanelStat } from './WeaponStats'
 export interface IBoonStats {
   heroId: Types.ObjectId
   stats: IPanelStat[]
+  panels?: IBoonPanelVariant[]
   createdAt: Date
   updatedAt: Date
 }
+
+export interface IBoonPanelVariant {
+  id: string
+  name: string
+  stats: IPanelStat[]
+}
+
+const boonStatSchema = new Schema<IPanelStat>({
+  label: { type: String, required: true },
+  value: { type: String, required: true },
+  unit: { type: String, default: '' },
+  icon: { type: String, default: 'dot' },
+  scaling: { type: String, enum: ['boon'], default: 'boon' },
+  scalingValue: { type: String, required: true },
+}, { _id: false })
+
+const boonPanelVariantSchema = new Schema<IBoonPanelVariant>({
+  id: { type: String, required: true },
+  name: { type: String, required: true },
+  stats: { type: [boonStatSchema], default: [] },
+}, { _id: false })
 
 const boonStatsSchema = new Schema<IBoonStats>({
   heroId: {
@@ -18,16 +40,10 @@ const boonStatsSchema = new Schema<IBoonStats>({
     index: true,
   },
   stats: {
-    type: [new Schema<IPanelStat>({
-      label: { type: String, required: true },
-      value: { type: String, required: true },
-      unit: { type: String, default: '' },
-      icon: { type: String, default: 'dot' },
-      scaling: { type: String, enum: ['boon'], default: 'boon' },
-      scalingValue: { type: String, required: true },
-    }, { _id: false })],
+    type: [boonStatSchema],
     default: [],
   },
+  panels: { type: [boonPanelVariantSchema], default: undefined },
 }, { timestamps: true })
 
 const BoonStats: Model<IBoonStats> = models.BoonStats || model<IBoonStats>('BoonStats', boonStatsSchema)

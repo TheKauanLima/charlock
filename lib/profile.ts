@@ -11,6 +11,7 @@ import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import User from '@/lib/models/User'
 import type { ModerationStatus } from '@/lib/moderation-types'
+import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
 
 export interface UserLevel {
   label: 'New User' | 'Contributor' | 'Power User' | 'Community Leader'
@@ -251,25 +252,14 @@ export async function getCurrentProfileUser() {
   try {
     await dbConnect()
 
-    return User.findOneAndUpdate(
-      { clerkId: clerkUser.id },
-      {
-        $set: {
-          clerkId: clerkUser.id,
-          email,
-          username,
-          emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
-          firstName: clerkUser.firstName,
-          lastName: clerkUser.lastName,
-        },
-      },
-      {
-        upsert: true,
-        returnDocument: 'after',
-        runValidators: true,
-        setDefaultsOnInsert: true,
-      },
-    ).lean<UserRecord | null>()
+    return syncUserRecordFromClerk({
+      clerkId: clerkUser.id,
+      email,
+      username,
+      emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+    }) as Promise<UserRecord | null>
   } catch (error) {
     if (isDatabaseConnectionError(error)) {
       throw new ProfileUnavailableError()

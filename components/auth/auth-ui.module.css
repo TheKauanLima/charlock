@@ -2,33 +2,35 @@
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 32px;
+  padding: 24px;
   color: #ffefd7;
   background:
-    linear-gradient(135deg, rgba(34, 146, 175, 0.18), transparent 32%),
-    linear-gradient(315deg, rgba(254, 52, 53, 0.16), transparent 36%),
-    #10130d;
+    linear-gradient(180deg, rgba(255, 239, 214, 0.06), transparent 34%),
+    var(--citadel-bg);
   font-family: Radiance, Arial, sans-serif;
 }
 
 .panel {
   width: min(100%, 460px);
-  border: 1px solid rgba(34, 146, 175, 0.72);
-  background: linear-gradient(180deg, rgba(26, 26, 26, 0.96), rgba(15, 17, 15, 0.96));
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48), inset 0 0 0 1px rgba(255, 239, 215, 0.06);
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.58),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
 
 .header {
   padding: 28px 30px 18px;
-  border-bottom: 1px solid rgba(254, 52, 53, 0.42);
+  border-bottom: 1px solid var(--citadel-border);
 }
 
 .eyebrow {
   margin: 0 0 8px;
-  color: #80eeff;
+  color: var(--citadel-metadata);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0;
 }
 
 .title {
@@ -36,6 +38,7 @@
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: clamp(2rem, 8vw, 3.1rem);
+  letter-spacing: 0.1em;
   line-height: 0.9;
   text-transform: uppercase;
 }
@@ -60,7 +63,7 @@
 
 .input {
   width: 100%;
-  border: 1px solid rgba(255, 239, 215, 0.2);
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.42);
   color: #ffefd7;
   padding: 12px 13px;
@@ -69,8 +72,8 @@
 }
 
 .input:focus {
-  border-color: #2292af;
-  box-shadow: 0 0 0 2px rgba(34, 146, 175, 0.24);
+  border-color: var(--citadel-gold);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .captcha {
@@ -79,21 +82,20 @@
 
 .button {
   min-height: 44px;
-  border: 1px solid #2292af;
-  border-radius: 999px;
-  background: rgba(34, 146, 175, 0.18);
-  color: #fef2d8;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  clip-path: var(--citadel-button-cut);
+  color: var(--citadel-gold);
   cursor: pointer;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: 1rem;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: opacity 150ms ease-out, border-color 150ms ease-out, background-color 150ms ease-out;
 }
 
 .button:hover:not(:disabled) {
-  border-color: #fe3435;
-  background: rgba(254, 52, 53, 0.18);
+  background: var(--citadel-gold-soft);
 }
 
 .button:disabled {
@@ -103,9 +105,9 @@
 
 .oauthButton {
   min-height: 44px;
-  border: 1px solid rgba(255, 239, 215, 0.32);
-  border-radius: 999px;
-  background: rgba(255, 239, 215, 0.08);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd7;
   cursor: pointer;
   font: inherit;
@@ -117,8 +119,8 @@
 }
 
 .oauthButton:hover:not(:disabled) {
-  border-color: #ffefd7;
-  background: rgba(255, 239, 215, 0.14);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .oauthButton:disabled {
@@ -162,9 +164,9 @@
 }
 
 .success {
-  border: 1px solid rgba(34, 146, 175, 0.52);
-  background: rgba(34, 146, 175, 0.1);
-  color: #dff7ff;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
   padding: 10px 12px;
   font-size: 0.92rem;
 }
@@ -180,7 +182,7 @@
 }
 
 .link {
-  color: #80eeff;
+  color: var(--citadel-gold);
   text-decoration: none;
 }
 

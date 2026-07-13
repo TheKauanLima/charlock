@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(0, 0, 0, 0.72);
+  background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(4px);
 }
 
@@ -17,11 +17,12 @@
   width: min(92vw, 760px);
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(255, 239, 214, 0.16);
-  border-radius: 4px;
-  background: #061d27;
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
   color: #ffefd6;
-  box-shadow: 0 24px 90px rgba(0, 0, 0, 0.62);
+  box-shadow:
+    0 24px 90px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
 
 .header {
@@ -34,9 +35,10 @@
 }
 
 .title {
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.875rem;
   font-weight: 900;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -52,20 +54,21 @@
   height: 36px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 239, 214, 0.15);
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   transition: border-color 150ms ease-out;
 }
 
 .closeButton:hover {
-  border-color: rgba(255, 239, 214, 0.45);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .closeButton:focus-visible,
 .assetButton:focus-visible {
-  outline: 2px solid #ffefd6;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .closeIcon {
@@ -91,11 +94,11 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px dashed rgba(47, 200, 144, 0.4);
-  border-radius: 4px;
-  background: rgba(47, 200, 144, 0.1);
+  border: 1px dashed var(--citadel-gold);
+  background: var(--citadel-gold-faint);
   padding: 16px;
-  color: #bafbe0;
+  color: var(--citadel-gold);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.7rem;
   font-weight: 900;
   letter-spacing: 0.2em;
@@ -105,7 +108,7 @@
 
 .uploadLabel:hover,
 .uploadThingButton:hover {
-  background: rgba(47, 200, 144, 0.16);
+  background: var(--citadel-gold-soft);
 }
 
 .uploadThingContainer {
@@ -176,8 +179,7 @@
   aspect-ratio: 1;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 239, 214, 0.12);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border);
   background: rgba(0, 0, 0, 0.28);
   transition:
     border-color 150ms ease-out,
@@ -185,8 +187,8 @@
 }
 
 .assetButton:hover {
-  border-color: rgba(47, 200, 144, 0.7);
-  background: rgba(47, 200, 144, 0.1);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
 }
 
 .imageAssetButton {

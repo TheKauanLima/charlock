@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   verifyMock: vi.fn(),
-  findOneAndUpdateMock: vi.fn(),
   deleteOneMock: vi.fn(),
+  syncUserRecordFromClerkMock: vi.fn(),
   updateUserMock: vi.fn(),
   dbConnectMock: vi.fn(),
   headersMock: vi.fn(),
@@ -26,9 +26,12 @@ vi.mock('@/lib/dbConnect', () => ({
 
 vi.mock('@/lib/models/User', () => ({
   default: {
-    findOneAndUpdate: mocks.findOneAndUpdateMock,
     deleteOne: mocks.deleteOneMock,
   },
+}))
+
+vi.mock('@/lib/user-record-sync', () => ({
+  syncUserRecordFromClerk: mocks.syncUserRecordFromClerkMock,
 }))
 
 vi.mock('@clerk/nextjs/server', () => ({
@@ -50,8 +53,8 @@ beforeEach(() => {
   process.env.CLERK_WEBHOOK_SECRET = 'whsec_test'
 
   mocks.verifyMock.mockReset()
-  mocks.findOneAndUpdateMock.mockReset()
   mocks.deleteOneMock.mockReset()
+  mocks.syncUserRecordFromClerkMock.mockReset()
   mocks.updateUserMock.mockReset()
   mocks.dbConnectMock.mockReset()
   mocks.headersMock.mockReset()
@@ -88,7 +91,7 @@ describe('Clerk webhook route', () => {
       },
     })
 
-    mocks.findOneAndUpdateMock.mockResolvedValue({
+    mocks.syncUserRecordFromClerkMock.mockResolvedValue({
       _id: 'mongo_123',
     })
 
@@ -97,23 +100,14 @@ describe('Clerk webhook route', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.dbConnectMock).toHaveBeenCalledTimes(1)
-    expect(mocks.findOneAndUpdateMock).toHaveBeenCalledWith(
-      { clerkId: 'clerk_123' },
-      {
-        clerkId: 'clerk_123',
-        email: 'test@example.com',
-        username: 'tester',
-        emailVerified: true,
-        firstName: 'Test',
-        lastName: 'User',
-      },
-      {
-        upsert: true,
-        returnDocument: 'after',
-        runValidators: true,
-        setDefaultsOnInsert: true,
-      },
-    )
+    expect(mocks.syncUserRecordFromClerkMock).toHaveBeenCalledWith({
+      clerkId: 'clerk_123',
+      email: 'test@example.com',
+      username: 'tester',
+      emailVerified: true,
+      firstName: 'Test',
+      lastName: 'User',
+    })
     expect(mocks.updateUserMock).toHaveBeenCalledWith('clerk_123', {
       publicMetadata: {
         mongo_user_id: 'mongo_123',
@@ -165,7 +159,7 @@ describe('Clerk webhook route', () => {
       },
     })
 
-    mocks.findOneAndUpdateMock.mockResolvedValue({
+    mocks.syncUserRecordFromClerkMock.mockResolvedValue({
       _id: 'mongo_meta',
     })
 
@@ -173,12 +167,8 @@ describe('Clerk webhook route', () => {
     const response = await POST(buildRequest())
 
     expect(response.status).toBe(200)
-    expect(mocks.findOneAndUpdateMock).toHaveBeenCalledWith(
-      { clerkId: 'clerk_meta' },
-      expect.objectContaining({
-        username: 'metadata_user',
-      }),
-      expect.any(Object),
-    )
+    expect(mocks.syncUserRecordFromClerkMock).toHaveBeenCalledWith(expect.objectContaining({
+      username: 'metadata_user',
+    }))
   })
 })

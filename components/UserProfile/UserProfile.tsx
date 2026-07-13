@@ -79,6 +79,16 @@ type NotificationFilter = 'all' | 'comment' | 'like' | 'follow'
 const PROFILE_PANELS: ProfilePanel[] = ['saved', 'bookmarks', 'likes', 'comments', 'notifications', 'settings']
 const BACKGROUND_SYNC_MESSAGE = 'SYSTEM: Profile configuration synchronized successfully.'
 
+function getProfileNameClassName(username: string) {
+  const compactNameClass = username.length > 22
+    ? styles.sideProfileNameCompact
+    : username.length > 14
+      ? styles.sideProfileNameLong
+      : ''
+
+  return [styles.sideProfileName, compactNameClass].filter(Boolean).join(' ')
+}
+
 function getPanelFromHash(): ProfilePanel {
   if (typeof window === 'undefined') {
     return 'saved'
@@ -1297,7 +1307,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
             </div>
             <div className={styles.sideProfileCopy}>
               <p className={styles.eyebrow}>Welcome Back</p>
-              <h1>{data.user.username}</h1>
+              <h1 className={getProfileNameClassName(data.user.username)}>{data.user.username}</h1>
               <span className={styles.followMeta}>{followerLabel}</span>
               {followStatus ? <span className={styles.followError} role="status">{followStatus}</span> : null}
               {data.viewerIsOwner ? (

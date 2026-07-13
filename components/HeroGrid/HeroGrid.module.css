@@ -110,7 +110,7 @@
   display: flex;
   height: 100%;
   flex-direction: column;
-  padding: 16px 24px;
+  padding: 66px 24px 16px;
 }
 
 @media (min-width: 640px) {
@@ -128,32 +128,45 @@
 }
 
 .tabs {
-  position: static;
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 320;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 4px 0 6px;
+  min-height: 52px;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.94);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.36), inset 0 -1px 0 var(--citadel-panel-inner-border);
+  padding: 6px 84px 6px 32px;
+  backdrop-filter: blur(14px);
 }
 
 .tabsButton {
   position: static;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.25);
-  padding: 8px 20px;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
+  padding: 7px 16px;
+  color: rgba(255, 239, 214, 0.62);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.35em;
+  font-weight: 900;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(8px);
+  cursor: pointer;
+  text-decoration: none;
 }
 
 .tabsButtonActive {
-  border-color: rgba(47, 200, 144, 0.9);
-  background: rgba(47, 200, 144, 0.12);
-  color: #bafbe0;
-  box-shadow: 0 0 20px rgba(47, 200, 144, 0.45);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  color: var(--citadel-gold);
+  box-shadow: inset 0 0 0 1px rgba(200, 164, 92, 0.12);
 }
 
 .tabsButtonDisabled {
@@ -183,8 +196,7 @@
 
 .searchField input {
   min-height: 34px;
-  border: 1px solid rgba(255, 239, 214, 0.16);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.42);
   color: #ffefd6;
   padding: 8px 10px;
@@ -199,8 +211,26 @@
 }
 
 .searchField input:focus {
-  border-color: #2fc890;
-  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.18);
+  border-color: var(--citadel-gold);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
+}
+
+.landingTitle {
+  position: absolute;
+  top: 48%;
+  right: clamp(44px, 8vw, 150px);
+  z-index: 6;
+  max-width: min(48vw, 760px);
+  margin: 0;
+  transform: translateY(-50%);
+  color: var(--citadel-text);
+  font-family: "Valve Occult", serif;
+  font-size: clamp(3.3rem, 8vw, 8.8rem);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 0.82;
+  text-align: right;
+  text-shadow: 0 12px 38px rgba(0, 0, 0, 0.72);
 }
 
 .browseNav {
@@ -212,22 +242,23 @@
 
 .browseNavButton {
   position: static;
-  border: 1px solid rgba(255, 239, 214, 0.14);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.32);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   padding: 7px 12px;
   color: rgba(255, 239, 214, 0.58);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-weight: 900;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
 }
 
 .browseNavButtonActive {
-  border-color: rgba(47, 200, 144, 0.78);
-  background: rgba(47, 200, 144, 0.14);
-  color: #bafbe0;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .browseHeroActions {
@@ -239,21 +270,21 @@
 }
 
 .browseHeroActions button {
-  border: 1px solid rgba(47, 200, 144, 0.5);
-  border-radius: 4px;
-  background: rgba(47, 200, 144, 0.12);
-  color: #bafbe0;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  clip-path: var(--citadel-button-cut);
+  color: var(--citadel-gold);
   padding: 8px 12px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.68rem;
   font-weight: 900;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
 }
 
 .browseHeroActions button:hover {
-  border-color: #2fc890;
-  background: rgba(47, 200, 144, 0.22);
+  background: var(--citadel-gold-soft);
 }
 
 .browseStatus {
@@ -288,7 +319,7 @@
   cursor: pointer;
   place-items: center;
   border: 1px solid rgba(255, 239, 214, 0.5);
-  border-radius: 999px;
+  clip-path: var(--citadel-button-cut);
   background: rgba(0, 0, 0, 0.42);
   padding: 0;
   backdrop-filter: blur(8px);
@@ -302,24 +333,23 @@
   display: block;
   width: 14px;
   height: 14px;
-  border-radius: 999px;
   border: 1px solid rgba(255, 239, 214, 0.56);
   background: transparent;
 }
 
 .detailsToggle:hover {
-  border-color: rgba(47, 200, 144, 0.78);
+  border-color: var(--citadel-gold);
 }
 
 .detailsToggleActive {
-  border-color: rgba(47, 200, 144, 0.9);
-  background: rgba(47, 200, 144, 0.14);
-  box-shadow: 0 0 18px rgba(47, 200, 144, 0.34);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-soft);
+  box-shadow: inset 0 0 0 1px rgba(200, 164, 92, 0.16);
 }
 
 .detailsToggleActive span {
-  border-color: #bafbe0;
-  background: #bafbe0;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold);
 }
 
 .browseMain {
@@ -363,7 +393,7 @@
   display: block;
   aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid rgba(47, 200, 144, 0.38);
+  border: 1px solid var(--citadel-border);
   background: #111;
 }
 
@@ -446,12 +476,12 @@
 .heroCardActive {
   z-index: 50;
   transform: scale(1.1) rotate(-3deg);
-  box-shadow: 0 0 0 0px rgba(47, 200, 144, 0.95), 0 0 70px rgba(47, 200, 144, 1.85), 0 0 90px rgba(47, 200, 144, 1.45);
+  box-shadow: 0 0 0 1px var(--citadel-gold), 0 0 42px rgba(17, 184, 161, 0.86);
 }
 
 .heroCard:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #2fc890;
+  box-shadow: 0 0 0 2px var(--citadel-gold);
 }
 
 .heroBacker {
@@ -515,10 +545,9 @@
   max-width: 170px;
   transform: translate(-8px, -50%);
   border: 1px solid rgba(255, 239, 214, 0.18);
-  border-left: 3px solid #2fc890;
-  border-radius: 4px;
-  background: rgba(5, 10, 8, 0.88);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.46), 0 0 24px rgba(47, 200, 144, 0.16);
+  border-left: 3px solid var(--citadel-gold);
+  background: rgba(15, 14, 16, 0.9);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.46);
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: clamp(0.86rem, 1.4vw, 1.2rem);
@@ -547,7 +576,7 @@
 .grid > .browseCard:nth-child(8n) .heroNameBadge {
   right: calc(100% + 8px);
   left: auto;
-  border-right: 3px solid #2fc890;
+  border-right: 3px solid var(--citadel-gold);
   border-left-width: 1px;
   text-align: right;
   transform: translate(8px, -50%);
@@ -586,7 +615,7 @@
   .grid > .browseCard:nth-child(4n) .heroNameBadge {
     right: calc(100% + 8px);
     left: auto;
-    border-right: 3px solid #2fc890;
+    border-right: 3px solid var(--citadel-gold);
     border-left-width: 1px;
     text-align: right;
     transform: translate(8px, -50%);
@@ -613,7 +642,7 @@
     max-width: 140px;
     transform: translate(-50%, 8px);
     border-right-width: 1px;
-    border-left: 3px solid #2fc890;
+    border-left: 3px solid var(--citadel-gold);
     text-align: center;
   }
 
@@ -672,21 +701,21 @@
 
 .loadMoreButton {
   align-self: center;
-  border: 1px solid rgba(47, 200, 144, 0.58);
-  border-radius: 4px;
-  background: rgba(47, 200, 144, 0.14);
-  color: #bafbe0;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  clip-path: var(--citadel-button-cut);
+  color: var(--citadel-gold);
   padding: 9px 16px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.68rem;
   font-weight: 900;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
 }
 
 .loadMoreButton:hover {
-  border-color: #2fc890;
-  background: rgba(47, 200, 144, 0.22);
+  background: var(--citadel-gold-soft);
 }
 
 .loadMoreButton:disabled {
@@ -700,17 +729,18 @@
   z-index: 2000;
   display: grid;
   place-items: center;
-  background: rgba(3, 4, 4, 0.74);
+  background: rgba(0, 0, 0, 0.8);
   padding: 24px;
   backdrop-filter: blur(10px);
 }
 
 .templateModal {
   width: min(760px, 100%);
-  border: 1px solid rgba(198, 154, 246, 0.72);
-  border-radius: 4px;
-  background: rgba(18, 14, 24, 0.96);
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
   color: #ffefd6;
   padding: 22px;
 }
@@ -737,7 +767,7 @@
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: clamp(2rem, 4vw, 3.3rem);
-  letter-spacing: 0;
+  letter-spacing: 0.1em;
   line-height: 0.95;
   text-transform: uppercase;
 }
@@ -747,9 +777,9 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(198, 154, 246, 0.74);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd6;
   font-size: 1rem;
   font-weight: 900;
@@ -758,8 +788,8 @@
 }
 
 .templateModalClose:hover {
-  border-color: #c69af6;
-  background: rgba(198, 154, 246, 0.16);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .templateGrid {
@@ -775,7 +805,6 @@
   align-content: space-between;
   justify-items: start;
   border: 1px solid rgba(255, 239, 214, 0.18);
-  border-radius: 4px;
   padding: 14px;
   text-align: left;
   text-transform: uppercase;
@@ -783,14 +812,14 @@
 
 .templateCardAvailable {
   cursor: pointer;
-  background: linear-gradient(135deg, rgba(47, 200, 144, 0.2), rgba(47, 200, 144, 0.06));
+  background: linear-gradient(135deg, var(--citadel-gold-soft), var(--citadel-gold-faint));
 }
 
 .templateCardAvailable:hover,
 .templateCardAvailable:focus-visible {
-  border-color: #2fc890;
+  border-color: var(--citadel-gold);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.24);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .templateCardLocked {
@@ -822,9 +851,9 @@
 }
 
 .templateStatusAvailable {
-  border: 1px solid rgba(47, 200, 144, 0.72);
-  background: rgba(47, 200, 144, 0.18);
-  color: #c7ffe7;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .templateStatusLocked {
@@ -834,6 +863,28 @@
 }
 
 @media (max-width: 640px) {
+  .content {
+    padding-top: 82px;
+  }
+
+  .tabs {
+    min-height: 66px;
+    gap: 5px;
+    padding: 8px 76px 8px 12px;
+  }
+
+  .tabsButton {
+    padding: 7px 9px;
+    font-size: 0.62rem;
+  }
+
+  .landingTitle {
+    top: 43%;
+    right: 18px;
+    max-width: 70vw;
+    font-size: clamp(2.8rem, 15vw, 5rem);
+  }
+
   .templateGrid {
     grid-template-columns: 1fr;
   }

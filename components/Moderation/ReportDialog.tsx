@@ -13,6 +13,7 @@ interface ReportDialogProps {
   endpoint: string
   contentLabel: string
   compact?: boolean
+  className?: string
   onReported?: (moderationStatus: ModerationStatus) => void
 }
 
@@ -25,7 +26,7 @@ interface ReportResponse {
 
 const SUCCESS_MESSAGE = 'SYSTEM: Content report logged. Thank you for maintaining safety.'
 
-export default function ReportDialog({ endpoint, contentLabel, compact = false, onReported }: ReportDialogProps) {
+export default function ReportDialog({ endpoint, contentLabel, compact = false, className, onReported }: ReportDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [reason, setReason] = useState<ReportReason>(REPORT_REASONS[0])
   const [details, setDetails] = useState('')
@@ -83,7 +84,7 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
     <>
       <button
         type="button"
-        className={cn(styles.trigger, compact && styles.triggerCompact)}
+        className={cn(styles.trigger, compact && styles.triggerCompact, className)}
         aria-label={compact ? `Report ${contentLabel}` : undefined}
         onClick={() => {
           setFeedback(null)

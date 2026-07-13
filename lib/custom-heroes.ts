@@ -79,6 +79,7 @@ interface SpiritStatsRecord {
 
 interface BoonStatsRecord {
   stats: IPanelStat[]
+  panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
 
 interface AbilityStatsRecord {
@@ -178,6 +179,20 @@ function normalizeBoonStats(value: unknown) {
   }).filter(stat => stat.label) : []
 
   return buildBoonStatsArray(stats)
+}
+
+function normalizeBoonPanels(value: unknown) {
+  if (!Array.isArray(value)) return []
+
+  return value.map((panel, index) => {
+    const record = isRecord(panel) ? panel : {}
+
+    return {
+      id: getString(record.id, `boon-panel-${index + 1}`),
+      name: getString(record.name, `Boon ${index + 2}`),
+      stats: normalizeBoonStats(record.stats),
+    }
+  })
 }
 
 function normalizeWeaponPanels(value: unknown) {
@@ -297,7 +312,10 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
     },
     allowCopies,
     heroInfo,
-    boon: { stats: normalizeBoonStats(boonRecord.stats) },
+    boon: {
+      stats: normalizeBoonStats(boonRecord.stats),
+      panels: normalizeBoonPanels(boonRecord.panels),
+    },
     weapon: {
       weaponName: getString(weaponRecord.weaponName, `${name} Weapon`),
       weaponDesc: getString(weaponRecord.weaponDesc),
@@ -483,7 +501,10 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
       render: summary.render,
     },
     heroInfo: summary.heroInfo,
-    boon: { stats: normalizeBoonStats(bundle.boon?.stats) },
+    boon: {
+      stats: normalizeBoonStats(bundle.boon?.stats),
+      panels: normalizeBoonPanels(bundle.boon?.panels),
+    },
     weapon: {
       weaponName: bundle.weapon?.weaponName ?? `${summary.displayName} Weapon`,
       weaponDesc: bundle.weapon?.weaponDesc ?? '',

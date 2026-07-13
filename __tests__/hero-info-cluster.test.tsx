@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from 'react'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -28,12 +28,25 @@ describe('HeroInfoCluster', () => {
       },
     } satisfies HeroDefinition
 
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(buildHeroStatsSeed(hero)), { status: 200 }))
+    const stats = buildHeroStatsSeed(hero)
+    stats.boon.panels = [{
+      id: 'boon-alt',
+      name: 'Aggressive',
+      stats: stats.boon.stats.map(stat => stat.label === 'Base Bullet Damage' ? { ...stat, value: '2.5', scalingValue: '2.5' } : stat),
+    }]
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(stats), { status: 200 }))
     render(<HeroInfoCluster hero={hero} />)
 
+    expect(screen.getByTestId('boon-rewards-panel')).not.toBeVisible()
+    expect(screen.getByTestId('hero-info-name-text')).toHaveTextContent('Grey Talon')
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    expect(screen.getByRole('tabpanel', { name: 'Grey Talon boon rewards' }).className).toContain('tabPanelVisible')
     expect(screen.getByTestId('boon-rewards-panel')).toBeInTheDocument()
+    await user.click(await screen.findByRole('tab', { name: 'Aggressive' }))
+    expect(within(screen.getByTestId('boon-rewards-panel')).getByText('2.5')).toBeInTheDocument()
     await user.click(document.body)
-    expect(screen.queryByTestId('boon-rewards-panel')).not.toBeInTheDocument()
+    expect(screen.getByTestId('boon-rewards-panel')).not.toBeVisible()
     await user.click(screen.getByRole('tab', { name: 'Overview' }))
     expect(screen.getByTestId('boon-rewards-panel')).toHaveAccessibleName('Grey Talon boon rewards')
   })
@@ -347,6 +360,8 @@ describe('HeroInfoCluster', () => {
     expect(screen.getByRole('heading', { name: 'Spirit Power Impact' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: 'Overview' }))
+    expect(screen.getByTestId('boon-rewards-panel')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Overview' }))
     expect(screen.getByTestId('hero-info-name-image')).toBeInTheDocument()
   })
 
@@ -620,12 +635,17 @@ describe('HeroInfoCluster', () => {
 
     render(<HeroInfoCluster hero={hero} />)
 
-    await user.click(screen.getByRole('button', { name: 'Bookmark' }))
-    expect(await screen.findByRole('button', { name: 'Bookmarked' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Bookmark Arc Light' }))
+    expect(await screen.findByRole('button', { name: 'Remove Arc Light bookmark' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Export Character/i })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /Comments/ }))
+    await user.click(screen.getByRole('button', { name: 'Open Arc Light comments' }))
 
-    expect(await screen.findByText('Strong silhouette.')).toBeInTheDocument()
+    const commentsDialog = await screen.findByRole('dialog', { name: 'Arc Light comments' })
+
+    expect(within(commentsDialog).getByText('Strong silhouette.')).toBeInTheDocument()
+    expect(within(commentsDialog).getByRole('button', { name: 'Post comment' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Report character' })).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes/507f1f77bcf86cd799439011/comments', expect.objectContaining({ signal: expect.any(AbortSignal) }))
   })
 })

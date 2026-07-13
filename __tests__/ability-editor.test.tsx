@@ -15,6 +15,25 @@ afterEach(() => {
   cleanup()
 })
 
+async function confirmFocusedGoBack(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Go Back' }))
+}
+
+function findTextNodeContaining(root: Node, text: string) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let currentNode = walker.nextNode()
+
+  while (currentNode) {
+    if (currentNode.textContent?.includes(text)) {
+      return currentNode
+    }
+
+    currentNode = walker.nextNode()
+  }
+
+  throw new Error(`Unable to find text node containing "${text}"`)
+}
+
 describe('AbilityEditor', () => {
   it('uses the cast property art for default charge stats', () => {
     const abilities = buildDefaultAbilityStats(HEROES[0]).abilities
@@ -77,6 +96,80 @@ describe('AbilityEditor', () => {
     expect(tierSystemRule).toMatch(/overflow-y:\s*visible/)
   })
 
+  it('reduces the ability name font size after fifteen characters', () => {
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const longNameRule = stylesheet.match(/\.nameInputWrap input\.nameInputLong\s*\{([^}]*)\}/)?.[1]
+    const { rerender } = render(
+      <AbilityEditor
+        key="short-name"
+        ability={{ ...ability, name: '123456789012345' }}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ability Name').className).not.toContain('nameInputLong')
+    expect(longNameRule).toMatch(/font-size:\s*1\.55rem/)
+
+    rerender(
+      <AbilityEditor
+        key="long-name"
+        ability={{ ...ability, name: '1234567890123456' }}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ability Name').className).toContain('nameInputLong')
+  })
+
+  it('centers the focused editor stage around the hero info cluster', () => {
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const editorLayoutRule = stylesheet.match(/^\.editorLayout\s*\{([^}]*)\}/m)?.[1]
+    const heroClusterRule = stylesheet.match(/^\.heroInfoCluster\s*\{([^}]*)\}/m)?.[1]
+    const secondSlotsRule = stylesheet.match(/^\.secondAbilityToggle\s*\{([^}]*)\}/m)?.[1]
+    const editorLayoutPreviewRule = stylesheet.match(/^\.editorLayoutPreview\s*\{([^}]*)\}/m)?.[1]
+
+    expect(editorLayoutRule).toMatch(/top:\s*50%/)
+    expect(editorLayoutRule).toMatch(/left:\s*calc\(50% \+ clamp\(54px, 6vw, 120px\)\)/)
+    expect(editorLayoutRule).toMatch(/transform:\s*translateY\(-50%\)/)
+    expect(editorLayoutRule).not.toMatch(/top:\s*clamp\(88px, 10vh, 128px\)/)
+    expect(editorLayoutRule).not.toMatch(/right:\s*clamp\(44px, 11vw, 210px\)/)
+    expect(editorLayoutPreviewRule).toMatch(/transform:\s*none/)
+    expect(heroClusterRule).toMatch(/left:\s*calc\(50% - clamp\(190px, 12\.5vw, 250px\)\)/)
+    expect(heroClusterRule).toMatch(/width:\s*min\(42vw, 620px\)/)
+    expect(heroClusterRule).toMatch(/transform:\s*translateX\(-50%\)/)
+    expect(secondSlotsRule).toMatch(/left:\s*calc\(50% - clamp\(420px, 25vw, 500px\)\)/)
+  })
+
+  it('keeps focused ability navigation on the normal return panel', async () => {
+    const user = userEvent.setup()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const onSave = vi.fn()
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(stylesheet).not.toContain('.editorSideRail')
+    expect(stylesheet).not.toContain('.editorProfileButton')
+    expect(screen.queryByRole('link', { name: 'Open profile' })).not.toBeInTheDocument()
+    expect(screen.getByText('Focused Ability Editor')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: ability.name }))
+  })
+
   it('exposes every property icon asset in the icon picker groups', () => {
     const exportedPaths = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.path)).sort()
     const exportedLabels = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.label))
@@ -123,7 +216,7 @@ describe('AbilityEditor', () => {
     }))
     expect(onAbilityIconChange).toHaveBeenCalledWith({ set: 'primary', index: 0 }, hero.heroInfo.ability2Icon)
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
     expect(onSave.mock.calls[0]?.[0].icon).toBe(hero.heroInfo.ability2Icon)
   })
 
@@ -472,7 +565,7 @@ describe('AbilityEditor', () => {
 
     tierOneText.innerHTML = '<div>Line one</div><div>Line two</div>'
     fireEvent.input(tierOneText)
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
@@ -571,7 +664,7 @@ describe('AbilityEditor', () => {
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
     await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Kinetic Fault',
@@ -652,7 +745,7 @@ describe('AbilityEditor', () => {
       'Reorder Description section',
     ])
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
 
@@ -736,7 +829,7 @@ describe('AbilityEditor', () => {
     await user.click(tierTwoButton)
     expect(screen.getByLabelText('Ability Name')).toHaveValue('Unified Ability Name')
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
@@ -817,7 +910,7 @@ describe('AbilityEditor', () => {
     expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
     await user.click(screen.getByRole('button', { name: 'Tier 3 upgrade' }))
     expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
 
@@ -877,7 +970,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: '0' }))
     expectAbilityText('Base inherited text')
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedTierTexts = savedAbility?.tiers.map(tier => {
@@ -928,7 +1021,7 @@ describe('AbilityEditor', () => {
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Darken selected text' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -964,7 +1057,7 @@ describe('AbilityEditor', () => {
     richTextEditor.innerHTML = '<div>New ability detail.</div><div><span data-rich-dark="true"><br>aaaaaaaaaaaaaa</span></div>'
     fireEvent.input(richTextEditor)
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1009,7 +1102,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
     await user.click(screen.getByRole('button', { name: 'Apply Default color' }))
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1060,7 +1153,7 @@ describe('AbilityEditor', () => {
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Bold selected text' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1071,6 +1164,8 @@ describe('AbilityEditor', () => {
   it('closes text swatches on outside click and exposes the expanded palette', async () => {
     const user = userEvent.setup()
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const swatchPanelRule = stylesheet.match(/\.swatchPanel\s*\{([^}]*)\}/)?.[1]
 
     render(
       <AbilityEditor
@@ -1086,12 +1181,77 @@ describe('AbilityEditor', () => {
     expect(screen.getByRole('button', { name: 'Apply Default color' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Apply Green color' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Apply Orange color' })).toBeInTheDocument()
+    expect(swatchPanelRule).toMatch(/position:\s*fixed/)
+    expect(swatchPanelRule).toMatch(/z-index:\s*2200/)
+    expect(swatchPanelRule).toMatch(/max-height:\s*calc\(100dvh - 16px\)/)
+    expect(swatchPanelRule).not.toMatch(/bottom:\s*calc\(100% \+ 6px\)/)
 
     fireEvent.pointerDown(document.body)
 
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Apply Orange color' })).not.toBeInTheDocument()
     })
+  })
+
+  it('adds custom text colors to recently made swatches and saves reusable custom color tokens', async () => {
+    window.localStorage.removeItem('charlock_recent_rich_text_colors')
+
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.sections = [{
+      id: 'description',
+      type: 'richText',
+      title: 'Description',
+      text: 'Abrams channels custom ability 1.',
+    }]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+    const abramsTextNode = findTextNodeContaining(richTextEditor, 'Abrams')
+    const abramsRange = document.createRange()
+
+    abramsRange.setStart(abramsTextNode, 0)
+    abramsRange.setEnd(abramsTextNode, 'Abrams'.length)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(abramsRange)
+
+    await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
+    fireEvent.change(screen.getByLabelText('Custom text color'), { target: { value: '#123456' } })
+
+    expect(richTextEditor.querySelector('[data-rich-custom-color="#123456"]')).not.toBeNull()
+    expect(window.localStorage.getItem('charlock_recent_rich_text_colors')).toContain('#123456')
+
+    const channelsTextNode = findTextNodeContaining(richTextEditor, 'channels')
+    const channelsRange = document.createRange()
+    const channelsStart = channelsTextNode.textContent?.indexOf('channels') ?? -1
+
+    expect(channelsStart).toBeGreaterThanOrEqual(0)
+    channelsRange.setStart(channelsTextNode, channelsStart)
+    channelsRange.setEnd(channelsTextNode, channelsStart + 'channels'.length)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(channelsRange)
+
+    await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
+
+    expect(screen.getByText('Recently made')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Apply recently made #123456 color' }))
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toContain('[c:#123456]Abrams[/c]')
+    expect(savedRichText?.text).toContain('[c:#123456]channels[/c]')
   })
 
   it('replaces rich text colors instead of stacking them and clears them with Default', async () => {
@@ -1137,7 +1297,7 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open text color swatches' }))
     await user.click(screen.getByRole('button', { name: 'Apply Default color' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1187,7 +1347,7 @@ describe('AbilityEditor', () => {
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Bold selected text' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1253,7 +1413,7 @@ describe('AbilityEditor', () => {
 
     await user.clear(screen.getByLabelText('Main cell 1 title'))
     await user.type(screen.getByLabelText('Main cell 1 title'), 'Impact Damage')
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
@@ -1313,7 +1473,7 @@ describe('AbilityEditor', () => {
     await user.click(screen.getByRole('button', { name: 'Remove lower cell 3' }))
     expect(lowerCellGrid.children).toHaveLength(2)
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
@@ -1353,7 +1513,7 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove lower cell 2' }))
     await user.click(screen.getByRole('button', { name: 'Add Lower Cell' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedGrid = savedAbility?.sections.find(section => section.type === 'grid')
@@ -1492,7 +1652,7 @@ describe('AbilityEditor', () => {
     expect(healPreview?.style.backgroundColor).toBe('rgb(132, 201, 85)')
 
     await user.click(healOption)
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1528,7 +1688,7 @@ describe('AbilityEditor', () => {
     await user.click(spiritSwatch)
     await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
     await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
 
@@ -1562,7 +1722,7 @@ describe('AbilityEditor', () => {
 
     await user.click(within(iconModal).getByRole('button', { name: 'Amber icon color' }))
     await user.click(within(iconModal).getByRole('button', { name: 'Close property icon selector' }))
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRangeStat = savedAbility?.subStats.find(
@@ -1614,7 +1774,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1663,7 +1823,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1707,7 +1867,7 @@ describe('AbilityEditor', () => {
 
     expect(richTextEditor.querySelector('[data-inline-icon="heal"]')).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
@@ -1750,7 +1910,7 @@ describe('AbilityEditor', () => {
       expect(richTextEditor.querySelector('[data-inline-icon-marker]')).toBeNull()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')

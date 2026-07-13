@@ -3,14 +3,16 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSignUp } from '@clerk/nextjs'
+import { useClerk, useSignUp } from '@clerk/nextjs'
 
 import { getAuthErrorMessage, sendThemedAuthEmail } from './auth-errors'
 import styles from './auth-ui.module.css'
 
 export default function SignUpForm() {
   const router = useRouter()
+  const { client } = useClerk()
   const { signUp } = useSignUp()
+  const googleSignUp = client?.signUp
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -64,7 +66,7 @@ export default function SignUpForm() {
   }
 
   async function handleGoogleSignUp() {
-    if (!signUp || isGoogleSubmitting) {
+    if (!googleSignUp || isGoogleSubmitting) {
       return
     }
 
@@ -73,16 +75,12 @@ export default function SignUpForm() {
     setIsGoogleSubmitting(true)
 
     try {
-      const result = await signUp.sso({
+      await googleSignUp.authenticateWithRedirect({
         strategy: 'oauth_google',
-        redirectUrl: '/',
-        redirectCallbackUrl: '/sso-callback',
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: '/',
         ...(username.trim() ? { unsafeMetadata: { username: username.trim() } } : {}),
       })
-
-      if (result.error) {
-        throw result.error
-      }
     } catch (caughtError) {
       setError(getAuthErrorMessage(caughtError))
       setIsGoogleSubmitting(false)
@@ -138,7 +136,7 @@ export default function SignUpForm() {
   return (
     <form className={styles.form} onSubmit={handleCreateAccount}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      <button className={styles.oauthButton} type="button" disabled={!signUp || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignUp}>
+      <button className={styles.oauthButton} type="button" disabled={!googleSignUp || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignUp}>
         {isGoogleSubmitting ? 'Opening Google' : 'Continue with Google'}
       </button>
       <span className={styles.divider}>or</span>

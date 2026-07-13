@@ -29,8 +29,8 @@
   z-index: 2;
   display: grid;
   grid-template-columns: 300px minmax(0, 920px);
-  gap: 28px;
-  width: min(1380px, calc(100% - 64px));
+  gap: 24px;
+  width: min(var(--citadel-container), calc(100% - 48px));
   margin: 0 auto;
   padding: 76px 0 58px;
 }
@@ -65,7 +65,7 @@
   width: 42px;
   height: 42px;
   border: 1px solid rgba(255, 239, 214, 0.28);
-  border-radius: 999px;
+  clip-path: var(--citadel-button-cut);
   background: rgba(0, 0, 0, 0.36);
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
@@ -76,8 +76,8 @@
 
 .backButton:hover,
 .backButton:focus-visible {
-  border-color: var(--settings-name);
-  color: var(--settings-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -134,8 +134,8 @@
 .sidePanelItem:hover,
 .sidePanelItem:focus-visible,
 .sidePanelItemActive {
-  border-color: var(--settings-name);
-  background: color-mix(in srgb, var(--settings-accent) 18%, rgba(0, 0, 0, 0.34));
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
   color: #ffefd6;
   outline: none;
 }
@@ -156,11 +156,13 @@
 .header,
 .section,
 .dangerZone {
-  border: 1px solid color-mix(in srgb, var(--settings-accent) 72%, #ffefd6 8%);
+  border: 1px solid var(--citadel-border);
   background:
     linear-gradient(180deg, rgba(18, 19, 17, 0.94), rgba(8, 10, 9, 0.92)),
     #111;
-  box-shadow: 0 0 26px color-mix(in srgb, var(--settings-accent) 22%, transparent), inset 0 0 0 1px rgba(255, 239, 214, 0.06);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.36),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
 
 .header {
@@ -203,6 +205,7 @@
   margin: 0;
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  letter-spacing: 0.1em;
   line-height: 0.9;
   text-transform: uppercase;
 }
@@ -265,7 +268,7 @@
 .textareaField textarea,
 .deleteForm input {
   width: 100%;
-  border: 1px solid rgba(255, 239, 214, 0.22);
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.48);
   color: #ffefd6;
   padding: 12px;
@@ -281,8 +284,8 @@
 .field select:focus,
 .textareaField textarea:focus,
 .deleteForm input:focus {
-  border-color: var(--settings-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--settings-accent) 26%, transparent);
+  border-color: var(--citadel-gold);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .toggle {
@@ -344,10 +347,10 @@
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  border-radius: 999px;
+  clip-path: var(--citadel-button-cut);
   cursor: pointer;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
-  letter-spacing: 0;
+  letter-spacing: 0.1em;
   text-decoration: none;
   text-transform: uppercase;
   transition: border-color 150ms ease-out, background-color 150ms ease-out, color 150ms ease-out;
@@ -355,16 +358,17 @@
 
 .saveButton {
   justify-self: start;
-  border: 1px solid var(--settings-accent);
-  background: color-mix(in srgb, var(--settings-accent) 18%, transparent);
-  color: #ffefd6;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  color: var(--citadel-gold);
   padding: 0 22px;
 }
 
 .saveButton:hover,
 .secondaryAction:hover {
-  border-color: #ffefd6;
-  background: rgba(255, 239, 214, 0.12);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-soft);
+  color: var(--citadel-gold);
 }
 
 .securitySection {
@@ -380,8 +384,8 @@
 }
 
 .secondaryAction {
-  border: 1px solid rgba(255, 239, 214, 0.32);
-  background: transparent;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
   color: #ffefd6;
   padding: 0 18px;
 }
@@ -390,7 +394,7 @@
   display: grid;
   gap: 14px;
   padding: 22px;
-  border-color: rgba(254, 52, 53, 0.82);
+  border-color: var(--citadel-danger);
   background:
     repeating-linear-gradient(135deg, rgba(254, 52, 53, 0.16) 0 10px, rgba(0, 0, 0, 0.2) 10px 20px),
     linear-gradient(180deg, rgba(36, 8, 8, 0.96), rgba(8, 5, 5, 0.94));
@@ -420,19 +424,19 @@
 
 .deleteForm button {
   border: 1px solid #fe3435;
-  background: rgba(254, 52, 53, 0.2);
-  color: #ffefd6;
+  background: var(--citadel-danger-bg);
+  color: #ffd6d7;
   padding: 0 20px;
 }
 
 .deleteForm button:hover {
-  background: rgba(254, 52, 53, 0.34);
+  background: rgba(158, 28, 25, 0.36);
 }
 
 @media (max-width: 720px) {
   .content {
     grid-template-columns: 1fr;
-    width: min(100% - 28px, 920px);
+    width: min(100% - 28px, var(--citadel-container));
     padding-top: 76px;
   }
 

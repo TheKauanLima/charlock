@@ -55,6 +55,11 @@ const spiritPanelVariantSchema = z.object({
   spiritPowerStat: panelStatSchema,
 }).strict()
 
+const boonPanelVariantSchema = z.object({
+  ...namedPanelSchema,
+  stats: z.array(panelStatSchema).max(24),
+}).strict()
+
 const abilityRichTextSectionSchema = z.object({
   id: z.string().max(160).optional(),
   type: z.literal('richText'),
@@ -141,7 +146,8 @@ export const customHeroSaveSchema = z.object({
   allowCopies: z.boolean().default(false),
   heroInfo: heroInfoSchema.default({}),
   boon: z.object({
-    stats: z.array(panelStatSchema).max(4).optional(),
+    stats: z.array(panelStatSchema).max(24).optional(),
+    panels: z.array(boonPanelVariantSchema).max(8).optional(),
   }).strict().default({}),
   weapon: z.object({
     weaponName: z.string().max(120).optional(),

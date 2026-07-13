@@ -27,6 +27,34 @@ describe('hero stat mappers', () => {
     expect(stats.every(stat => stat.scaling === 'boon' && stat.scalingValue === String(stat.value))).toBe(true)
   })
 
+  it('preserves custom boon reward rows after the default rewards', () => {
+    const stats = buildBoonStatsArray([
+      { label: 'Base Health', value: '120', unit: '', icon: 'health', scaling: 'boon', scalingValue: '120' },
+      { label: 'Air Control', value: '9', unit: '', icon: 'damage_magic_color', scaling: 'boon', scalingValue: '9' },
+    ])
+
+    expect(stats).toHaveLength(5)
+    expect(stats[3]).toMatchObject({ label: 'Base Health', value: '120', scalingValue: '120' })
+    expect(stats[4]).toMatchObject({ label: 'Air Control', value: '9', scaling: 'boon', scalingValue: '9' })
+  })
+
+  it('preserves edited default boon reward labels and icons by position', () => {
+    const stats = buildBoonStatsArray([
+      { label: 'Bullet Bonus', value: '0.5', unit: '', icon: '/panorama/images/icons/properties/heal.svg', scaling: 'boon', scalingValue: '0.5' },
+      { label: 'Melee Bonus', value: '2', unit: '', icon: 'damage_melee_color', scaling: 'boon', scalingValue: '2' },
+      { label: 'Spirit Bonus', value: '3', unit: '', icon: 'damage_magic_color', scaling: 'boon', scalingValue: '3' },
+      { label: 'Health Bonus', value: '40', unit: '', icon: 'health', scaling: 'boon', scalingValue: '40' },
+      { label: 'Air Control', value: '9', unit: '', icon: 'damage_magic_color', scaling: 'boon', scalingValue: '9' },
+    ])
+
+    expect(stats).toHaveLength(5)
+    expect(stats[0]).toMatchObject({ label: 'Bullet Bonus', value: '0.5', icon: '/panorama/images/icons/properties/heal.svg' })
+    expect(stats[1]).toMatchObject({ label: 'Melee Bonus', value: '2' })
+    expect(stats[2]).toMatchObject({ label: 'Spirit Bonus', value: '3' })
+    expect(stats[3]).toMatchObject({ label: 'Health Bonus', value: '40' })
+    expect(stats[4]).toMatchObject({ label: 'Air Control', value: '9' })
+  })
+
   it('maps row values and scaling metadata into weapon stats', () => {
     const stats = buildWeaponStatsArray({
       bullet_damage: 13.5,
@@ -68,6 +96,9 @@ describe('migrated stat panels', () => {
     expect(screen.getByTestId('boon-ap-icon')).toBeInTheDocument()
     expect(screen.getByTestId('boon-base-health-icon')).toBeInTheDocument()
     expect(screen.getAllByLabelText(/value$/)).toHaveLength(4)
+    expect(screen.getByLabelText('Boon stat 1 label')).toHaveValue('Base Bullet Damage')
+    expect(screen.getByRole('button', { name: 'Change Base Bullet Damage icon' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove Base Bullet Damage' })).not.toBeInTheDocument()
 
     const boonStyles = readFileSync('components/panels/HeroStatsBoonPanel.module.css', 'utf8')
     expect(boonStyles).toMatch(/\.header\s*\{[^}]*background:\s*#11130e/)
@@ -75,6 +106,11 @@ describe('migrated stat panels', () => {
     expect(boonStyles).not.toMatch(/\.unlockIcon\s*\{[^}]*mask:/)
     expect(boonStyles).toMatch(/\.apIcon\s*\{[^}]*background:\s*#e6cafc/)
     expect(boonStyles).toMatch(/\.healthIcon\s*\{[^}]*background:\s*#01fe9c/)
+    expect(boonStyles).toMatch(/\.iconPickerBackdrop\s*\{[^}]*background:\s*transparent/)
+    expect(boonStyles).toMatch(/\.iconPicker\s*\{[^}]*position:\s*absolute/)
+    expect(boonStyles).toMatch(/\.iconPickerDefault button\s*\{/)
+    expect(boonStyles).toMatch(/\.iconPickerGrid button span\s*\{[^}]*background-size:\s*contain/)
+    expect(boonStyles).not.toMatch(/\.iconPickerGrid button span\s*\{[^}]*mask-position/)
 
     const unlockIcon = readFileSync('public/panorama/images/hud/unlock_icon.svg', 'utf8')
     expect(unlockIcon).toContain('path[fill="white"] { fill: #e6cafc; }')
@@ -85,6 +121,57 @@ describe('migrated stat panels', () => {
     expect(changedValue).toBe('0.42')
     expect(changedScaling).toBe('boon')
     expect(changedScalingValue).toBe('0.42')
+  })
+
+  it('renames, changes icons, and edits default and custom boon rewards', async () => {
+    const user = userEvent.setup()
+    let latestStats = buildBoonStatsArray()
+    const handleStatsChange = (stats: typeof latestStats) => {
+      latestStats = stats
+      panel.rerender(<HeroStatsBoonPanel heroName="Victor" isEditable stats={latestStats} onStatsChange={handleStatsChange} />)
+    }
+    const panel = render(<HeroStatsBoonPanel heroName="Victor" isEditable stats={latestStats} onStatsChange={handleStatsChange} />)
+
+    await user.clear(screen.getByLabelText('Boon stat 1 label'))
+    await user.type(screen.getByLabelText('Boon stat 1 label'), 'Bullet Bonus')
+    await user.click(screen.getByRole('button', { name: 'Change Bullet Bonus icon' }))
+    let iconModal = screen.getByTestId('boon-stat-icon-modal')
+    const nativeSpiritIcon = within(iconModal).getByRole('button', { name: 'Use Spirit' }).querySelector('[aria-hidden="true"]')
+
+    expect(within(iconModal).getByRole('button', { name: 'Use Default Icon' })).toHaveTextContent('Native colors')
+    expect(nativeSpiritIcon?.getAttribute('style')).toContain('background-image')
+    expect(nativeSpiritIcon?.getAttribute('style')).not.toContain('mask')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
+
+    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: '/panorama/images/icons/properties/heal.svg' })
+    expect(screen.queryByRole('button', { name: 'Remove Bullet Bonus' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add Boon Stat' }))
+
+    expect(screen.getByLabelText('Extra Stat value')).toHaveValue('0')
+    expect(screen.getByLabelText('Boon stat 5 label')).toHaveValue('Extra Stat')
+
+    await user.clear(screen.getByLabelText('Boon stat 5 label'))
+    await user.type(screen.getByLabelText('Boon stat 5 label'), 'Air Control')
+    await user.clear(screen.getByLabelText('Air Control value'))
+    await user.type(screen.getByLabelText('Air Control value'), '9')
+
+    expect(latestStats[4]).toMatchObject({ label: 'Air Control', value: '9', scaling: 'boon', scalingValue: '9' })
+
+    await user.click(screen.getByRole('button', { name: 'Change Air Control icon' }))
+
+    iconModal = screen.getByTestId('boon-stat-icon-modal')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
+
+    expect(latestStats[4]).toMatchObject({ icon: '/panorama/images/icons/properties/heal.svg' })
+    expect(screen.queryByTestId('boon-stat-icon-modal')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove Air Control' }))
+
+    expect(latestStats).toHaveLength(4)
+    expect(screen.queryByLabelText('Air Control value')).not.toBeInTheDocument()
   })
 
   it('raises any panel row that contains an open scaling menu', () => {

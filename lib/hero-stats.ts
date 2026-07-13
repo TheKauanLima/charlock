@@ -20,7 +20,7 @@ import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { normalizeAbilityStats } from '@/lib/ability-editor-types'
 import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 export { buildFallbackHeroStatsBySlug, buildHeroStatsSeed, buildHeroStatsSource } from '@/lib/hero-stats-shared'
-export type { HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
+export type { BoonStatsPayload, HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
 
 interface HeroRecord {
   _id: Types.ObjectId
@@ -216,6 +216,7 @@ function normalizeStoredStats(
 
 interface BoonStatsRecord {
   stats?: IPanelStat[]
+  panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
 
 function normalizeOptionalStoredStats(stats: IPanelStat[] | undefined, definitions: StandardStatDefinition[]): PanelStat[] {
@@ -291,7 +292,7 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
     HeroInfo.findOne({ heroId: hero._id })
       .select('nameType nameValue nameColor nameFontSize nameFontFamily nameFontWeight tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
       .lean<HeroInfoRecord | null>(),
-    BoonStats.findOne({ heroId: hero._id }).select('stats').lean<BoonStatsRecord | null>(),
+    BoonStats.findOne({ heroId: hero._id }).select('stats panels').lean<BoonStatsRecord | null>(),
     WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats panels bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
     VitalityStats.findOne({ heroId: hero._id }).select('name stats panels maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
     SpiritStats.findOne({ heroId: hero._id }).select('name topStats spiritPower spiritPowerStat panels abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
@@ -318,7 +319,14 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
         heroInfo: heroInfoPayload,
       }),
     } : {}),
-    boon: { stats: buildBoonStatsArray(boon?.stats) },
+    boon: {
+      stats: buildBoonStatsArray(boon?.stats),
+      panels: (boon?.panels ?? []).map(panel => ({
+        id: panel.id,
+        name: panel.name,
+        stats: buildBoonStatsArray(panel.stats),
+      })),
+    },
     weapon: {
       weaponName: weapon.weaponName,
       weaponDesc: weapon.weaponDesc,

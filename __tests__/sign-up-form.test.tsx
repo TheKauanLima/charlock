@@ -10,7 +10,7 @@ const signUpMocks = vi.hoisted(() => ({
   sendEmailCode: vi.fn(),
   verifyEmailCode: vi.fn(),
   finalize: vi.fn(),
-  sso: vi.fn(),
+  authenticateWithRedirect: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -21,6 +21,13 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@clerk/nextjs', () => ({
+  useClerk: () => ({
+    client: {
+      signUp: {
+        authenticateWithRedirect: signUpMocks.authenticateWithRedirect,
+      },
+    },
+  }),
   useSignUp: () => ({
     signUp: {
       create: signUpMocks.create,
@@ -30,7 +37,6 @@ vi.mock('@clerk/nextjs', () => ({
         verifyEmailCode: signUpMocks.verifyEmailCode,
       },
       finalize: signUpMocks.finalize,
-      sso: signUpMocks.sso,
     },
   }),
 }))
@@ -78,17 +84,17 @@ describe('SignUpForm', () => {
   it('starts Google OAuth sign-up with optional username metadata', async () => {
     const user = userEvent.setup()
 
-    signUpMocks.sso.mockResolvedValueOnce({ error: null })
+    signUpMocks.authenticateWithRedirect.mockResolvedValueOnce(undefined)
 
     render(<SignUpForm />)
 
     await user.type(screen.getByLabelText('Username'), 'playerone')
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
-    expect(signUpMocks.sso).toHaveBeenCalledWith({
+    expect(signUpMocks.authenticateWithRedirect).toHaveBeenCalledWith({
       strategy: 'oauth_google',
-      redirectUrl: '/',
-      redirectCallbackUrl: '/sso-callback',
+      redirectUrl: '/sso-callback',
+      redirectUrlComplete: '/',
       unsafeMetadata: {
         username: 'playerone',
       },

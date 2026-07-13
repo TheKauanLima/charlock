@@ -60,6 +60,11 @@ export interface SpiritPanelVariant extends NamedStatPanel {
 
 export interface BoonStatsPayload {
   stats: PanelStat[]
+  panels?: BoonPanelVariant[]
+}
+
+export interface BoonPanelVariant extends NamedStatPanel {
+  stats: PanelStat[]
 }
 
 export interface HeroStatsPayload {

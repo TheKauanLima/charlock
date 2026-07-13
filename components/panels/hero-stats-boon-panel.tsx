@@ -1,10 +1,12 @@
 'use client'
 
 import Image from 'next/image'
-import type { ChangeEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, ChangeEvent } from 'react'
 
-import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
+import { BOON_DEFAULT_STAT_COUNT, BOON_STAT_DEFINITIONS, buildBoonStatsArray, createBoonStat } from '@/components/panels/boon-stats-mapper'
 import { formatPanelValue, type PanelStat } from '@/components/panels/scaling-utils'
+import { PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 
 import styles from './HeroStatsBoonPanel.module.css'
 
@@ -22,8 +24,86 @@ const ICON_PATHS: Record<string, string> = {
   health: '/panorama/images/icons/properties/health.svg',
 }
 
+function getNextCustomBoonStatLabel(stats: PanelStat[]) {
+  const baseLabel = 'Extra Stat'
+  const usedLabels = new Set(stats.map(stat => stat.label))
+
+  if (!usedLabels.has(baseLabel)) {
+    return baseLabel
+  }
+
+  for (let index = 2; index <= 20; index += 1) {
+    const label = `${baseLabel} ${index}`
+
+    if (!usedLabels.has(label)) {
+      return label
+    }
+  }
+
+  return `${baseLabel} ${stats.length + 1}`
+}
+
+function getIconPath(icon: string | undefined) {
+  if (icon?.startsWith('/')) {
+    return icon
+  }
+
+  return ICON_PATHS[icon ?? ''] ?? ICON_PATHS.damage_magic_color
+}
+
+function getDefaultIconForIndex(index: number) {
+  return BOON_STAT_DEFINITIONS[index]?.icon ?? createBoonStat().icon ?? 'damage_magic_color'
+}
+
 export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false, onStatsChange }: HeroStatsBoonPanelProps) {
   const normalizedStats = buildBoonStatsArray(stats)
+  const panelRef = useRef<HTMLElement>(null)
+  const [iconTargetIndex, setIconTargetIndex] = useState<number | null>(null)
+  const [iconPickerStyle, setIconPickerStyle] = useState<CSSProperties>({})
+
+  useEffect(() => {
+    if (iconTargetIndex === null) {
+      return
+    }
+
+    function updateIconPickerPosition() {
+      const panelRect = panelRef.current?.getBoundingClientRect()
+      const pickerWidth = 430
+      const viewportPadding = 16
+      const topPadding = 68
+      const panelGap = 14
+
+      if (!panelRect) {
+        setIconPickerStyle({
+          left: `${viewportPadding}px`,
+          top: `${topPadding}px`,
+          maxHeight: `calc(100dvh - ${topPadding + viewportPadding}px)`,
+        })
+        return
+      }
+
+      const preferredLeft = panelRect.left - pickerWidth - panelGap
+      const maximumLeft = Math.max(viewportPadding, window.innerWidth - pickerWidth - viewportPadding)
+      const left = Math.max(viewportPadding, Math.min(preferredLeft, maximumLeft))
+      const maximumTop = Math.max(topPadding, window.innerHeight - 520 - viewportPadding)
+      const top = Math.max(topPadding, Math.min(panelRect.top, maximumTop))
+
+      setIconPickerStyle({
+        left: `${left}px`,
+        top: `${top}px`,
+        maxHeight: `calc(100dvh - ${top + viewportPadding}px)`,
+      })
+    }
+
+    updateIconPickerPosition()
+    window.addEventListener('resize', updateIconPickerPosition)
+    window.addEventListener('scroll', updateIconPickerPosition, true)
+
+    return () => {
+      window.removeEventListener('resize', updateIconPickerPosition)
+      window.removeEventListener('scroll', updateIconPickerPosition, true)
+    }
+  }, [iconTargetIndex])
 
   function handleChange(index: number, event: ChangeEvent<HTMLInputElement>) {
     onStatsChange?.(normalizedStats.map((stat, statIndex) => (
@@ -31,8 +111,33 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
     )))
   }
 
+  function handleLabelChange(index: number, event: ChangeEvent<HTMLInputElement>) {
+    onStatsChange?.(normalizedStats.map((stat, statIndex) => (
+      statIndex === index ? { ...stat, label: event.target.value, scaling: 'boon', scalingValue: String(stat.value) } : stat
+    )))
+  }
+
+  function handleAddStat() {
+    onStatsChange?.([...normalizedStats, createBoonStat(getNextCustomBoonStatLabel(normalizedStats))])
+  }
+
+  function handleRemoveStat(index: number) {
+    onStatsChange?.(normalizedStats.filter((_, statIndex) => statIndex !== index))
+  }
+
+  function handleIconChange(iconPath: string) {
+    if (iconTargetIndex === null) {
+      return
+    }
+
+    onStatsChange?.(normalizedStats.map((stat, statIndex) => (
+      statIndex === iconTargetIndex ? { ...stat, icon: iconPath, scaling: 'boon', scalingValue: String(stat.value) } : stat
+    )))
+    setIconTargetIndex(null)
+  }
+
   return (
-    <section className={styles.panel} data-testid="boon-rewards-panel" data-hero-stat-panel="true" aria-label={`${heroName} boon rewards`}>
+    <section ref={panelRef} className={styles.panel} data-testid="boon-rewards-panel" data-hero-stat-panel="true" aria-label={`${heroName} boon rewards`}>
       <header className={styles.header}>
         <h2 className={styles.title}>Boon Rewards</h2>
         <p className={styles.thresholdCopy}>At each threshold, {heroName} gains:</p>
@@ -51,13 +156,20 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
         <h3>Stat Increases</h3>
         <p>Rewards max at Boon 35</p>
         <div className={styles.grid}>
-          {normalizedStats.map((stat, index) => (
-            <div className={styles.stat} key={stat.label}>
+          {normalizedStats.map((stat, index) => {
+            const isProtectedStat = index < BOON_DEFAULT_STAT_COUNT
+
+            return (
+            <div className={styles.stat} key={isProtectedStat ? `default-boon-stat-${index}` : `custom-boon-stat-${index}`}>
               <span className={styles.valueRow}>
-                {stat.icon === 'health' ? (
+                {isEditable ? (
+                  <button type="button" className={styles.iconButton} aria-label={`Change ${stat.label || 'Boon stat'} icon`} onClick={() => setIconTargetIndex(index)}>
+                    <span data-testid={stat.icon === 'health' ? 'boon-base-health-icon' : undefined} aria-hidden="true" style={{ backgroundImage: `url('${getIconPath(stat.icon)}')` }} />
+                  </button>
+                ) : stat.icon === 'health' ? (
                   <span className={styles.healthIcon} data-testid="boon-base-health-icon" aria-hidden="true" />
                 ) : (
-                  <Image src={ICON_PATHS[stat.icon ?? '']} alt="" width={23} height={23} />
+                  <Image src={getIconPath(stat.icon)} alt="" width={23} height={23} />
                 )}
                 <span aria-hidden="true">+</span>
                 {isEditable ? (
@@ -66,11 +178,61 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
                   <strong>{formatPanelValue(stat.value)}</strong>
                 )}
               </span>
-              <span className={styles.statLabel}>{stat.label}</span>
+              {isEditable ? (
+                <label className={styles.customLabel}>
+                  <span className={styles.srOnly}>Boon stat {index + 1} label</span>
+                  <input aria-label={`Boon stat ${index + 1} label`} value={stat.label} onChange={event => handleLabelChange(index, event)} />
+                </label>
+              ) : (
+                <span className={styles.statLabel}>{stat.label}</span>
+              )}
+              {isEditable && !isProtectedStat ? (
+                <button type="button" className={styles.removeStatButton} aria-label={`Remove ${stat.label || 'Boon stat'}`} onClick={() => handleRemoveStat(index)}>
+                  ×
+                </button>
+              ) : null}
             </div>
-          ))}
+            )
+          })}
         </div>
+        {isEditable ? (
+          <button type="button" className={styles.addStatButton} onClick={handleAddStat}>
+            Add Boon Stat
+          </button>
+        ) : null}
       </div>
+
+      {iconTargetIndex !== null ? (
+        <div className={styles.iconPickerBackdrop} role="dialog" aria-modal="true" aria-label="Boon stat icon selector" data-testid="boon-stat-icon-modal" onPointerDown={event => {
+          if (event.target === event.currentTarget) {
+            setIconTargetIndex(null)
+          }
+        }}>
+          <div className={styles.iconPicker} style={iconPickerStyle} data-testid="boon-stat-icon-picker">
+            <header className={styles.iconPickerHeader}>
+              <h3>Choose Boon Stat Icon</h3>
+              <button type="button" aria-label="Close Boon stat icon selector" onClick={() => setIconTargetIndex(null)}>×</button>
+            </header>
+            <div className={styles.iconPickerDefault}>
+              <button type="button" aria-label="Use Default Icon" onClick={() => handleIconChange(getDefaultIconForIndex(iconTargetIndex))}>
+                <span aria-hidden="true" style={{ backgroundImage: `url('${getIconPath(getDefaultIconForIndex(iconTargetIndex))}')` }} />
+                <span>
+                  <strong>Default Icon</strong>
+                  <em>Native colors</em>
+                </span>
+              </button>
+            </div>
+            <div className={styles.iconPickerGrid}>
+              {PROPERTY_ICON_GROUPS.flatMap(group => group.assets).map(asset => (
+                <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => handleIconChange(asset.path)}>
+                  <span aria-hidden="true" style={{ backgroundImage: `url('${asset.path}')` }} />
+                  {asset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

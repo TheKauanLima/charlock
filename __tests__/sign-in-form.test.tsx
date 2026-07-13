@@ -8,7 +8,7 @@ const signInMocks = vi.hoisted(() => ({
   create: vi.fn(),
   password: vi.fn(),
   finalize: vi.fn(),
-  sso: vi.fn(),
+  authenticateWithRedirect: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -19,12 +19,18 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@clerk/nextjs', () => ({
+  useClerk: () => ({
+    client: {
+      signIn: {
+        authenticateWithRedirect: signInMocks.authenticateWithRedirect,
+      },
+    },
+  }),
   useSignIn: () => ({
     signIn: {
       create: signInMocks.create,
       password: signInMocks.password,
       finalize: signInMocks.finalize,
-      sso: signInMocks.sso,
     },
   }),
 }))
@@ -43,16 +49,16 @@ describe('SignInForm', () => {
   it('starts Google OAuth sign-in', async () => {
     const user = userEvent.setup()
 
-    signInMocks.sso.mockResolvedValueOnce({ error: null })
+    signInMocks.authenticateWithRedirect.mockResolvedValueOnce(undefined)
 
     render(<SignInForm />)
 
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
-    expect(signInMocks.sso).toHaveBeenCalledWith({
+    expect(signInMocks.authenticateWithRedirect).toHaveBeenCalledWith({
       strategy: 'oauth_google',
-      redirectUrl: '/',
-      redirectCallbackUrl: '/sso-callback',
+      redirectUrl: '/sso-callback',
+      redirectUrlComplete: '/',
     })
   })
 })

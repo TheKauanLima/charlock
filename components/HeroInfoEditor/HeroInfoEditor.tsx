@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, WheelEvent } from 'react'
+import { ArrowLeft, Sparkles, UserRound } from 'lucide-react'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
@@ -61,6 +63,7 @@ interface HeroInfoEditorProps {
   onRenderSelectionChange: (renderSelection: EditorRenderSelection) => void
   onDraftChange: (draft: HeroInfoDefinition) => void
   onSaveHero: (payload: CustomHeroSavePayload) => void
+  onExitEditor?: () => void
 }
 
 interface ColorFieldProps {
@@ -96,6 +99,7 @@ interface AbilityControl {
 }
 
 type AbilitySetId = 'primary' | 'secondary'
+type ControlRailTabId = 'text' | 'colors' | 'images' | 'options'
 
 interface ActiveAbilityTarget {
   set: AbilitySetId
@@ -125,6 +129,13 @@ const ABILITY_CONTROLS: AbilityControl[] = [
   { label: 'Ability 2', iconKey: 'ability2Icon' },
   { label: 'Ability 3', iconKey: 'ability3Icon' },
   { label: 'Ability 4', iconKey: 'ability4Icon' },
+]
+
+const CONTROL_RAIL_TABS: Array<{ id: ControlRailTabId; label: string; shortLabel: string }> = [
+  { id: 'text', label: 'Text and font settings', shortLabel: 'Aa' },
+  { id: 'colors', label: 'Color settings', shortLabel: '◐' },
+  { id: 'images', label: 'Image settings', shortLabel: '▧' },
+  { id: 'options', label: 'Editor options', shortLabel: '⚙' },
 ]
 
 const WEAPON_MODIFIER_TARGETS: Record<string, string> = {
@@ -402,10 +413,14 @@ export default function HeroInfoEditor({
   onRenderSelectionChange,
   onDraftChange,
   onSaveHero,
+  onExitEditor,
 }: HeroInfoEditorProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>('overview')
+  const [activeControlRailTab, setActiveControlRailTab] = useState<ControlRailTabId>('text')
+  const [isControlRailCollapsed, setIsControlRailCollapsed] = useState(false)
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const [activeAbilityTarget, setActiveAbilityTarget] = useState<ActiveAbilityTarget | null>(null)
+  const focusedAbilityDraftRef = useRef<AbilityDefinition | null>(null)
   const [abilityEditorRevision, setAbilityEditorRevision] = useState(0)
   const [isWeaponAssetModalOpen, setIsWeaponAssetModalOpen] = useState(false)
   const [isBackgroundAssetModalOpen, setIsBackgroundAssetModalOpen] = useState(false)
@@ -418,6 +433,7 @@ export default function HeroInfoEditor({
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
   const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizedInitialAbilityDraft)
   const [secondarySlotSelection, setSecondarySlotSelection] = useState<number[]>(() => normalizedInitialAbilityDraft.secondaryAbilitySlots ?? [])
+  const [activeBoonPanelId, setActiveBoonPanelId] = useState(BASE_PANEL_ID)
   const [activeWeaponPanelId, setActiveWeaponPanelId] = useState(BASE_PANEL_ID)
   const [activeVitalityPanelId, setActiveVitalityPanelId] = useState(BASE_PANEL_ID)
   const [activeSpiritPanelId, setActiveSpiritPanelId] = useState(BASE_PANEL_ID)
@@ -428,6 +444,7 @@ export default function HeroInfoEditor({
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isUnpublishConfirmOpen, setIsUnpublishConfirmOpen] = useState(false)
+  const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null)
   const recoveryReadyRef = useRef(false)
 
@@ -518,9 +535,11 @@ export default function HeroInfoEditor({
       })),
     [draft],
   )
+  const activeBoonPanel = statsDraft.boon.panels?.find(panel => panel.id === activeBoonPanelId)
   const activeWeaponPanel = statsDraft.weapon.panels?.find(panel => panel.id === activeWeaponPanelId)
   const activeVitalityPanel = statsDraft.vitality.panels?.find(panel => panel.id === activeVitalityPanelId)
   const activeSpiritPanel = statsDraft.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
+  const activeBoonStats = activeBoonPanel?.stats ?? statsDraft.boon.stats
   const activeWeaponStats = activeWeaponPanel?.stats ?? statsDraft.weapon.stats
   const activeWeaponBulletDps = activeWeaponPanel?.bulletDPS ?? statsDraft.weapon.bulletDPS
   const activeWeaponMinRange = activeWeaponPanel?.weaponMinRange ?? statsDraft.weapon.weaponMinRange
@@ -542,6 +561,7 @@ export default function HeroInfoEditor({
   }, [activeTabId])
 
   function handleTabSelect(tabId: SidebarTabId) {
+    closeFocusedAbilityEditorWithSave()
     setActiveTabId(current => current === tabId ? null : tabId)
   }
 
@@ -781,7 +801,20 @@ export default function HeroInfoEditor({
 
   function handleAbilitySave(nextAbility: AbilityDefinition) {
     commitAbilityDraft(nextAbility)
+    focusedAbilityDraftRef.current = null
     setActiveAbilityTarget(null)
+  }
+
+  function handleBoonStatsChange(stats: PanelStat[]) {
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      boon: activeBoonPanel
+        ? {
+          ...currentDraft.boon,
+          panels: (currentDraft.boon.panels ?? []).map(panel => panel.id === activeBoonPanel.id ? { ...panel, stats } : panel),
+        }
+        : { ...currentDraft.boon, stats },
+    }))
   }
 
   function updateActiveWeaponPanel(nextPanel: Partial<Pick<WeaponStatsPayload, 'stats' | 'bulletDPS' | 'weaponMinRange' | 'weaponMaxRange'>>) {
@@ -836,6 +869,56 @@ export default function HeroInfoEditor({
     setActiveWeaponPanelId(id)
   }
 
+  function addBoonPanel(name: string) {
+    const id = `boon-panel-${Date.now()}`
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      boon: {
+        ...currentDraft.boon,
+        panels: [...(currentDraft.boon.panels ?? []), { id, name, stats: structuredClone(activeBoonStats) }],
+      },
+    }))
+    setActiveBoonPanelId(id)
+  }
+
+  function renameBoonPanel(id: string, name: string) {
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      boon: {
+        ...currentDraft.boon,
+        panels: (currentDraft.boon.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
+      },
+    }))
+  }
+
+  function removeBoonPanel(id: string) {
+    if (id === BASE_PANEL_ID) return
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      boon: {
+        ...currentDraft.boon,
+        panels: (currentDraft.boon.panels ?? []).filter(panel => panel.id !== id),
+      },
+    }))
+    setActiveBoonPanelId(BASE_PANEL_ID)
+  }
+
+  function removeWeaponPanel(id: string) {
+    if (id === BASE_PANEL_ID) return
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      weapon: {
+        ...currentDraft.weapon,
+        panels: (currentDraft.weapon.panels ?? []).filter(panel => panel.id !== id),
+      },
+    }))
+    setWeaponBaseValuesByPanel(current => Object.fromEntries(Object.entries(current).filter(([panelId]) => panelId !== id)))
+    setActiveWeaponPanelId(BASE_PANEL_ID)
+  }
+
   function addVitalityPanel(name: string) {
     const id = `vitality-panel-${Date.now()}`
 
@@ -859,6 +942,19 @@ export default function HeroInfoEditor({
           panels: (currentDraft.vitality.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
         },
     }))
+  }
+
+  function removeVitalityPanel(id: string) {
+    if (id === BASE_PANEL_ID) return
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      vitality: {
+        ...currentDraft.vitality,
+        panels: (currentDraft.vitality.panels ?? []).filter(panel => panel.id !== id),
+      },
+    }))
+    setActiveVitalityPanelId(BASE_PANEL_ID)
   }
 
   function addSpiritPanel(name: string) {
@@ -891,6 +987,19 @@ export default function HeroInfoEditor({
     }))
   }
 
+  function removeSpiritPanel(id: string) {
+    if (id === BASE_PANEL_ID) return
+
+    setStatsDraft(currentDraft => ({
+      ...currentDraft,
+      spirit: {
+        ...currentDraft.spirit,
+        panels: (currentDraft.spirit.panels ?? []).filter(panel => panel.id !== id),
+      },
+    }))
+    setActiveSpiritPanelId(BASE_PANEL_ID)
+  }
+
   function handleAbilityModeToggle(currentAbility: AbilityDefinition) {
     commitAbilityDraft(currentAbility)
     setIsPreviewMode(currentMode => !currentMode)
@@ -898,6 +1007,7 @@ export default function HeroInfoEditor({
 
   function handleFocusedAbilitySelect(target: ActiveAbilityTarget, currentAbility: AbilityDefinition) {
     commitAbilityDraft(currentAbility)
+    focusedAbilityDraftRef.current = null
     setActiveAbilityTarget(target)
   }
 
@@ -1128,113 +1238,47 @@ export default function HeroInfoEditor({
     setTagDragState(null)
   }
 
-  function renderSecondAbilitySetModal() {
-    if (!secondAbilitySetModal) {
-      return null
-    }
-
-    return (
-      <div className={styles.secondSetModalBackdrop} role="presentation">
-        <section
-          className={styles.secondSetModal}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="second-set-modal-title"
-          data-testid="second-ability-set-modal"
-        >
-          {secondAbilitySetModal === 'selectSlots' ? (
-            <>
-              <div className={styles.secondSetModalHeader}>
-                <h2 id="second-set-modal-title">SELECT SECONDARY ABILITIES</h2>
-                <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
-                  X
-                </button>
-              </div>
-              <p className={styles.secondSetModalCopy}>
-                Choose exactly which abilities receive a second ability icon.
-              </p>
-              <div className={styles.secondaryAbilityChoices} aria-label="Secondary ability choices">
-                <HeroAbilityIconRow
-                  heroInfo={draft}
-                  selectedPrimaryIndexes={secondarySlotSelection}
-                  onAbilityClick={target => {
-                    if (target.set === 'primary') {
-                      toggleSecondarySlotSelection(target.index)
-                    }
-                  }}
-                  primaryTestIdPrefix="second-set-choice"
-                  primaryLabel={slot => `Toggle secondary Ability ${slot}`}
-                  editable
-                />
-              </div>
-              <div className={styles.secondSetConfirmActions}>
-                <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
-                  Cancel
-                </button>
-                <button type="button" className={styles.secondSetDeleteButton} onClick={applySecondaryAbilitySlots}>
-                  Apply Selection
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className={styles.secondSetModalHeader}>
-                <h2 id="second-set-modal-title">REMOVE SECOND SET?</h2>
-                <button type="button" className={styles.secondSetModalClose} aria-label="Close second ability set modal" onClick={() => setSecondAbilitySetModal(null)}>
-                  X
-                </button>
-              </div>
-              <p className={styles.secondSetModalCopy}>
-                Removing the second set will delete all secondary ability data as soon as the set disappears.
-              </p>
-              <div className={styles.secondSetConfirmActions}>
-                <button type="button" className={styles.secondSetCancelButton} onClick={() => setSecondAbilitySetModal(null)}>
-                  Keep Second Set
-                </button>
-                <button type="button" className={styles.secondSetDeleteButton} onClick={removeSecondAbilitySet}>
-                  Delete Second Set
-                </button>
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-    )
-  }
-
-  if (activeAbilityTarget !== null) {
-    const activeAbilityDraft = activeAbilityTarget.set === 'primary'
+  const activeAbilityDraft = activeAbilityTarget
+    ? activeAbilityTarget.set === 'primary'
       ? abilityStatsDraft.abilities[activeAbilityTarget.index] ?? buildDefaultAbility(activeAbilityTarget.index + 1, hero)
       : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)[activeAbilityTarget.index]
+    : null
+  const isFocusedAbilityEditorOpen = Boolean(activeAbilityTarget && activeAbilityDraft)
 
-    return (
-      <>
-        <AbilityEditor
-          key={`${activeAbilityTarget.set}-${activeAbilityDraft.slot}-${abilityEditorRevision}`}
-          ability={activeAbilityDraft}
-          mode={isPreviewMode ? 'preview' : 'edit'}
-          previewLayout="editor"
-          propertyIconGroups={PROPERTY_ICON_GROUPS}
-          hero={hero}
-          heroInfo={draft}
-          activeAbilityTarget={activeAbilityTarget}
-          secondaryAbilities={secondaryAbilities}
-          secondaryAbilitySlots={secondaryAbilitySlots}
-          isSecondAbilitySetEnabled={isSecondAbilitySetEnabled}
-          abilityIconGroups={ABILITY_ICON_GROUPS}
-          showDetails={isPreviewMode}
-          onHeroInfoChange={onDraftChange}
-          onAbilityIconChange={handleAbilityIconChange}
-          onAbilitySelect={handleFocusedAbilitySelect}
-          onAbilitySwap={swapPrimaryAndSecondaryAbility}
-          onSecondAbilitySetToggle={handleFocusedSecondAbilitySetToggle}
-          onModeToggle={handleAbilityModeToggle}
-          onSave={handleAbilitySave}
-          onCancel={() => setActiveAbilityTarget(null)}
-        />
-        {renderSecondAbilitySetModal()}
-      </>
-    )
+  function saveFocusedAbilityEditorDraft() {
+    if (!isFocusedAbilityEditorOpen || !activeAbilityTarget) {
+      return
+    }
+
+    const nextAbility = focusedAbilityDraftRef.current ?? activeAbilityDraft
+
+    if (nextAbility) {
+      commitAbilityDraft(nextAbility, activeAbilityTarget)
+    }
+
+    focusedAbilityDraftRef.current = null
+  }
+
+  function closeFocusedAbilityEditorWithSave() {
+    saveFocusedAbilityEditorDraft()
+    setActiveAbilityTarget(null)
+  }
+
+  function handleControlRailTabSelect(tabId: ControlRailTabId) {
+    closeFocusedAbilityEditorWithSave()
+    setActiveControlRailTab(tabId)
+    setIsControlRailCollapsed(false)
+  }
+
+  function handleOpenAbilityEditorFromRail() {
+    saveFocusedAbilityEditorDraft()
+    setActiveAbilityTarget({ set: 'primary', index: 0 })
+    setIsControlRailCollapsed(false)
+  }
+
+  function handleEditorExitRequest() {
+    closeFocusedAbilityEditorWithSave()
+    setIsExitConfirmOpen(true)
   }
 
   return (
@@ -1245,7 +1289,15 @@ export default function HeroInfoEditor({
     >
       <SidebarTabs activeTabId={activeTabId} onSelect={handleTabSelect} overviewLabel="Hero render" />
 
-      <div className={styles.previewStage}>
+      <div
+        className={cn(
+          styles.previewStage,
+          isControlRailCollapsed && styles.previewStageRailCollapsed,
+          isFocusedAbilityEditorOpen && styles.previewStageAbilityEditorActive,
+        )}
+        data-testid="editor-preview-stage"
+        aria-hidden={isFocusedAbilityEditorOpen ? true : undefined}
+      >
             <div className={styles.nameRow}>
               {draft.nameType === 'image' ? (
                 <span
@@ -1283,7 +1335,7 @@ export default function HeroInfoEditor({
                   data-tag-text={tag.text.trim() || tag.label}
                   onWheel={event => handleTagWheel(event, tag)}
                   style={{
-                    transform: `rotate(${tag.tilt}deg) translateY(${tag.offsetY}px)`,
+                    transform: `translateY(${tag.offsetY}px) rotate(${tag.tilt}deg)`,
                     backgroundColor: draft.tagColor,
                     color: draft.tagTextColor,
                   }}
@@ -1393,12 +1445,28 @@ export default function HeroInfoEditor({
       {activeTabId ? (
         <aside className={styles.statsAside} data-hero-stat-panel="true">
           {activeTabId === 'overview' ? (
-            <HeroStatsBoonPanel
-              heroName={boonHeroName}
-              stats={statsDraft.boon.stats}
-              isEditable={!isPreviewMode}
-              onStatsChange={stats => setStatsDraft(current => ({ ...current, boon: { stats } }))}
-            />
+            <div className={styles.weaponStack}>
+              <PanelVariantTabs
+                baseName="Boon"
+                baseTabName="Boon Rewards"
+                variants={statsDraft.boon.panels}
+                activeId={activeBoonPanel?.id ?? BASE_PANEL_ID}
+                canAdd={!isPreviewMode}
+                canRename={!isPreviewMode && Boolean(activeBoonPanel)}
+                canRemove={!isPreviewMode}
+                onSelect={setActiveBoonPanelId}
+                onAdd={addBoonPanel}
+                onRename={renameBoonPanel}
+                onRemove={removeBoonPanel}
+              />
+              <HeroStatsBoonPanel
+                key={`${isPreviewMode ? 'boon-preview' : 'boon-edit'}-${activeBoonPanel?.id ?? BASE_PANEL_ID}`}
+                heroName={boonHeroName}
+                stats={activeBoonStats}
+                isEditable={!isPreviewMode}
+                onStatsChange={handleBoonStatsChange}
+              />
+            </div>
           ) : null}
           {activeTabId === 'weapon' ? (
             <div className={styles.weaponStack}>
@@ -1408,8 +1476,10 @@ export default function HeroInfoEditor({
                 variants={statsDraft.weapon.panels}
                 activeId={activeWeaponPanel?.id ?? BASE_PANEL_ID}
                 canAdd={!isPreviewMode}
+                canRemove={!isPreviewMode}
                 onSelect={setActiveWeaponPanelId}
                 onAdd={addWeaponPanel}
+                onRemove={removeWeaponPanel}
               />
               <WeaponPanel
                 key={`${isPreviewMode ? 'weapon-preview' : 'weapon-edit'}-${activeWeaponPanel?.id ?? BASE_PANEL_ID}`}
@@ -1438,224 +1508,324 @@ export default function HeroInfoEditor({
 
           {activeTabId === 'vitality' ? (
             <div className={styles.weaponStack}>
-              <PanelVariantTabs baseName="Vitality" baseTabName={statsDraft.vitality.name ?? 'Vitality'} variants={statsDraft.vitality.panels} activeId={activeVitalityPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} onSelect={setActiveVitalityPanelId} onAdd={addVitalityPanel} onRename={renameVitalityPanel} />
+              <PanelVariantTabs baseName="Vitality" baseTabName={statsDraft.vitality.name ?? 'Vitality'} variants={statsDraft.vitality.panels} activeId={activeVitalityPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} canRemove={!isPreviewMode} onSelect={setActiveVitalityPanelId} onAdd={addVitalityPanel} onRename={renameVitalityPanel} onRemove={removeVitalityPanel} />
               <HeroStatsVitalityPanel key={`${isPreviewMode ? 'vitality-preview' : 'vitality-edit'}-${activeVitalityPanel?.id ?? BASE_PANEL_ID}`} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={activeVitalityStats} onStatsChange={handleVitalityStatsChange} />
             </div>
           ) : null}
 
           {activeTabId === 'spirit' ? (
             <div className={styles.weaponStack}>
-              <PanelVariantTabs baseName="Spirit" baseTabName={statsDraft.spirit.name ?? 'Spirit'} variants={statsDraft.spirit.panels} activeId={activeSpiritPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} onSelect={setActiveSpiritPanelId} onAdd={addSpiritPanel} onRename={renameSpiritPanel} />
+              <PanelVariantTabs baseName="Spirit" baseTabName={statsDraft.spirit.name ?? 'Spirit'} variants={statsDraft.spirit.panels} activeId={activeSpiritPanel?.id ?? BASE_PANEL_ID} canAdd={!isPreviewMode} canRename={!isPreviewMode} canRemove={!isPreviewMode} onSelect={setActiveSpiritPanelId} onAdd={addSpiritPanel} onRename={renameSpiritPanel} onRemove={removeSpiritPanel} />
               <HeroStatsSpiritPanel key={`${isPreviewMode ? 'spirit-preview' : 'spirit-edit'}-${activeSpiritPanel?.id ?? BASE_PANEL_ID}`} isEditable={!isPreviewMode} showDetails={isPreviewMode} stats={activeSpiritTopStats} spiritPowerStat={activeSpiritPowerStat} onStatsChange={handleSpiritTopStatsChange} onSpiritPowerStatChange={handleSpiritPowerStatChange} />
             </div>
           ) : null}
         </aside>
       ) : null}
 
-      <div className={styles.controlRail}>
-        <div className={styles.railHeader}>
-          <div>
-            <h2 className={styles.railTitle}>Create</h2>
-            <p className={styles.railSubtitle}>{hero.displayName} draft</p>
+      <div className={cn(styles.controlRail, isControlRailCollapsed && styles.controlRailCollapsed)} data-testid="editor-control-rail" data-collapsed={isControlRailCollapsed ? 'true' : undefined}>
+        <nav className={styles.controlTabRail} aria-label="Hero editor navigation">
+          <button
+            type="button"
+            className={styles.editorBackButton}
+            aria-label="Go Back"
+            onClick={handleEditorExitRequest}
+          >
+            <ArrowLeft aria-hidden="true" />
+            <span>Go Back</span>
+          </button>
+          <div className={styles.controlTabList} role="tablist" aria-label="Editor settings sections" data-testid="editor-control-tabs">
+            {CONTROL_RAIL_TABS.filter(tab => tab.id !== 'options').map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                id={`editor-${tab.id}-tab`}
+                role="tab"
+                aria-label={tab.label}
+                aria-selected={activeControlRailTab === tab.id}
+                aria-controls={`editor-${tab.id}-panel`}
+                className={cn(styles.controlTabButton, activeControlRailTab === tab.id && styles.controlTabButtonActive)}
+                onClick={() => handleControlRailTabSelect(tab.id)}
+              >
+                <span aria-hidden="true">{tab.shortLabel}</span>
+                <strong>{tab.label.split(' ')[0]}</strong>
+              </button>
+            ))}
           </div>
           <button
             type="button"
-            className={cn(styles.previewModeButton, isPreviewMode && styles.previewModeButtonActive)}
-            aria-pressed={isPreviewMode}
-            onClick={() => setIsPreviewMode(currentMode => !currentMode)}
+            className={styles.controlTabButton}
+            aria-label="Open ability editor"
+            onClick={handleOpenAbilityEditorFromRail}
           >
-            {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
+            <Sparkles aria-hidden="true" />
+            <strong>Ability</strong>
           </button>
-        </div>
+          <div className={styles.controlTabList} role="tablist" aria-label="Editor options section">
+            {CONTROL_RAIL_TABS.filter(tab => tab.id === 'options').map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                id={`editor-${tab.id}-tab`}
+                role="tab"
+                aria-label={tab.label}
+                aria-selected={activeControlRailTab === tab.id}
+                aria-controls={`editor-${tab.id}-panel`}
+                className={cn(styles.controlTabButton, activeControlRailTab === tab.id && styles.controlTabButtonActive)}
+                onClick={() => handleControlRailTabSelect(tab.id)}
+              >
+                <span aria-hidden="true">{tab.shortLabel}</span>
+                <strong>Editor</strong>
+              </button>
+            ))}
+          </div>
+          <Link href="/profile" className={styles.editorProfileButton} aria-label="Open profile" onClick={closeFocusedAbilityEditorWithSave}>
+            <UserRound aria-hidden="true" />
+            <strong>Profile</strong>
+          </Link>
+        </nav>
 
-        <div className={styles.railContent}>
-          {activeTabId === 'overview' || activeTabId === null ? (
-            <div className={styles.sectionGroup}>
-              <span className={styles.sectionTitle}>Hero Render</span>
-              <div className={styles.renderModeGrid}>
-                <button
-                  type="button"
-                  className={cn(
-                    styles.segmentedButton,
-                    renderSelection.mode === 'background' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
-                  )}
-                  onClick={() => onRenderSelectionChange({ mode: 'background', src: null })}
-                >
-                  None
-                </button>
-                <button
-                  type="button"
-                  className={cn(
-                    styles.segmentedButton,
-                    renderSelection.mode === 'hero' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
-                  )}
-                  onClick={() => setIsHeroRenderAssetModalOpen(true)}
-                >
-                  Asset
-                </button>
-                <CloudUploadButton
-                  endpoint="heroRender"
-                  label="Upload"
-                  className={cn(
-                    renderSelection.mode === 'custom' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
-                  )}
-                  onUploaded={handleHeroRenderUpload}
-                />
-              </div>
+        <div className={styles.controlPane}>
+          <div className={styles.railHeader}>
+            <div>
+              <h2 className={styles.railTitle}>Create</h2>
+              <p className={styles.railSubtitle}>{hero.displayName} draft</p>
             </div>
-          ) : null}
-
-          <div className={styles.fieldLabel}>
-            <span>Background</span>
             <button
               type="button"
-              className={styles.backgroundPickerButton}
-              onClick={() => setIsBackgroundAssetModalOpen(true)}
-              aria-label={`Choose background. Current: ${selectedBackgroundOption?.label ?? 'Unknown'}`}
-              data-testid="editor-background-picker"
+              className={cn(styles.previewModeButton, isPreviewMode && styles.previewModeButtonActive)}
+              aria-pressed={isPreviewMode}
+              onClick={() => setIsPreviewMode(currentMode => !currentMode)}
             >
-              <span
-                className={styles.backgroundPickerPreview}
-                aria-hidden="true"
-                style={{ backgroundImage: `url('${selectedBackground}')` }}
-              />
-              <span className={styles.backgroundPickerText}>
-                {selectedBackgroundOption?.label ?? 'Choose Background'}
-              </span>
+              {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
             </button>
           </div>
 
-          <div className={styles.fieldGroup}>
-            <span className={styles.sectionTitle}>Hero Name</span>
-            <div className={styles.segmentedGrid} role="group" aria-label="Hero name mode">
-              {(['text', 'image'] as const).map(mode => (
-                <button
-                  key={mode}
-                  type="button"
-                  className={cn(
-                    styles.segmentedButton,
-                    draft.nameType === mode ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
-                  )}
-                  aria-pressed={draft.nameType === mode}
-                  onClick={() => updateDraft({ nameType: mode })}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
+          <div className={styles.railContent}>
+            <section
+              id="editor-text-panel"
+              role="tabpanel"
+              aria-labelledby="editor-text-tab"
+              className={styles.controlPaneSection}
+              hidden={activeControlRailTab !== 'text'}
+            >
+              <div className={styles.fieldGroup}>
+                <span className={styles.sectionTitle}>Hero Name</span>
+                <div className={styles.segmentedGrid} role="group" aria-label="Hero name mode">
+                  {(['text', 'image'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={cn(
+                        styles.segmentedButton,
+                        draft.nameType === mode ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
+                      )}
+                      aria-pressed={draft.nameType === mode}
+                      onClick={() => updateDraft({ nameType: mode })}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
 
-            {draft.nameType === 'text' ? (
-              <>
-                <label className={styles.fieldLabel} htmlFor="editor-name-font">
-                  Font
-                  <select
-                    id="editor-name-font"
-                    value={getNameFontSelectValue(draft.nameFontFamily)}
-                    onChange={event => updateDraft({ nameFontFamily: event.target.value })}
-                    className={styles.select}
-                  >
-                    {NAME_FONT_OPTIONS.map(option => (
-                      <option key={option.label} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
-                  Font Size
-                  <span className={styles.sizeControl}>
-                    <input
-                      id="editor-name-font-size"
-                      type="range"
-                      min={NAME_SIZE_MIN}
-                      max={NAME_SIZE_MAX}
-                      step="1"
-                      value={nameSizeControlValue}
-                      onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
-                      className={styles.sizeRange}
-                      aria-label="Font Size"
-                    />
-                    <input
-                      type="number"
-                      min={NAME_SIZE_MIN}
-                      max={NAME_SIZE_MAX}
-                      step="1"
-                      value={nameSizeControlValue}
-                      onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
-                      className={cn(styles.input, styles.sizeNumber)}
-                      aria-label="Font size value"
-                    />
-                  </span>
-                  <span className={styles.sizeHint}>
-                    Size {nameSizeControlValue} of {NAME_SIZE_MAX}
-                  </span>
-                </label>
-                <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
-                  Weight
-                  <select
-                    id="editor-name-font-weight"
-                    value={draft.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT}
-                    onChange={event => updateDraft({ nameFontWeight: event.target.value })}
-                    className={styles.select}
-                  >
-                    {NAME_FONT_WEIGHTS.map(weight => (
-                      <option key={weight.value} value={weight.value}>
-                        {weight.label}
-                      </option>
-                    ))}
-                  </select>
-
-                </label>
-              </>
-            ) : (
-              <CloudUploadButton
-                endpoint="heroNameAsset"
-                label="Upload name image"
-                className={styles.uploadNameButton}
-                onUploaded={handleNameUpload}
-              />
-            )}
-          </div>
-
-          <div className={styles.sectionGroup}>
-            <ColorField label="Hero Name" value={draft.nameColor} onChange={value => updateDraft({ nameColor: value })} />
-            <ColorField label="Tag Text" value={draft.tagTextColor} onChange={value => updateDraft({ tagTextColor: value })} />
-            <ColorField label="Tag Rectangles" value={draft.tagColor} onChange={value => updateDraft({ tagColor: value })} />
-            <ColorField label="Ability Icons" value={draft.abilityIconColor} onChange={value => updateDraft({ abilityIconColor: value })} />
-            <ColorField label="Ability Circles" value={draft.abilityCircleColor} onChange={value => updateDraft({ abilityCircleColor: value })} />
-            <label className={styles.copyToggle} htmlFor="editor-second-ability-set">
-              <input
-                id="editor-second-ability-set"
-                type="checkbox"
-                checked={isSecondAbilitySetEnabled}
-                onChange={event => handleSecondAbilitySetToggleRequest(event.target.checked)}
-              />
-              <span aria-hidden="true" />
-              <strong>Second Ability Set</strong>
-            </label>
-          </div>
-        </div>
-
-        <div className={styles.globalActions}>
-          <div className={styles.portraitUploadPanel}>
-            <span className={styles.portraitUploadTitle}>Portrait</span>
-            <div className={styles.portraitUploadContent}>
-              <div className={styles.portraitPreviewCard} aria-label={`${exportHeroName} portrait preview`} role="img" data-testid="editor-portrait-preview">
-                <span className={styles.portraitPreviewBacker} />
-                <span className={styles.portraitPreviewImage} data-testid="editor-portrait-preview-image" aria-hidden="true" style={{ backgroundImage: `url('${heroPortraitInput}')` }} />
-                <span className={styles.portraitPreviewBorder} />
-                <span className={styles.portraitPreviewTint} />
+                {draft.nameType === 'text' ? (
+                  <>
+                    <label className={styles.fieldLabel} htmlFor="editor-name-font">
+                      Font
+                      <select
+                        id="editor-name-font"
+                        value={getNameFontSelectValue(draft.nameFontFamily)}
+                        onChange={event => updateDraft({ nameFontFamily: event.target.value })}
+                        className={styles.select}
+                      >
+                        {NAME_FONT_OPTIONS.map(option => (
+                          <option key={option.label} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.fieldLabel} htmlFor="editor-name-font-size">
+                      Font Size
+                      <span className={styles.sizeControl}>
+                        <input
+                          id="editor-name-font-size"
+                          type="range"
+                          min={NAME_SIZE_MIN}
+                          max={NAME_SIZE_MAX}
+                          step="1"
+                          value={nameSizeControlValue}
+                          onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
+                          className={styles.sizeRange}
+                          aria-label="Font Size"
+                        />
+                        <input
+                          type="number"
+                          min={NAME_SIZE_MIN}
+                          max={NAME_SIZE_MAX}
+                          step="1"
+                          value={nameSizeControlValue}
+                          onChange={event => updateDraft({ nameFontSize: getNameSizeCss(Number(event.target.value)) })}
+                          className={cn(styles.input, styles.sizeNumber)}
+                          aria-label="Font size value"
+                        />
+                      </span>
+                      <span className={styles.sizeHint}>
+                        Size {nameSizeControlValue} of {NAME_SIZE_MAX}
+                      </span>
+                    </label>
+                    <label className={styles.fieldLabel} htmlFor="editor-name-font-weight">
+                      Weight
+                      <select
+                        id="editor-name-font-weight"
+                        value={draft.nameFontWeight || DEFAULT_HERO_NAME_FONT_WEIGHT}
+                        onChange={event => updateDraft({ nameFontWeight: event.target.value })}
+                        className={styles.select}
+                      >
+                        {NAME_FONT_WEIGHTS.map(weight => (
+                          <option key={weight.value} value={weight.value}>
+                            {weight.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <CloudUploadButton
+                    endpoint="heroNameAsset"
+                    label="Upload name image"
+                    className={styles.uploadNameButton}
+                    onUploaded={handleNameUpload}
+                  />
+                )}
               </div>
-              <div className={styles.portraitUploadControls}>
-                <CloudUploadButton endpoint="heroPortrait" label="Upload portrait" onUploaded={setHeroPortraitInput} />
-                {heroPortraitInput !== hero.portrait ? (
-                  <button type="button" className={styles.resetPortraitButton} onClick={() => setHeroPortraitInput(hero.portrait)}>
-                    Default Portrait
+
+              <div className={styles.editorHint}>
+                <strong>Tags</strong>
+                <span>Edit tag text directly on the character preview. Drag tag corners to rotate and edges to move vertically.</span>
+              </div>
+            </section>
+
+            <section
+              id="editor-colors-panel"
+              role="tabpanel"
+              aria-labelledby="editor-colors-tab"
+              className={styles.controlPaneSection}
+              hidden={activeControlRailTab !== 'colors'}
+            >
+              <ColorField label="Hero Name" value={draft.nameColor} onChange={value => updateDraft({ nameColor: value })} />
+              <ColorField label="Tag Text" value={draft.tagTextColor} onChange={value => updateDraft({ tagTextColor: value })} />
+              <ColorField label="Tag Rectangles" value={draft.tagColor} onChange={value => updateDraft({ tagColor: value })} />
+              <ColorField label="Ability Icons" value={draft.abilityIconColor} onChange={value => updateDraft({ abilityIconColor: value })} />
+              <ColorField label="Ability Circles" value={draft.abilityCircleColor} onChange={value => updateDraft({ abilityCircleColor: value })} />
+            </section>
+
+            <section
+              id="editor-images-panel"
+              role="tabpanel"
+              aria-labelledby="editor-images-tab"
+              className={styles.controlPaneSection}
+              hidden={activeControlRailTab !== 'images'}
+            >
+              <div className={styles.sectionGroup}>
+                <span className={styles.sectionTitle}>Hero Render</span>
+                <div className={styles.renderModeGrid}>
+                  <button
+                    type="button"
+                    className={cn(
+                      styles.segmentedButton,
+                      renderSelection.mode === 'background' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
+                    )}
+                    onClick={() => onRenderSelectionChange({ mode: 'background', src: null })}
+                  >
+                    None
                   </button>
-                ) : null}
+                  <button
+                    type="button"
+                    className={cn(
+                      styles.segmentedButton,
+                      renderSelection.mode === 'hero' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
+                    )}
+                    onClick={() => setIsHeroRenderAssetModalOpen(true)}
+                  >
+                    Asset
+                  </button>
+                  <CloudUploadButton
+                    endpoint="heroRender"
+                    label="Upload"
+                    className={cn(
+                      renderSelection.mode === 'custom' ? styles.segmentedButtonActive : styles.segmentedButtonInactive,
+                    )}
+                    onUploaded={handleHeroRenderUpload}
+                  />
+                </div>
               </div>
-            </div>
+
+              <div className={styles.fieldLabel}>
+                <span>Background</span>
+                <button
+                  type="button"
+                  className={styles.backgroundPickerButton}
+                  onClick={() => setIsBackgroundAssetModalOpen(true)}
+                  aria-label={`Choose background. Current: ${selectedBackgroundOption?.label ?? 'Unknown'}`}
+                  data-testid="editor-background-picker"
+                >
+                  <span
+                    className={styles.backgroundPickerPreview}
+                    aria-hidden="true"
+                    style={{ backgroundImage: `url('${selectedBackground}')` }}
+                  />
+                  <span className={styles.backgroundPickerText}>
+                    {selectedBackgroundOption?.label ?? 'Choose Background'}
+                  </span>
+                </button>
+              </div>
+
+              <div className={styles.portraitUploadPanel}>
+                <span className={styles.portraitUploadTitle}>Portrait</span>
+                <div className={styles.portraitUploadContent}>
+                  <div className={styles.portraitPreviewCard} aria-label={`${exportHeroName} portrait preview`} role="img" data-testid="editor-portrait-preview">
+                    <span className={styles.portraitPreviewBacker} />
+                    <span className={styles.portraitPreviewImage} data-testid="editor-portrait-preview-image" aria-hidden="true" style={{ backgroundImage: `url('${heroPortraitInput}')` }} />
+                    <span className={styles.portraitPreviewBorder} />
+                    <span className={styles.portraitPreviewTint} />
+                  </div>
+                  <div className={styles.portraitUploadControls}>
+                    <CloudUploadButton endpoint="heroPortrait" label="Upload portrait" onUploaded={setHeroPortraitInput} />
+                    {heroPortraitInput !== hero.portrait ? (
+                      <button type="button" className={styles.resetPortraitButton} onClick={() => setHeroPortraitInput(hero.portrait)}>
+                        Default Portrait
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section
+              id="editor-options-panel"
+              role="tabpanel"
+              aria-labelledby="editor-options-tab"
+              className={styles.controlPaneSection}
+              hidden={activeControlRailTab !== 'options'}
+            >
+              <label className={styles.copyToggle} htmlFor="editor-second-ability-set">
+                <input
+                  id="editor-second-ability-set"
+                  type="checkbox"
+                  checked={isSecondAbilitySetEnabled}
+                  onChange={event => handleSecondAbilitySetToggleRequest(event.target.checked)}
+                />
+                <span aria-hidden="true" />
+                <strong>Second Ability Set</strong>
+              </label>
+              <div className={styles.editorHint}>
+                <strong>Stat panels</strong>
+                <span>Use the right-side stat tabs to edit Boon, Weapon, Vitality, and Spirit values.</span>
+              </div>
+            </section>
           </div>
+
+          <div className={styles.globalActions}>
           <label className={styles.heroNamePrompt} htmlFor="editor-save-hero-name">
             Hero Name
             <input
@@ -1724,7 +1894,18 @@ export default function HeroInfoEditor({
           {saveFailure && onRetrySave ? <SaveFailureBanner reason={saveFailure} onRetry={onRetrySave} /> : null}
           {saveStatusMessage ? <SystemToast message={saveStatusMessage} /> : null}
           {recoveryStatus && !saveStatusMessage ? <SystemToast message={recoveryStatus} /> : null}
+          </div>
         </div>
+        <button
+          type="button"
+          className={styles.controlRailToggle}
+          aria-label={isControlRailCollapsed ? 'Expand editor settings panel' : 'Retract editor settings panel'}
+          aria-expanded={!isControlRailCollapsed}
+          onClick={() => setIsControlRailCollapsed(current => !current)}
+        >
+          <span aria-hidden="true">{isControlRailCollapsed ? '›' : '‹'}</span>
+          <strong>{isControlRailCollapsed ? 'Open' : 'Hide'}</strong>
+        </button>
       </div>
 
       {isUnpublishConfirmOpen ? (
@@ -1758,6 +1939,29 @@ export default function HeroInfoEditor({
                 }}
               >
                 Confirm Unpublish
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isExitConfirmOpen ? (
+        <div className={styles.exitConfirmBackdrop} role="presentation">
+          <section className={styles.exitConfirmDialog} role="dialog" aria-modal="true" aria-labelledby="hero-editor-exit-title">
+            <p className={styles.exitConfirmEyebrow}>Leave hero editor?</p>
+            <h2 id="hero-editor-exit-title">Go back to the main pages?</h2>
+            <p>
+              Your current draft is kept in local recovery, but it will not be saved to your profile until you save or publish it.
+            </p>
+            <div className={styles.exitConfirmActions}>
+              <button type="button" className={styles.exitStayButton} onClick={() => setIsExitConfirmOpen(false)}>
+                Stay here
+              </button>
+              <button type="button" className={styles.exitConfirmButton} onClick={() => {
+                setIsExitConfirmOpen(false)
+                onExitEditor?.()
+              }}>
+                Yes, Go Back
               </button>
             </div>
           </section>
@@ -1886,6 +2090,35 @@ export default function HeroInfoEditor({
             updateWeaponDraft({ gunImageSrc: uploadUrl })
             setIsWeaponAssetModalOpen(false)
           }}
+        />
+      ) : null}
+
+      {isFocusedAbilityEditorOpen && activeAbilityTarget && activeAbilityDraft ? (
+        <AbilityEditor
+          key={`${activeAbilityTarget.set}-${activeAbilityDraft.slot}-${abilityEditorRevision}`}
+          ability={activeAbilityDraft}
+          mode={isPreviewMode ? 'preview' : 'edit'}
+          previewLayout="editor"
+          propertyIconGroups={PROPERTY_ICON_GROUPS}
+          hero={hero}
+          heroInfo={draft}
+          activeAbilityTarget={activeAbilityTarget}
+          secondaryAbilities={secondaryAbilities}
+          secondaryAbilitySlots={secondaryAbilitySlots}
+          isSecondAbilitySetEnabled={isSecondAbilitySetEnabled}
+          abilityIconGroups={ABILITY_ICON_GROUPS}
+          showDetails={isPreviewMode}
+          onHeroInfoChange={onDraftChange}
+          onAbilityIconChange={handleAbilityIconChange}
+          onAbilitySelect={handleFocusedAbilitySelect}
+          onAbilitySwap={swapPrimaryAndSecondaryAbility}
+          onSecondAbilitySetToggle={handleFocusedSecondAbilitySetToggle}
+          onModeToggle={handleAbilityModeToggle}
+          onDraftChange={abilityDraft => {
+            focusedAbilityDraftRef.current = abilityDraft
+          }}
+          onSave={handleAbilitySave}
+          onCancel={() => setActiveAbilityTarget(null)}
         />
       ) : null}
     </section>

@@ -1,12 +1,11 @@
 'use client'
 
-import { Bookmark, Send, Trash2 } from 'lucide-react'
+import { Bookmark, MessageSquare, Send, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
-import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import type { AbilityIconTarget } from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import ReportDialog from '@/components/Moderation/ReportDialog'
@@ -18,7 +17,6 @@ import PanelVariantTabs, { BASE_PANEL_ID } from '@/components/PanelVariantTabs/P
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
-import { buildCharacterExportPayload } from '@/lib/character-export'
 import { buildDefaultAbilityStats, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
@@ -81,7 +79,7 @@ function formatNoteTime(value: string) {
 }
 
 export default function HeroInfoCluster({ hero, showDetails = false, onCreateFromHero }: HeroInfoClusterProps) {
-  const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>('overview')
+  const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>(null)
   const heroId = getCustomHeroId(hero)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
   const [comments, setComments] = useState<CommentItem[]>([])
@@ -91,6 +89,7 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
   const [isPostingComment, setIsPostingComment] = useState(false)
   const [bookmarkOverride, setBookmarkOverride] = useState<{ heroId: string; value: boolean } | null>(null)
   const [selectedAbilityTarget, setSelectedAbilityTarget] = useState<AbilityIconTarget | null>(null)
+  const [activeBoonPanelId, setActiveBoonPanelId] = useState(BASE_PANEL_ID)
   const [activeWeaponPanelId, setActiveWeaponPanelId] = useState(BASE_PANEL_ID)
   const [activeVitalityPanelId, setActiveVitalityPanelId] = useState(BASE_PANEL_ID)
   const [activeSpiritPanelId, setActiveSpiritPanelId] = useState(BASE_PANEL_ID)
@@ -111,14 +110,12 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
     fontFamily: heroInfo.nameFontFamily ?? DEFAULT_HERO_NAME_FONT_FAMILY,
     fontWeight: heroInfo.nameFontWeight ?? DEFAULT_HERO_NAME_FONT_WEIGHT,
   } as CSSProperties
-  const exportPayload = buildCharacterExportPayload(displayHero, statsData, {
-    heroInfo,
-  })
   const fallbackAbilityStats = useMemo(() => buildDefaultAbilityStats(displayHero), [displayHero])
   const isBookmarked = bookmarkOverride?.heroId === heroId
     ? bookmarkOverride.value
     : Boolean((hero as SocialHeroDefinition).bookmarkedByCurrentUser)
   const visibleComments = commentsHeroId === heroId ? comments : []
+  const activeBoonPanel = statsData.boon.panels?.find(panel => panel.id === activeBoonPanelId)
   const activeWeaponPanel = statsData.weapon.panels?.find(panel => panel.id === activeWeaponPanelId)
   const activeVitalityPanel = statsData.vitality.panels?.find(panel => panel.id === activeVitalityPanelId)
   const activeSpiritPanel = statsData.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
@@ -351,9 +348,8 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       >
         <SidebarTabs activeTabId={activeTabId} onSelect={handleTabSelect} />
 
-      {activeTabId === 'overview' || activeTabId === null ? (
-        <div id="hero-panel-overview" role="tabpanel" aria-label={`${hero.displayName} overview`} className={styles.panelContents} data-hero-stat-panel="true">
-          {activeTabId === 'overview' ? <HeroStatsBoonPanel heroName={hero.displayName} stats={statsData.boon.stats} /> : null}
+      {activeTabId === null ? (
+        <div className={styles.panelContents} data-hero-stat-panel="true">
           <div className={styles.nameRow}>
             {heroInfo.nameType === 'image' ? (
               <span
@@ -404,6 +400,18 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       ) : null}
 
       <div
+        id="hero-panel-overview"
+        data-hero-stat-panel="true"
+        role="tabpanel"
+        aria-label={`${hero.displayName} boon rewards`}
+        hidden={activeTabId !== 'overview'}
+        className={cn(activeTabId === 'overview' ? styles.tabPanelVisible : styles.tabPanelHidden)}
+      >
+        <PanelVariantTabs baseName="Boon" baseTabName="Boon Rewards" variants={statsData.boon.panels} activeId={activeBoonPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveBoonPanelId} />
+        <HeroStatsBoonPanel heroName={hero.displayName} stats={activeBoonPanel?.stats ?? statsData.boon.stats} />
+      </div>
+
+      <div
         id="hero-panel-weapon"
         data-hero-stat-panel="true"
         role="tabpanel"
@@ -450,32 +458,52 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
       </div>
 
         {heroId ? (
-          <section className={styles.socialPanel} aria-label={`${hero.displayName} social actions`}>
-            <div className={styles.socialActions}>
-              <button
-                type="button"
-                className={`${styles.bookmarkButton} ${isBookmarked ? styles.bookmarkButtonActive : ''}`}
-                aria-pressed={isBookmarked}
-                onClick={handleBookmarkToggle}
-              >
-                <Bookmark aria-hidden="true" />
-                {isBookmarked ? 'Bookmarked' : 'Bookmark'}
-              </button>
-              <button
-                type="button"
-                className={styles.commentsToggle}
-                aria-expanded={isCommentsOpen}
-                onClick={() => setIsCommentsOpen(current => !current)}
-              >
-                Comments
-                <span>{visibleComments.length}</span>
-              </button>
-              <CharacterExportButton payload={exportPayload} />
-              <ReportDialog endpoint={`/api/heroes/${encodeURIComponent(heroId)}/report`} contentLabel="character" />
-            </div>
+          <>
+            <section className={styles.socialPanel} aria-label={`${hero.displayName} social actions`}>
+              <div className={styles.socialActions}>
+                <button
+                  type="button"
+                  className={cn(styles.actionIconButton, styles.bookmarkButton, isBookmarked && styles.bookmarkButtonActive)}
+                  aria-label={isBookmarked ? `Remove ${hero.displayName} bookmark` : `Bookmark ${hero.displayName}`}
+                  aria-pressed={isBookmarked}
+                  onClick={handleBookmarkToggle}
+                >
+                  <Bookmark aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={cn(styles.actionIconButton, styles.commentsToggle)}
+                  aria-label={`Open ${hero.displayName} comments`}
+                  aria-expanded={isCommentsOpen}
+                  onClick={() => setIsCommentsOpen(true)}
+                >
+                  <MessageSquare aria-hidden="true" />
+                </button>
+                <ReportDialog endpoint={`/api/heroes/${encodeURIComponent(heroId)}/report`} contentLabel="character" compact className={styles.actionIconButton} />
+              </div>
+            </section>
 
             {isCommentsOpen ? (
-              <div className={styles.commentsDrawer}>
+              <div
+                className={styles.commentsModalBackdrop}
+                role="presentation"
+                onPointerDown={event => {
+                  if (event.target === event.currentTarget) {
+                    setIsCommentsOpen(false)
+                  }
+                }}
+              >
+                <section className={styles.commentsModal} role="dialog" aria-modal="true" aria-labelledby={`${heroId}-comments-title`}>
+                  <header className={styles.commentsModalHeader}>
+                    <div>
+                      <p>Community comments</p>
+                      <h2 id={`${heroId}-comments-title`}>{hero.displayName} comments</h2>
+                    </div>
+                    <button type="button" className={styles.commentsModalClose} aria-label="Close comments" onClick={() => setIsCommentsOpen(false)}>
+                      <X aria-hidden="true" />
+                    </button>
+                  </header>
+                  <div className={styles.commentsDrawer}>
                 <form
                   className={styles.commentForm}
                   onSubmit={event => {
@@ -505,27 +533,33 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
                           <time dateTime={comment.createdAt}>{formatNoteTime(comment.createdAt)}</time>
                         </div>
                         <p>{comment.content}</p>
-                        <ReportDialog
-                          endpoint={`/api/comments/${encodeURIComponent(comment.id)}/report`}
-                          contentLabel="comment"
-                          onReported={moderationStatus => {
-                            if (moderationStatus === 'hidden') {
-                              setComments(currentComments => currentComments.filter(item => item.id !== comment.id))
-                            }
-                          }}
-                        />
-                        {comment.viewerCanDelete ? (
-                          <button type="button" className={styles.commentDeleteButton} aria-label="Delete comment" onClick={() => handleDeleteComment(comment.id)}>
-                            <Trash2 aria-hidden="true" />
-                          </button>
-                        ) : null}
+                        <div className={styles.commentActions}>
+                          <ReportDialog
+                            endpoint={`/api/comments/${encodeURIComponent(comment.id)}/report`}
+                            contentLabel="comment"
+                            compact
+                            className={styles.commentIconButton}
+                            onReported={moderationStatus => {
+                              if (moderationStatus === 'hidden') {
+                                setComments(currentComments => currentComments.filter(item => item.id !== comment.id))
+                              }
+                            }}
+                          />
+                          {comment.viewerCanDelete ? (
+                            <button type="button" className={cn(styles.commentDeleteButton, styles.commentIconButton)} aria-label="Delete comment" onClick={() => handleDeleteComment(comment.id)}>
+                              <Trash2 aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>
                 ) : null}
               </div>
+                </section>
+              </div>
             ) : null}
-          </section>
+          </>
         ) : null}
 
         {statsState.error ? <span className="sr-only" role="status">Using fallback hero stats</span> : null}

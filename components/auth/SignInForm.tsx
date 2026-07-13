@@ -3,14 +3,16 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSignIn } from '@clerk/nextjs'
+import { useClerk, useSignIn } from '@clerk/nextjs'
 
 import { getAuthErrorMessage } from './auth-errors'
 import styles from './auth-ui.module.css'
 
 export default function SignInForm() {
   const router = useRouter()
+  const { client } = useClerk()
   const { signIn } = useSignIn()
+  const googleSignIn = client?.signIn
   const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -53,7 +55,7 @@ export default function SignInForm() {
   }
 
   async function handleGoogleSignIn() {
-    if (!signIn || isGoogleSubmitting) {
+    if (!googleSignIn || isGoogleSubmitting) {
       return
     }
 
@@ -61,15 +63,11 @@ export default function SignInForm() {
     setIsGoogleSubmitting(true)
 
     try {
-      const result = await signIn.sso({
+      await googleSignIn.authenticateWithRedirect({
         strategy: 'oauth_google',
-        redirectUrl: '/',
-        redirectCallbackUrl: '/sso-callback',
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: '/',
       })
-
-      if (result.error) {
-        throw result.error
-      }
     } catch (caughtError) {
       setError(getAuthErrorMessage(caughtError))
       setIsGoogleSubmitting(false)
@@ -79,7 +77,7 @@ export default function SignInForm() {
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
-      <button className={styles.oauthButton} type="button" disabled={!signIn || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignIn}>
+      <button className={styles.oauthButton} type="button" disabled={!googleSignIn || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignIn}>
         {isGoogleSubmitting ? 'Opening Google' : 'Continue with Google'}
       </button>
       <span className={styles.divider}>or</span>

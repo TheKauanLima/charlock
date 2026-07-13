@@ -2,8 +2,8 @@
   min-height: 100vh;
   padding: clamp(20px, 4vw, 54px);
   background:
-    radial-gradient(circle at 20% 0%, rgba(113, 38, 35, 0.25), transparent 34%),
-    linear-gradient(145deg, #111512, #050706 70%);
+    linear-gradient(180deg, rgba(113, 38, 35, 0.12), transparent 32%),
+    var(--citadel-bg);
   color: #ffefd6;
 }
 
@@ -12,7 +12,7 @@
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  max-width: 1320px;
+  max-width: var(--citadel-container);
   margin: 0 auto 28px;
 }
 
@@ -42,8 +42,11 @@
 
 .header h1 {
   margin: 7px 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: clamp(2rem, 5vw, 4.8rem);
+  letter-spacing: 0.1em;
   line-height: 0.92;
+  text-transform: uppercase;
 }
 
 .header span {
@@ -52,19 +55,25 @@
 
 .header a {
   padding: 10px 14px;
-  border: 1px solid rgba(255, 239, 214, 0.25);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd6;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  letter-spacing: 0.1em;
   text-decoration: none;
+  text-transform: uppercase;
 }
 
 .workspace {
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
-  max-width: 1320px;
+  max-width: var(--citadel-container);
   min-height: 620px;
   margin: 0 auto;
-  border: 1px solid rgba(255, 239, 214, 0.14);
+  border: 1px solid var(--citadel-border);
   background: rgba(0, 0, 0, 0.28);
+  box-shadow: inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
 
 .sidebar {
@@ -88,9 +97,9 @@
 }
 
 .sidebar button[aria-pressed="true"] {
-  border-color: rgba(47, 200, 144, 0.36);
-  background: rgba(47, 200, 144, 0.1);
-  color: #bafbe0;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .sidebar button span {
@@ -180,7 +189,7 @@
 
 .item blockquote {
   margin: 0;
-  border-left: 2px solid rgba(47, 200, 144, 0.5);
+  border-left: 2px solid var(--citadel-gold);
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.24);
 }
@@ -230,9 +239,13 @@
   align-items: center;
   gap: 6px;
   padding: 0 10px;
-  border: 1px solid rgba(47, 200, 144, 0.34);
-  background: rgba(47, 200, 144, 0.08);
-  color: #bafbe0;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
+  color: #ffefd6;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .item footer button:last-child {
@@ -257,8 +270,8 @@
 
 .status {
   padding: 9px 11px;
-  border: 1px solid rgba(47, 200, 144, 0.3);
-  color: #bafbe0;
+  border: 1px solid var(--citadel-gold);
+  color: var(--citadel-gold);
   font-size: 0.76rem;
 }
 

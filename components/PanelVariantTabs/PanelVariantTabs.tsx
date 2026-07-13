@@ -16,14 +16,16 @@ interface PanelVariantTabsProps {
   activeId: string
   canAdd?: boolean
   canRename?: boolean
+  canRemove?: boolean
   onSelect: (id: string) => void
   onAdd?: (name: string) => void
   onRename?: (id: string, name: string) => void
+  onRemove?: (id: string) => void
 }
 
 export const BASE_PANEL_ID = 'base'
 
-export default function PanelVariantTabs({ baseName, baseTabName = baseName, variants = [], activeId, canAdd = false, canRename = false, onSelect, onAdd, onRename }: PanelVariantTabsProps) {
+export default function PanelVariantTabs({ baseName, baseTabName = baseName, variants = [], activeId, canAdd = false, canRename = false, canRemove = false, onSelect, onAdd, onRename, onRemove }: PanelVariantTabsProps) {
   const [namingMode, setNamingMode] = useState<'add' | 'rename' | null>(null)
   const [name, setName] = useState('')
   const canSubmit = Boolean(name.trim()) && (namingMode === 'rename' || variants.length < 8)
@@ -53,11 +55,31 @@ export default function PanelVariantTabs({ baseName, baseTabName = baseName, var
         <button type="button" role="tab" aria-selected={activeId === BASE_PANEL_ID} className={styles.tab} onClick={() => onSelect(BASE_PANEL_ID)}>
           {baseTabName}
         </button>
-        {variants.map(variant => (
-          <button key={variant.id} type="button" role="tab" aria-selected={activeId === variant.id} className={styles.tab} onClick={() => onSelect(variant.id)}>
-            {variant.name}
-          </button>
-        ))}
+        {variants.map(variant => {
+          const isActive = activeId === variant.id
+          const isRemovable = canRemove && isActive
+
+          return (
+            <span key={variant.id} className={styles.tabShell} role="presentation">
+              <button type="button" role="tab" aria-selected={isActive} className={`${styles.tab} ${isRemovable ? styles.removableTab : ''}`} onClick={() => onSelect(variant.id)}>
+                {variant.name}
+              </button>
+              {isRemovable ? (
+                <button
+                  type="button"
+                  className={styles.removeButton}
+                  aria-label={`Remove active ${baseName} panel`}
+                  onClick={() => {
+                    setNamingMode(null)
+                    onRemove?.(variant.id)
+                  }}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              ) : null}
+            </span>
+          )
+        })}
         {canAdd && variants.length < 8 ? (
           <button type="button" className={styles.addButton} aria-label={`Add ${baseName} panel`} onClick={() => { setName(''); setNamingMode('add') }}>
             + Panel

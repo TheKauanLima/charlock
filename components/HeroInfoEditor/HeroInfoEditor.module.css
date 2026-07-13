@@ -18,6 +18,16 @@
   padding: 16px;
 }
 
+.previewStageRailCollapsed {
+  left: clamp(28px, 21vw, 190px);
+}
+
+.previewStageAbilityEditorActive {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .nameRow {
   display: flex;
   justify-content: center;
@@ -354,9 +364,8 @@
 .miniEditor {
   display: grid;
   gap: 8px;
-  border: 1px solid rgba(255, 239, 214, 0.14);
-  border-radius: 4px;
-  background: rgba(6, 29, 39, 0.82);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.82);
   padding: 12px;
   color: #ffefd6;
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
@@ -380,19 +389,236 @@
 .controlRail {
   pointer-events: auto;
   position: absolute;
-  top: 88px;
-  left: clamp(18px, 2vw, 36px);
-  max-height: calc(100vh - 122px);
-  width: min(30vw, 360px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  border: 1px solid rgba(255, 239, 214, 0.14);
-  border-radius: 4px;
-  background: rgba(6, 29, 39, 0.8);
-  padding: 16px;
+  top: 52px;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 356px);
+  width: min(32vw, 410px);
+  min-width: 360px;
+  overflow: visible;
+  border: 1px solid var(--citadel-border);
+  border-top: 0;
+  border-left: 0;
+  background: rgba(15, 14, 16, 0.86);
   color: #ffefd6;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(24px);
+  transition: transform 180ms ease;
+}
+
+.controlRailCollapsed {
+  transform: translateX(calc(-100% + 28px));
+}
+
+.controlTabRail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 239, 214, 0.12);
+  background: rgba(5, 7, 6, 0.42);
+  padding: 14px 7px;
+}
+
+.editorBackButton,
+.editorProfileButton {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 239, 214, 0.22);
+  border-radius: 3px;
+  color: #ffefd6;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.editorBackButton {
+  display: grid;
+  min-height: 58px;
+  gap: 3px;
+  border-color: rgba(255, 188, 172, 0.52);
+  background: rgba(139, 23, 20, 0.9);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.editorBackButton svg,
+.editorProfileButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.editorBackButton span {
+  display: block;
+}
+
+.editorProfileButton {
+  display: grid;
+  margin-top: auto;
+  gap: 3px;
+  background: rgba(255, 239, 214, 0.08);
+  color: rgba(255, 239, 214, 0.76);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.editorProfileButton strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+.editorBackButton:hover,
+.editorBackButton:focus-visible {
+  border-color: rgba(255, 231, 216, 0.86);
+  background: rgba(177, 34, 28, 0.96);
+  color: #fff7ee;
+  outline: none;
+  transform: translateX(1px);
+}
+
+.editorProfileButton:hover,
+.editorProfileButton:focus-visible {
+  border-color: rgba(198, 154, 246, 0.78);
+  background: rgba(58, 36, 76, 0.82);
+  color: #f7e9ff;
+  outline: none;
+  transform: translateX(1px);
+}
+
+.controlTabList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.controlRailToggle {
+  position: absolute;
+  top: 14px;
+  right: -28px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 86px;
+  width: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid rgba(255, 239, 214, 0.18);
+  background: rgba(0, 0, 0, 0.36);
+  box-sizing: border-box;
+  color: rgba(255, 239, 214, 0.82);
+  cursor: pointer;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  overflow: hidden;
+  padding: 6px 2px;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+  writing-mode: horizontal-tb;
+}
+
+.controlRailToggle span {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.controlRailToggle strong {
+  display: block;
+  max-height: 48px;
+  overflow: hidden;
+  font-size: 0.46rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-orientation: mixed;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+}
+
+.controlRailToggle:hover,
+.controlRailToggle:focus-visible,
+.controlRailCollapsed .controlRailToggle {
+  border-color: var(--citadel-teal);
+  background: rgba(0, 255, 214, 0.1);
+  color: var(--citadel-teal);
+  outline: none;
+}
+
+.controlTabButton {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 239, 214, 0.58);
+  cursor: pointer;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  text-transform: uppercase;
+  transition:
+    border-color 150ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.controlTabButton span {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.controlTabButton svg {
+  width: 16px;
+  height: 16px;
+}
+
+.controlTabButton strong {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.48rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-overflow: ellipsis;
+}
+
+.controlTabButton:hover,
+.controlTabButton:focus-visible,
+.controlTabButtonActive {
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.controlPane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .railHeader {
@@ -400,13 +626,16 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
+  border-bottom: 1px solid rgba(255, 239, 214, 0.1);
+  padding: 16px 16px 14px;
 }
 
 .railTitle {
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.875rem;
   font-weight: 900;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -418,11 +647,12 @@
 }
 
 .liveBadge {
-  border: 1px solid rgba(47, 200, 144, 0.35);
-  border-radius: 999px;
-  background: rgba(47, 200, 144, 0.1);
-  padding: 4px 10px;
-  color: #bafbe0;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  clip-path: var(--citadel-button-cut);
+  padding: 5px 10px;
+  color: var(--citadel-gold);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.22em;
@@ -436,7 +666,39 @@
 }
 
 .railContent {
+  min-height: 0;
   gap: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.controlPaneSection {
+  display: grid;
+  gap: 16px;
+}
+
+.controlPaneSection[hidden] {
+  display: none;
+}
+
+.editorHint {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 239, 214, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  color: rgba(255, 239, 214, 0.58);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.editorHint strong {
+  color: rgba(255, 239, 214, 0.84);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .fieldGroup {
@@ -477,8 +739,7 @@
 .input,
 .textarea,
 .select {
-  border: 1px solid rgba(255, 239, 214, 0.15);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.45);
   color: #ffefd6;
   outline: none;
@@ -503,8 +764,7 @@
   grid-template-columns: 64px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(255, 239, 214, 0.15);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.45);
   padding: 6px;
   color: #ffefd6;
@@ -516,14 +776,14 @@
 }
 
 .backgroundPickerButton:hover {
-  border-color: rgba(47, 200, 144, 0.62);
-  background: rgba(47, 200, 144, 0.08);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
 }
 
 .backgroundPickerButton:focus-visible {
-  border-color: #2fc890;
+  border-color: var(--citadel-gold);
   outline: 0;
-  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.25);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .backgroundPickerPreview {
@@ -556,7 +816,7 @@
 
 .sizeRange {
   width: 100%;
-  accent-color: #2fc890;
+  accent-color: var(--citadel-gold);
   cursor: pointer;
 }
 
@@ -593,22 +853,23 @@
 .input:focus,
 .select:focus,
 .textarea:focus {
-  border-color: #2fc890;
-  box-shadow: 0 0 0 2px rgba(47, 200, 144, 0.25);
+  border-color: var(--citadel-gold);
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .segmentedButton,
 .assetButton,
 .uploadButton,
 .cloudUploadButton {
-  border: 1px solid rgba(255, 239, 214, 0.15);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border);
   background: rgba(0, 0, 0, 0.3);
+  clip-path: var(--citadel-button-cut);
   padding: 8px 12px;
   color: rgba(255, 239, 214, 0.58);
   font-size: 0.62rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   transition:
     border-color 150ms ease-out,
@@ -620,22 +881,22 @@
 .assetButton:focus-visible,
 .uploadButton:focus-visible,
 .cloudUploadButton:focus-visible {
-  outline: 2px solid #ffefd6;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .segmentedButtonActive {
-  border-color: #2fc890;
-  background: rgba(47, 200, 144, 0.18);
-  color: #bafbe0;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .segmentedButtonInactive:hover,
 .assetButton:hover,
 .uploadButton:hover,
 .cloudUploadButton:hover {
-  border-color: rgba(47, 200, 144, 0.7);
-  color: #bafbe0;
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .uploadButton,
@@ -671,11 +932,11 @@
 }
 
 .previewModeButton {
-  border: 1px solid rgba(198, 154, 246, 0.52);
-  border-radius: 999px;
-  background: rgba(45, 27, 58, 0.72);
-  padding: 4px 10px;
-  color: #efe2ff;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
+  padding: 5px 10px;
+  color: var(--citadel-text);
   cursor: pointer;
   font-size: 0.62rem;
   font-weight: 900;
@@ -684,9 +945,9 @@
 }
 
 .previewModeButtonActive {
-  border-color: rgba(153, 255, 214, 0.68);
-  background: rgba(20, 76, 58, 0.78);
-  color: #c9ffe8;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .cloudUploadButtonError {
@@ -733,9 +994,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
   border-top: 1px solid rgba(255, 239, 214, 0.1);
+  padding: 14px 16px 16px;
 }
 
 .heroNamePrompt,
@@ -818,14 +1078,15 @@
 }
 
 .resetPortraitButton {
-  border: 1px solid rgba(255, 239, 214, 0.14);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border);
   background: rgba(0, 0, 0, 0.28);
+  clip-path: var(--citadel-button-cut);
   padding: 8px 12px;
   color: rgba(255, 239, 214, 0.62);
   font-size: 0.62rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   transition:
     border-color 150ms ease-out,
@@ -834,13 +1095,13 @@
 
 .resetPortraitButton:hover,
 .resetPortraitButton:focus-visible {
-  border-color: rgba(47, 200, 144, 0.7);
-  color: #bafbe0;
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .resetPortraitButton:focus-visible {
-  outline: 2px solid #ffefd6;
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .heroNamePrompt {
@@ -895,13 +1156,13 @@
 }
 
 .copyToggle input:checked + span {
-  border-color: #2fc890;
-  background: rgba(47, 200, 144, 0.18);
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
 }
 
 .copyToggle input:checked + span::after {
   transform: translateX(16px);
-  background: #bafbe0;
+  background: var(--citadel-gold);
 }
 
 .copyToggle input:focus-visible + span {
@@ -917,20 +1178,19 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(3, 9, 13, 0.58);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
 }
 
 .secondSetModal {
   width: min(92vw, 620px);
-  border: 1px solid rgba(198, 154, 246, 0.62);
-  border-radius: 4px;
-  background:
-    linear-gradient(135deg, rgba(48, 37, 58, 0.96), rgba(13, 12, 19, 0.96)),
-    #11130e;
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
   padding: 18px;
   color: #fff3dd;
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.48);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
 
 .secondSetModalHeader {
@@ -942,9 +1202,10 @@
 
 .secondSetModalHeader h2 {
   color: #fff3dd;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 1rem;
   font-weight: 950;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -954,8 +1215,9 @@
   aspect-ratio: 1;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(198, 154, 246, 0.62);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #fff3dd;
   font-size: 1.25rem;
   line-height: 1;
@@ -973,8 +1235,7 @@
   display: flex;
   justify-content: center;
   margin-top: 18px;
-  border: 1px solid rgba(198, 154, 246, 0.42);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border);
   padding: 22px 16px;
   background: rgba(255, 255, 255, 0.06);
 }
@@ -989,10 +1250,11 @@
 .secondSetCancelButton,
 .secondSetDeleteButton {
   min-height: 38px;
-  border: 1px solid rgba(198, 154, 246, 0.52);
-  border-radius: 2px;
+  border: 1px solid var(--citadel-border);
+  clip-path: var(--citadel-button-cut);
   padding: 0 14px;
   color: #fff3dd;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -1004,20 +1266,21 @@
 }
 
 .secondSetDeleteButton {
-  border-color: rgba(255, 210, 210, 0.58);
-  background: rgba(158, 28, 25, 0.82);
+  border-color: var(--citadel-danger);
+  background: var(--citadel-danger-bg);
 }
 
 .saveActionButton,
 .publishActionButton,
 .unpublishActionButton,
 .exportActionButton {
-  border: 1px solid rgba(255, 239, 214, 0.3);
-  border-radius: 4px;
+  border: 1px solid var(--citadel-border);
+  clip-path: var(--citadel-button-cut);
   padding: 12px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.75rem;
   font-weight: 900;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   transition: all 150ms ease-out;
 }
@@ -1033,15 +1296,15 @@
 }
 
 .publishActionButton {
-  background: rgba(47, 200, 144, 0.15);
-  border-color: rgba(47, 200, 144, 0.5);
-  color: #bafbe0;
+  background: var(--citadel-bg-raised);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
 }
 
 .publishActionButton:hover {
-  background: rgba(47, 200, 144, 0.25);
-  border-color: #2fc890;
-  box-shadow: 0 0 15px rgba(47, 200, 144, 0.15);
+  background: var(--citadel-gold-soft);
+  border-color: var(--citadel-gold);
+  box-shadow: none;
 }
 
 .unpublishActionButton {
@@ -1053,7 +1316,7 @@
 .unpublishActionButton:hover {
   border-color: #ff8f84;
   background: rgba(158, 28, 25, 0.3);
-  box-shadow: 0 0 15px rgba(255, 92, 79, 0.14);
+  box-shadow: none;
 }
 
 .saveActionButton:disabled,
@@ -1061,6 +1324,97 @@
 .unpublishActionButton:disabled {
   cursor: wait;
   opacity: 0.62;
+}
+
+.exitConfirmBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2400;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 24px;
+  pointer-events: auto;
+}
+
+.exitConfirmDialog {
+  width: min(440px, calc(100vw - 32px));
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-bg-panel);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.62),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
+  color: #ffefd6;
+  padding: 20px;
+}
+
+.exitConfirmEyebrow {
+  margin: 0 0 8px;
+  color: rgba(255, 188, 172, 0.84);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.exitConfirmDialog h2,
+.exitConfirmDialog p {
+  margin: 0;
+}
+
+.exitConfirmDialog h2 {
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.exitConfirmDialog p:not(.exitConfirmEyebrow) {
+  margin-top: 10px;
+  color: rgba(255, 239, 214, 0.72);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.exitConfirmActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.exitStayButton,
+.exitConfirmButton {
+  border: 1px solid var(--citadel-border);
+  clip-path: var(--citadel-button-cut);
+  cursor: pointer;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  padding: 10px 14px;
+  text-transform: uppercase;
+}
+
+.exitStayButton {
+  background: rgba(255, 239, 214, 0.06);
+  color: rgba(255, 239, 214, 0.78);
+}
+
+.exitConfirmButton {
+  border-color: rgba(255, 188, 172, 0.62);
+  background: rgba(139, 23, 20, 0.9);
+  color: #fff7ee;
+}
+
+.exitStayButton:hover,
+.exitStayButton:focus-visible,
+.exitConfirmButton:hover,
+.exitConfirmButton:focus-visible {
+  border-color: var(--citadel-gold);
+  outline: none;
 }
 
 .saveError,
@@ -1076,7 +1430,7 @@
 }
 
 .actionStatus {
-  color: #bafbe0;
+  color: var(--citadel-gold);
 }
 
 .uploadIcon {
@@ -1095,7 +1449,9 @@
   }
 
   .controlRail {
-    width: min(34vw, 340px);
+    grid-template-columns: 50px minmax(0, 310px);
+    width: min(40vw, 360px);
+    min-width: 320px;
   }
 }
 
@@ -1112,7 +1468,10 @@
   }
 
   .controlRail {
-    left: 12px;
-    width: min(88vw, 360px);
+    top: 52px;
+    right: 0;
+    grid-template-columns: 48px minmax(0, 1fr);
+    width: 100%;
+    min-width: 0;
   }
 }

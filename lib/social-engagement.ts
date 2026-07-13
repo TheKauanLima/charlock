@@ -13,6 +13,7 @@ import type { IComment } from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import User from '@/lib/models/User'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
+import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
 
 const FALLBACK_HERO_PORTRAIT = HEROES[0]?.portrait ?? ''
@@ -246,25 +247,14 @@ async function ensureCurrentUserRecord() {
   const metadataUsername = clerkUser.unsafeMetadata?.username
   const username = clerkUser.username || (typeof metadataUsername === 'string' ? metadataUsername : null)
 
-  return User.findOneAndUpdate(
-    { clerkId: clerkUser.id },
-    {
-      $set: {
-        clerkId: clerkUser.id,
-        email,
-        username,
-        emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
-        firstName: clerkUser.firstName,
-        lastName: clerkUser.lastName,
-      },
-    },
-    {
-      upsert: true,
-      returnDocument: 'after',
-      runValidators: true,
-      setDefaultsOnInsert: true,
-    },
-  ).lean<UserRecord | null>()
+  return syncUserRecordFromClerk({
+    clerkId: clerkUser.id,
+    email,
+    username,
+    emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
+    firstName: clerkUser.firstName,
+    lastName: clerkUser.lastName,
+  }) as Promise<UserRecord | null>
 }
 
 export async function toggleHeroBookmark(heroId: string) {

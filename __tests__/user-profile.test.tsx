@@ -297,6 +297,25 @@ describe('UserProfile', () => {
     fetchMock.mockRestore()
   })
 
+  it('formats long profile usernames without compressing them beside the avatar', () => {
+    render(<UserProfile data={{
+      ...profileData,
+      user: {
+        ...profileData.user,
+        username: 'TRILOGYTHEGAMER2',
+      },
+    }} heroes={HEROES} />)
+
+    const heading = screen.getByRole('heading', { name: 'TRILOGYTHEGAMER2' })
+    const stylesheet = readFileSync('components/UserProfile/UserProfile.module.css', 'utf8')
+
+    expect(heading.className).toContain('sideProfileName')
+    expect(heading.className).toContain('sideProfileNameLong')
+    expect(stylesheet).toMatch(/\.sideProfileCopy\s*\{[\s\S]*grid-column:\s*1 \/ -1;[\s\S]*width:\s*100%/)
+    expect(stylesheet).toMatch(/\.sideProfileCopy h1\s*\{[\s\S]*overflow-wrap:\s*break-word;[\s\S]*word-break:\s*normal/)
+    expect(stylesheet).toMatch(/\.sideProfileNameLong\s*\{[\s\S]*font-size:\s*1\.82rem/)
+  })
+
   it('shows themed empty and error states for profile ledgers', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.spyOn(globalThis, 'fetch')

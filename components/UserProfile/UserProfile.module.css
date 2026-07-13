@@ -32,8 +32,8 @@
 .washLayer {
   z-index: 2;
   background:
-    radial-gradient(circle at 84% 18%, color-mix(in srgb, var(--profile-accent) 30%, transparent), transparent 34%),
-    linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.9) 44%, rgba(0, 0, 0, 0.5) 100%);
+    linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.9) 44%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--profile-accent) 12%, transparent), transparent 44%);
 }
 
 .backgroundSyncOverlay {
@@ -59,8 +59,8 @@
   z-index: 3;
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
-  gap: 28px;
-  width: min(1380px, calc(100% - 64px));
+  gap: 24px;
+  width: min(var(--citadel-container), calc(100% - 48px));
   margin: 0 auto;
   padding: 76px 0 58px;
 }
@@ -98,7 +98,7 @@
 .creatorSearch > span { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; border: 1px solid rgba(255, 239, 214, 0.24); background: rgba(0, 0, 0, 0.45); }
 .creatorSearch svg { width: 16px; justify-self: center; }
 .creatorSearch input { min-width: 0; height: 42px; border: 0; outline: 0; color: #ffefd6; background: transparent; font-family: var(--font-geist-mono), monospace; }
-.creatorSearch button { height: 42px; border: 0; border-left: 1px solid rgba(255, 239, 214, 0.2); color: #151109; background: var(--profile-name); padding: 0 14px; font-size: 0.66rem; font-weight: 900; text-transform: uppercase; }
+.creatorSearch button { height: 42px; border: 1px solid var(--citadel-gold); color: var(--citadel-gold); background: var(--citadel-bg-raised); clip-path: var(--citadel-button-cut); padding: 0 14px; font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif; font-size: 0.66rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; }
 
 .sidePanel {
   position: sticky;
@@ -130,7 +130,7 @@
   width: 42px;
   height: 42px;
   border: 1px solid rgba(255, 239, 214, 0.28);
-  border-radius: 999px;
+  clip-path: var(--citadel-button-cut);
   background: rgba(0, 0, 0, 0.36);
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
@@ -141,8 +141,8 @@
 
 .backButton:hover,
 .backButton:focus-visible {
-  border-color: var(--profile-name);
-  color: var(--profile-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -202,8 +202,8 @@
 .sidePanelItem:hover,
 .sidePanelItem:focus-visible,
 .sidePanelItemActive {
-  border-color: var(--profile-name);
-  background: color-mix(in srgb, var(--profile-accent) 18%, rgba(0, 0, 0, 0.34));
+  border-color: var(--citadel-gold);
+  background: var(--citadel-gold-faint);
   color: #ffefd6;
   outline: none;
 }
@@ -252,6 +252,11 @@
   min-width: 0;
 }
 
+.sideProfileCopy {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
 .eyebrow,
 .sectionHeader p {
   margin: 0;
@@ -270,13 +275,35 @@
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: clamp(3.4rem, 9vw, 7rem);
+  letter-spacing: 0.1em;
   line-height: 0.84;
   text-transform: uppercase;
 }
 
 .sideProfileCopy h1 {
-  overflow-wrap: anywhere;
-  font-size: clamp(1.9rem, 2.4vw, 3rem);
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
+  font-size: 2.35rem;
+  letter-spacing: 0.06em;
+  text-wrap: balance;
+}
+
+.sideProfileName {
+  display: block;
+  max-width: 100%;
+}
+
+.sideProfileNameLong {
+  font-size: 1.82rem;
+  letter-spacing: 0.04em;
+  line-height: 0.92;
+}
+
+.sideProfileNameCompact {
+  font-size: 1.48rem;
+  letter-spacing: 0.03em;
+  line-height: 0.98;
 }
 
 .followMeta,
@@ -299,28 +326,30 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
-  background: color-mix(in srgb, var(--profile-accent) 16%, rgba(0, 0, 0, 0.58));
-  color: #ffefd6;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  clip-path: var(--citadel-button-cut);
+  color: var(--citadel-gold);
   cursor: pointer;
   padding: 11px 14px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.72rem;
   font-weight: 900;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .followButton[aria-pressed="true"] {
-  border-color: var(--profile-name);
-  background: color-mix(in srgb, var(--profile-accent) 28%, rgba(0, 0, 0, 0.5));
+  border-color: var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  color: var(--citadel-text);
 }
 
 .avatarEditButton {
   margin-top: 10px;
-  border: 1px solid var(--profile-accent);
-  background: transparent;
-  color: var(--profile-accent);
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  color: var(--citadel-gold);
   cursor: pointer;
   clip-path: polygon(0 0, 92% 0, 100% 25%, 100% 100%, 8% 100%, 0 75%);
   padding: 9px 13px;
@@ -334,8 +363,8 @@
 
 .avatarEditButton:hover,
 .avatarEditButton:focus-visible {
-  background: color-mix(in srgb, var(--profile-accent) 16%, transparent);
-  color: var(--profile-name);
+  background: var(--citadel-gold-soft);
+  color: var(--citadel-gold);
   outline: none;
   transform: translateY(-1px);
 }
@@ -400,7 +429,7 @@
 .cardGrid {
   position: static;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 8px;
+  gap: 24px;
   overflow: visible;
 }
 
@@ -414,9 +443,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border: 1px solid rgba(255, 239, 214, 0.1);
-  background: rgba(0, 0, 0, 0.24);
-  padding: 14px 16px;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  padding: 16px;
 }
 
 .backgroundSummary p {
@@ -443,8 +472,9 @@
   justify-content: center;
   gap: 8px;
   min-height: 38px;
-  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
-  background: color-mix(in srgb, var(--profile-accent) 16%, rgba(0, 0, 0, 0.58));
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd6;
   cursor: pointer;
   padding: 10px 12px;
@@ -462,7 +492,8 @@
 
 .backgroundSummary button:hover,
 .backgroundSummary button:focus-visible {
-  border-color: var(--profile-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -477,8 +508,9 @@
   z-index: 40;
   display: grid;
   place-items: center;
-  background: rgba(0, 0, 0, 0.68);
+  background: rgba(0, 0, 0, 0.8);
   padding: 28px;
+  backdrop-filter: blur(4px);
 }
 
 .backgroundModal {
@@ -487,11 +519,11 @@
   width: min(980px, 100%);
   max-height: min(760px, calc(100vh - 56px));
   overflow: auto;
-  border: 1px solid color-mix(in srgb, var(--profile-accent) 56%, rgba(255, 239, 214, 0.14));
-  background:
-    linear-gradient(180deg, rgba(18, 19, 17, 0.97), rgba(6, 7, 6, 0.96)),
-    #080908;
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.72);
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
   padding: 24px;
 }
 
@@ -499,11 +531,13 @@
   display: grid;
   gap: 20px;
   width: min(560px, 100%);
-  border: 1px solid rgba(255, 92, 92, 0.62);
+  border: 1px solid var(--citadel-border);
   background:
     repeating-linear-gradient(180deg, rgba(255, 72, 72, 0.035) 0 1px, transparent 1px 8px),
-    #100a09;
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.78);
+    var(--citadel-panel);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.78),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
   padding: 24px;
 }
 
@@ -533,11 +567,12 @@
   gap: 8px;
   min-height: 40px;
   border: 1px solid #ff6868;
-  background: #9e2424;
-  color: #fff;
+  background: var(--citadel-danger-bg);
+  clip-path: var(--citadel-button-cut);
+  color: #ffd6d7;
   cursor: pointer;
   padding: 9px 14px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -546,7 +581,7 @@
 
 .deleteHeroConfirmButton:hover,
 .deleteHeroConfirmButton:focus-visible {
-  background: #c83232;
+  background: rgba(158, 28, 25, 0.36);
   outline: none;
 }
 
@@ -567,6 +602,7 @@
   color: #ffefd6;
   font-family: var(--block, "Valve Pulp", Arial, sans-serif);
   font-size: clamp(1.9rem, 4vw, 3rem);
+  letter-spacing: 0.1em;
   line-height: 0.9;
   text-transform: uppercase;
 }
@@ -585,8 +621,9 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid rgba(255, 239, 214, 0.22);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd6;
   cursor: pointer;
   font-family: var(--font-geist-mono), "Roboto Mono", monospace;
@@ -597,7 +634,8 @@
 
 .modalCloseButton:hover,
 .modalCloseButton:focus-visible {
-  border-color: var(--profile-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -606,7 +644,7 @@
   grid-template-columns: repeat(2, minmax(0, 220px));
   width: max-content;
   max-width: 100%;
-  border: 1px solid rgba(255, 239, 214, 0.16);
+  border: 1px solid var(--citadel-border);
   background: rgba(0, 0, 0, 0.34);
 }
 
@@ -630,8 +668,8 @@
 }
 
 .backgroundTabs button[aria-selected="true"] {
-  background: color-mix(in srgb, var(--profile-accent) 22%, rgba(0, 0, 0, 0.4));
-  color: #ffefd6;
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .backgroundOptions {
@@ -784,12 +822,13 @@
   justify-content: center;
   gap: 8px;
   min-height: 40px;
-  border: 1px solid rgba(255, 239, 214, 0.18);
-  background: rgba(0, 0, 0, 0.36);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: rgba(255, 239, 214, 0.78);
   cursor: pointer;
   padding: 9px 14px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -797,16 +836,17 @@
 }
 
 .backgroundConfirmButton {
-  border-color: color-mix(in srgb, var(--profile-accent) 76%, rgba(255, 239, 214, 0.2));
-  background: color-mix(in srgb, var(--profile-accent) 18%, rgba(0, 0, 0, 0.56));
-  color: #ffefd6;
+  border-color: var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  color: var(--citadel-gold);
 }
 
 .backgroundCancelButton:hover,
 .backgroundCancelButton:focus-visible,
 .backgroundConfirmButton:hover,
 .backgroundConfirmButton:focus-visible {
-  border-color: var(--profile-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -870,7 +910,7 @@
 .bookmarkToolbar select,
 .notificationToolbar select {
   min-height: 34px;
-  border: 1px solid rgba(255, 239, 214, 0.16);
+  border: 1px solid var(--citadel-border-muted);
   background: rgba(0, 0, 0, 0.56);
   color: #ffefd6;
   padding: 7px 10px;
@@ -882,12 +922,13 @@
 
 .notificationToolbar button {
   min-height: 34px;
-  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
-  background: color-mix(in srgb, var(--profile-accent) 14%, rgba(0, 0, 0, 0.56));
-  color: #ffefd6;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  clip-path: var(--citadel-button-cut);
+  color: var(--citadel-gold);
   cursor: pointer;
   padding: 8px 12px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -898,8 +939,9 @@
 .notificationToolbar select:focus-visible,
 .notificationToolbar button:focus-visible,
 .notificationToolbar button:hover {
-  border-color: var(--profile-name);
+  border-color: var(--citadel-gold);
   outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
 }
 
 .notificationToolbar button:disabled {
@@ -968,12 +1010,13 @@
   justify-content: center;
   gap: 7px;
   min-height: 36px;
-  border: 1px solid color-mix(in srgb, var(--profile-accent) 72%, rgba(255, 239, 214, 0.18));
-  background: color-mix(in srgb, var(--profile-accent) 14%, rgba(0, 0, 0, 0.56));
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: #ffefd6;
   cursor: pointer;
   padding: 8px 12px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -991,7 +1034,8 @@
 .rowActions a:focus-visible,
 .rowActions button:hover,
 .rowActions button:focus-visible {
-  border-color: var(--profile-name);
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -1159,12 +1203,13 @@
 
 .notificationRow button {
   min-height: 32px;
-  border: 1px solid rgba(255, 239, 214, 0.16);
-  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  clip-path: var(--citadel-button-cut);
   color: rgba(255, 239, 214, 0.78);
   cursor: pointer;
   padding: 7px 10px;
-  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
   font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -1173,7 +1218,8 @@
 
 .notificationRow button:hover,
 .notificationRow button:focus-visible {
-  border-color: var(--notification-accent, var(--profile-name));
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
   outline: none;
 }
 
@@ -1235,8 +1281,8 @@
 }
 
 .segmentedControl button[aria-selected="true"] {
-  background: color-mix(in srgb, var(--profile-accent) 22%, rgba(0, 0, 0, 0.4));
-  color: #ffefd6;
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
 }
 
 .unreadDot {
@@ -1332,7 +1378,7 @@
 @media (max-width: 900px) {
   .content {
     grid-template-columns: 1fr;
-    width: min(100% - 28px, 1180px);
+    width: min(100% - 28px, var(--citadel-container));
     padding-top: 76px;
   }
 

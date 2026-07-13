@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { toApiErrorResponse } from '@/lib/api-errors'
 import dbConnect from '@/lib/dbConnect'
 import User from '@/lib/models/User'
+import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
 
 interface ClerkEmailAddress {
   email_address: string
@@ -123,23 +124,14 @@ export async function POST(request: Request) {
         )
       }
 
-      const userDoc = await User.findOneAndUpdate(
-        { clerkId: evt.data.id },
-        {
-          clerkId: evt.data.id,
-          email,
-          username: getUsername(evt.data),
-          emailVerified: getPrimaryEmailVerified(evt.data),
-          firstName: evt.data.first_name ?? null,
-          lastName: evt.data.last_name ?? null,
-        },
-        {
-          upsert: true,
-          returnDocument: 'after',
-          runValidators: true,
-          setDefaultsOnInsert: true,
-        },
-      )
+      const userDoc = await syncUserRecordFromClerk({
+        clerkId: evt.data.id,
+        email,
+        username: getUsername(evt.data),
+        emailVerified: getPrimaryEmailVerified(evt.data),
+        firstName: evt.data.first_name ?? null,
+        lastName: evt.data.last_name ?? null,
+      })
 
       if (!userDoc) {
         throw new Error('Failed to upsert MongoDB user record')

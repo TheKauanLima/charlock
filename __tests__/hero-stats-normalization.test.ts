@@ -92,6 +92,14 @@ describe('getHeroStatsBySlug stat normalization', () => {
   it('returns the standard stat rows when stored hero documents are partial or malformed', async () => {
     heroFindOneMock.mockReturnValueOnce(createQueryMock({ _id: 'hero-1', slug: 'apollo', name: 'Apollo', portrait: '/portrait.png', render: '/render.png' }))
     heroInfoFindOneMock.mockReturnValueOnce(createQueryMock(null))
+    boonFindOneMock.mockReturnValueOnce(createQueryMock({
+      stats: [{ label: 'Base Bullet Damage', value: '0.5', unit: '', icon: 'damage_bullet_color', scaling: 'boon', scalingValue: '0.5' }],
+      panels: [{
+        id: 'boon-alt',
+        name: 'Aggressive',
+        stats: [{ label: 'Base Bullet Damage', value: '2.5', unit: '', icon: 'damage_bullet_color', scaling: 'boon', scalingValue: '2.5' }],
+      }],
+    }))
     weaponFindOneMock.mockReturnValueOnce(
       createQueryMock({
         weaponName: 'Dueling Rapier & Sidearm',
@@ -177,6 +185,8 @@ describe('getHeroStatsBySlug stat normalization', () => {
     ])
     expect(stats?.weapon.stats[0]).toMatchObject({ value: '18', icon: 'bulletDamage' })
     expect(stats?.weapon.stats[14]).toMatchObject({ label: 'Pellet Count', value: '6' })
+    expect(stats?.boon.stats[0]).toMatchObject({ label: 'Base Bullet Damage', value: '0.5', scaling: 'boon' })
+    expect(stats?.boon.panels?.[0]).toMatchObject({ name: 'Aggressive', stats: expect.arrayContaining([expect.objectContaining({ label: 'Base Bullet Damage', value: '2.5' })]) })
     expect(stats?.vitality.stats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
     expect(stats?.vitality.stats[15]).toMatchObject({ label: 'Dash Speed', value: '0' })
     expect(stats?.weapon.panels?.[0]).toMatchObject({ name: 'Shotgun', bulletDPS: 120, stats: expect.arrayContaining([expect.objectContaining({ label: 'Bullet Damage', value: '20' })]) })

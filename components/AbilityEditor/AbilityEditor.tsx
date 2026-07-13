@@ -1,7 +1,8 @@
 'use client'
 
 import { Bold, GripVertical, Italic, Moon, Plus, Search, X } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
@@ -93,6 +94,7 @@ interface AbilityEditorProps {
   onAbilitySwap?: (primaryIndex: number, currentAbility: AbilityDefinition) => void
   onSecondAbilitySetToggle?: (enabled: boolean, currentAbility: AbilityDefinition) => void
   onModeToggle?: (currentAbility: AbilityDefinition) => void
+  onDraftChange?: (ability: AbilityDefinition) => void
   onSave?: (ability: AbilityDefinition) => void
   onCancel?: () => void
 }
@@ -123,6 +125,10 @@ const RICH_TEXT_COLORS: Array<{ id: string; label: string; token: string }> = [
   { id: 'green', label: 'Green', token: 'green' },
   { id: 'orange', label: 'Orange', token: 'orange' },
 ]
+
+const RICH_TEXT_COLOR_TOKENS = RICH_TEXT_COLORS.map(color => color.token).join('|')
+const CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY = 'charlock_recent_rich_text_colors'
+const MAX_RECENT_CUSTOM_TEXT_COLORS = 8
 
 const COOLDOWN_ICON_COLOR = '#7e61a1'
 const ICON_COLOR_SWATCHES = [
@@ -236,6 +242,54 @@ function escapeHtml(value: string) {
     .replaceAll('"', '&quot;')
 }
 
+function normalizeHexColor(value: string) {
+  const trimmed = value.trim()
+
+  if (/^#[\da-f]{6}$/i.test(trimmed)) {
+    return trimmed.toLowerCase()
+  }
+
+  return null
+}
+
+function getRecentCustomTextColors() {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const parsedValue: unknown = JSON.parse(window.localStorage.getItem(CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY) ?? '[]')
+
+    if (!Array.isArray(parsedValue)) {
+      return []
+    }
+
+    return parsedValue
+      .map(value => typeof value === 'string' ? normalizeHexColor(value) : null)
+      .filter((value): value is string => Boolean(value))
+      .slice(0, MAX_RECENT_CUSTOM_TEXT_COLORS)
+  } catch {
+    return []
+  }
+}
+
+function saveRecentCustomTextColor(color: string) {
+  const normalizedColor = normalizeHexColor(color)
+
+  if (!normalizedColor || typeof window === 'undefined') {
+    return []
+  }
+
+  const recentColors = [
+    normalizedColor,
+    ...getRecentCustomTextColors().filter(recentColor => recentColor !== normalizedColor),
+  ].slice(0, MAX_RECENT_CUSTOM_TEXT_COLORS)
+
+  window.localStorage.setItem(CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY, JSON.stringify(recentColors))
+
+  return recentColors
+}
+
 function tokenTextToHtml(text: string) {
   let html = escapeHtml(text)
 
@@ -244,7 +298,15 @@ function tokenTextToHtml(text: string) {
   html = html.replace(/\[b\]([\s\S]*?)\[\/b\]/g, '<strong>$1</strong>')
   html = html.replace(/\[i\]([\s\S]*?)\[\/i\]/g, '<em>$1</em>')
   html = html.replace(/\[dark\]([\s\S]*?)\[\/dark\]/g, `<span class="${styles.darkenText}" data-rich-dark="true">$1</span>`)
-  html = html.replace(/\[c:(spirit|healing|damage|warning|green|orange)\]([\s\S]*?)\[\/c\]/g, (_, color: string, content: string) => `<span class="${styles[`richColor${color.charAt(0).toUpperCase()}${color.slice(1)}`]}" data-rich-color="${color}">${content}</span>`)
+  html = html.replace(new RegExp(`\\[c:(${RICH_TEXT_COLOR_TOKENS}|#[\\da-fA-F]{6})\\]([\\s\\S]*?)\\[/c\\]`, 'g'), (_, color: string, content: string) => {
+    const customColor = normalizeHexColor(color)
+
+    if (customColor) {
+      return `<span class="${styles.richColorCustom}" data-rich-custom-color="${customColor}" style="color:${customColor}">${content}</span>`
+    }
+
+    return `<span class="${styles[`richColor${color.charAt(0).toUpperCase()}${color.slice(1)}`]}" data-rich-color="${color}">${content}</span>`
+  })
 
   return html.replaceAll('\n', '<br>')
 }
@@ -349,6 +411,16 @@ function serializeRichNode(node: Node): string {
     return `[c:${element.dataset.richColor}]${children}[/c]`
   }
 
+  if (element.dataset.richCustomColor) {
+    const customColor = normalizeHexColor(element.dataset.richCustomColor)
+
+    if (!children || !customColor) {
+      return children
+    }
+
+    return `[c:${customColor}]${children}[/c]`
+  }
+
   if (element.dataset.richDark) {
     if (!children) {
       return ''
@@ -431,7 +503,7 @@ function getTierTextDensity(text: string) {
 }
 
 function removeRichTextColoring(fragment: DocumentFragment) {
-  fragment.querySelectorAll<HTMLElement>('[data-rich-color]').forEach(element => {
+  fragment.querySelectorAll<HTMLElement>('[data-rich-color], [data-rich-custom-color]').forEach(element => {
     unwrapRichTextElement(element)
   })
 }
@@ -449,7 +521,7 @@ function elementMatchesRichTextEffect(element: HTMLElement, effect: RichTextEffe
     return element.dataset.richDark === 'true'
   }
 
-  return element.dataset.richColor === effect.token
+  return element.dataset.richColor === effect.token || element.dataset.richCustomColor === effect.token
 }
 
 function findRichTextEffectElement(node: Node, effect: RichTextEffect, root: HTMLElement) {
@@ -659,9 +731,15 @@ function unwrapEffectFromRange(range: Range, root: HTMLElement, effect: RichText
 
 function unwrapColorEffectsFromRange(range: Range, root: HTMLElement) {
   let nextRange = range
+  const colorTokens = [
+    ...RICH_TEXT_COLORS.map(color => color.token),
+    ...Array.from(root.querySelectorAll<HTMLElement>('[data-rich-custom-color]'))
+      .map(element => element.dataset.richCustomColor)
+      .filter((color): color is string => Boolean(normalizeHexColor(color ?? ''))),
+  ]
 
-  for (const color of RICH_TEXT_COLORS) {
-    const effect: RichTextEffect = { type: 'color', token: color.token }
+  for (const colorToken of colorTokens) {
+    const effect: RichTextEffect = { type: 'color', token: colorToken }
 
     if (!rangeFullyHasEffect(nextRange, root, effect)) {
       continue
@@ -839,7 +917,7 @@ function reorderSections(sections: AbilitySection[], sourceIndex: number, target
   return nextSections
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onAbilitySwap, onSecondAbilitySetToggle, onModeToggle, onSave, onCancel }: AbilityEditorProps) {
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onAbilitySwap, onSecondAbilitySetToggle, onModeToggle, onDraftChange, onSave, onCancel }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
   const isEditorPreview = isPreviewMode && previewLayout === 'editor'
@@ -884,12 +962,17 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       assets: group.assets.filter(asset => asset.label.toLowerCase().includes(query) || asset.path.toLowerCase().includes(query)),
     })).filter(group => group.assets.length)
   }, [abilityIconAssetGroups, iconSearch])
+  const isAbilityNameLong = abilityName.length > 15
 
   useEffect(() => () => {
     if (flashTimeoutRef.current) {
       clearTimeout(flashTimeoutRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    onDraftChange?.(syncAbilityNames(draftAbility))
+  }, [draftAbility, onDraftChange])
 
   useLayoutEffect(() => {
     function syncBaseTierButtonPosition() {
@@ -1508,7 +1591,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 ) : null}
                 <label className={styles.nameInputWrap}>
                   <span className={styles.srOnly}>Ability Name</span>
-                  <input value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
+                  <input className={cn(isAbilityNameLong && styles.nameInputLong)} value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
                 </label>
               </div>
 
@@ -1677,6 +1760,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           onClose={closeAbilityIconModal}
         />
       ) : null}
+
     </section>
   )
 }
@@ -2043,9 +2127,14 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
 function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon }: RichTextSectionProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const swatchMenuRef = useRef<HTMLDivElement | null>(null)
+  const swatchButtonRef = useRef<HTMLButtonElement | null>(null)
+  const swatchPanelRef = useRef<HTMLDivElement | null>(null)
   const lastTextRef = useRef('')
   const lastSelectionRef = useRef<Range | null>(null)
   const [isSwatchOpen, setIsSwatchOpen] = useState(false)
+  const [customColorValue, setCustomColorValue] = useState('#ffffff')
+  const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomTextColors)
+  const [swatchPanelPosition, setSwatchPanelPosition] = useState({ left: 8, top: 8 })
 
   useEffect(() => {
     if (!editorRef.current || document.activeElement === editorRef.current || lastTextRef.current === section.text) {
@@ -2066,6 +2155,10 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
         return
       }
 
+      if (event.target instanceof Node && swatchPanelRef.current?.contains(event.target)) {
+        return
+      }
+
       setIsSwatchOpen(false)
     }
 
@@ -2075,6 +2168,38 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
       document.removeEventListener('pointerdown', handleDocumentPointerDown, true)
     }
   }, [isSwatchOpen])
+
+  const getSwatchPanelPosition = useCallback((panelElement: HTMLDivElement | null = swatchPanelRef.current) => {
+    const buttonElement = swatchButtonRef.current
+
+    if (!buttonElement || typeof window === 'undefined') {
+      return { left: 8, top: 8 }
+    }
+
+    const buttonRect = buttonElement.getBoundingClientRect()
+    const panelRect = panelElement?.getBoundingClientRect()
+    const panelWidth = panelRect?.width ?? 214
+    const panelHeight = panelRect?.height ?? 220
+    const viewportPadding = 8
+    const panelGap = 6
+    const maxLeft = Math.max(viewportPadding, window.innerWidth - panelWidth - viewportPadding)
+    const left = Math.min(Math.max(viewportPadding, buttonRect.left), maxLeft)
+    const top = Math.max(viewportPadding, buttonRect.top - panelHeight - panelGap)
+
+    return { left, top }
+  }, [])
+
+  const updateSwatchPanelPosition = useCallback((panelElement: HTMLDivElement | null = swatchPanelRef.current) => {
+    setSwatchPanelPosition(getSwatchPanelPosition(panelElement))
+  }, [getSwatchPanelPosition])
+
+  const handleSwatchPanelRef = useCallback((node: HTMLDivElement | null) => {
+    swatchPanelRef.current = node
+
+    if (node) {
+      updateSwatchPanelPosition(node)
+    }
+  }, [updateSwatchPanelPosition])
 
   function syncEditorText() {
     if (!editorRef.current) {
@@ -2352,6 +2477,10 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     rememberSelection({ allowCollapsed: false })
   }
 
+  function handleCustomColorMouseDown() {
+    rememberSelection({ allowCollapsed: false })
+  }
+
   function applyInlineElement(tagName: 'strong' | 'em' | 'span', attributes: Record<string, string> = {}, className = '', options: { clearColoring?: boolean; toggleEffect?: RichTextEffect } = {}) {
     let range = getEditorRange()
     const selection = window.getSelection()
@@ -2451,6 +2580,27 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     syncEditorText()
   }
 
+  function applyCustomTextColor(color: string) {
+    const customColor = normalizeHexColor(color)
+
+    if (!customColor) {
+      return
+    }
+
+    setCustomColorValue(customColor)
+    setRecentCustomColors(saveRecentCustomTextColor(customColor))
+    applyInlineElement(
+      'span',
+      {
+        'data-rich-custom-color': customColor,
+        style: `color: ${customColor}`,
+      },
+      styles.richColorCustom,
+      { clearColoring: true },
+    )
+    setIsSwatchOpen(false)
+  }
+
   function handleIconInsert() {
     if (!editorRef.current) {
       return
@@ -2490,37 +2640,85 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
         <button type="button" aria-label="Italicize selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('em', {}, '', { toggleEffect: { type: 'italic' } })}><Italic aria-hidden="true" /></button>
         <button type="button" aria-label="Darken selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('span', { 'data-rich-dark': 'true' }, styles.darkenText, { toggleEffect: { type: 'dark' } })}><Moon aria-hidden="true" /></button>
         <div className={styles.swatchMenu} ref={swatchMenuRef}>
-          <button type="button" aria-label="Open text color swatches" onMouseDown={handleToolbarMouseDown} onClick={() => setIsSwatchOpen(open => !open)}>
+          <button
+            ref={swatchButtonRef}
+            type="button"
+            aria-label="Open text color swatches"
+            onMouseDown={handleToolbarMouseDown}
+            onClick={() => {
+              setRecentCustomColors(getRecentCustomTextColors())
+              setSwatchPanelPosition(getSwatchPanelPosition())
+              setIsSwatchOpen(open => !open)
+            }}
+          >
             Swatches
           </button>
-          {isSwatchOpen ? (
-            <div className={styles.swatchPanel}>
-              <button
-                type="button"
-                className={styles.swatchDefault}
-                aria-label="Apply Default color"
-                onMouseDown={handleToolbarMouseDown}
-                onClick={() => {
-                  clearInlineColoring()
-                  setIsSwatchOpen(false)
-                }}
-              >
-                Default
-              </button>
-              {RICH_TEXT_COLORS.map(color => (
+          {isSwatchOpen && typeof document !== 'undefined' ? createPortal(
+            <div
+              ref={handleSwatchPanelRef}
+              className={styles.swatchPanel}
+              style={{
+                left: `${swatchPanelPosition.left}px`,
+                top: `${swatchPanelPosition.top}px`,
+              }}
+            >
+              <div className={styles.swatchPresetRow} aria-label="Preset text colors">
                 <button
-                  key={color.id}
                   type="button"
-                  aria-label={`Apply ${color.label} color`}
-                  className={styles[`swatch${color.id.charAt(0).toUpperCase()}${color.id.slice(1)}`]}
+                  className={styles.swatchDefault}
+                  aria-label="Apply Default color"
                   onMouseDown={handleToolbarMouseDown}
                   onClick={() => {
-                    applyInlineElement('span', { 'data-rich-color': color.token }, styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`], { clearColoring: true })
+                    clearInlineColoring()
                     setIsSwatchOpen(false)
                   }}
+                >
+                  Default
+                </button>
+                {RICH_TEXT_COLORS.map(color => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    aria-label={`Apply ${color.label} color`}
+                    className={styles[`swatch${color.id.charAt(0).toUpperCase()}${color.id.slice(1)}`]}
+                    onMouseDown={handleToolbarMouseDown}
+                    onClick={() => {
+                      applyInlineElement('span', { 'data-rich-color': color.token }, styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`], { clearColoring: true })
+                      setIsSwatchOpen(false)
+                    }}
+                  />
+                ))}
+              </div>
+              <label className={styles.customColorPicker}>
+                <span>Custom</span>
+                <input
+                  type="color"
+                  value={customColorValue}
+                  aria-label="Custom text color"
+                  onMouseDown={handleCustomColorMouseDown}
+                  onChange={event => applyCustomTextColor(event.target.value)}
                 />
-              ))}
-            </div>
+              </label>
+              {recentCustomColors.length ? (
+                <div className={styles.recentCustomColorGroup} aria-label="Recently made colors">
+                  <span>Recently made</span>
+                  <div className={styles.recentCustomColorRow}>
+                    {recentCustomColors.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        className={styles.customColorSwatch}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Apply recently made ${color} color`}
+                        onMouseDown={handleToolbarMouseDown}
+                        onClick={() => applyCustomTextColor(color)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>,
+            document.body,
           ) : null}
         </div>
         <button type="button" onMouseDown={handleToolbarMouseDown} onClick={handleIconInsert}>Inline Icon</button>

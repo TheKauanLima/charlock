@@ -156,25 +156,6 @@ describe('error and loading states', () => {
 
   it('preserves a draft and offers retry when the save session expires', async () => {
     const user = userEvent.setup()
-    const hero = HEROES[0]
-    writeEditorRecovery(buildEditorRecoverySnapshot({
-      heroSlug: hero.slug,
-      savedHeroId: null,
-      heroInfo: {
-        ...hero.heroInfo,
-        ability1Icon: '',
-        ability2Icon: '',
-        ability3Icon: '',
-        ability4Icon: '',
-      },
-      background: hero.render,
-      renderSelection: { mode: 'background', src: null },
-      heroName: 'Offline Arc',
-      portrait: hero.portrait,
-      allowCopies: false,
-      stats: buildHeroStatsSeed(hero),
-      abilityStats: buildDefaultAbilityStats(hero),
-    }))
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
       error: 'Session token expired.',
       code: 'AUTH_REQUIRED',
@@ -182,7 +163,8 @@ describe('error and loading states', () => {
     }, { status: 401 }))
 
     render(<HeroGrid initialTab="Create" />)
-    await waitFor(() => expect(screen.getByPlaceholderText('Name this save')).toHaveValue('Offline Arc'))
+    await user.click(screen.getByRole('button', { name: 'Use EMPTY template' }))
+    await user.type(screen.getByPlaceholderText('Name this save'), 'Offline Arc')
     await user.click(screen.getByRole('button', { name: 'Save Private' }))
 
     expect(await screen.findByRole('dialog', { name: 'SESSION CONNECTION TERMINATED' })).toBeInTheDocument()

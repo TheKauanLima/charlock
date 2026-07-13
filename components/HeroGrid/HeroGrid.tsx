@@ -152,7 +152,8 @@ function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload
 }
 
 export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
-  const [activeTab, setActiveTab] = useState<PrimaryTab>(initialTab)
+  const startsInCreate = initialTab === 'Create'
+  const [activeTab, setActiveTab] = useState<PrimaryTab>(startsInCreate ? 'Select' : initialTab)
   const [browseSort, setBrowseSort] = useState<CustomHeroSort>('new')
   const [browseSearch, setBrowseSearch] = useState('')
   const [browseHeroes, setBrowseHeroes] = useState<CustomHeroSummary[]>([])
@@ -167,6 +168,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [bookmarksStatus, setBookmarksStatus] = useState<string | null>(null)
   const [feedItems, setFeedItems] = useState<ActivityFeedItem[]>([])
   const [feedStatus, setFeedStatus] = useState<string | null>(null)
+  const [hasSelectedHero, setHasSelectedHero] = useState(false)
   const [activeHeroSlug, setActiveHeroSlug] = useState(HEROES[0]?.slug ?? '')
   const [renderHeroSlug, setRenderHeroSlug] = useState(activeHeroSlug)
   const [pendingRenderHeroSlug, setPendingRenderHeroSlug] = useState<string | null>(null)
@@ -177,7 +179,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [editingAbilityStats, setEditingAbilityStats] = useState<AbilityStatsPayload | null>(null)
   const [editorRevision, setEditorRevision] = useState(0)
   const [showDetails, setShowDetails] = useState(false)
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(startsInCreate)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setShowDetails(getStoredShowDetails()), 0)
@@ -206,6 +208,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [editorRenderSelection, setEditorRenderSelection] = useState<EditorRenderSelection>({ mode: 'background', src: null })
   const isCreateMode = activeTab === 'Create'
   const isCollectionTab = activeTab === 'Browse' || activeTab === 'Bookmarks'
+  const shouldShowRender = isCreateMode || (isCollectionTab ? Boolean(selectedCollectionHero) : activeTab === 'Select' && hasSelectedHero)
   const editorRenderImage = editorRenderSelection.mode === 'hero' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
   const displayRenderImage = isCreateMode ? editorRenderImage : selectedCollectionHero ? selectedCollectionHero.render : renderHero.render
   const displayRenderLabel = isCreateMode
@@ -537,6 +540,8 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }, [activeTab])
 
   function handleHeroSelect(heroSlug: string) {
+    setHasSelectedHero(true)
+
     if (heroSlug === activeHeroSlug) {
       return
     }
@@ -819,6 +824,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     })
   }
 
+  function handleExitCreateEditor() {
+    setIsTemplateModalOpen(false)
+    setActiveTab('Select')
+  }
+
   return (
     <div className={styles.shell}>
       <div className={styles.backgroundLayer} />
@@ -827,15 +837,17 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       <div className={styles.renderLayer}>
         <div className={styles.renderFade} />
-        <div
-          key={isCreateMode ? editorBackground : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
-          className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
-          role="img"
-          aria-label={displayRenderLabel}
-          aria-hidden={renderPhase === 'fade-out'}
-          data-testid="hero-render-layer"
-          style={{ backgroundImage: `url('${displayRenderImage}')` }}
-        />
+        {shouldShowRender ? (
+          <div
+            key={isCreateMode ? editorBackground : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
+            className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
+            role="img"
+            aria-label={displayRenderLabel}
+            aria-hidden={renderPhase === 'fade-out'}
+            data-testid="hero-render-layer"
+            style={{ backgroundImage: `url('${displayRenderImage}')` }}
+          />
+        ) : null}
         {isCreateMode && editorRenderSelection.mode === 'custom' && editorRenderSelection.src ? (
           <div
             className={styles.renderFrame}
@@ -847,10 +859,14 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         ) : null}
       </div>
 
+      {activeTab === 'Select' && !hasSelectedHero ? (
+        <h1 className={styles.landingTitle} data-testid="landing-title">CURSED CONCEPTS</h1>
+      ) : null}
+
       <div className={styles.content}>
-        <nav aria-label="Hero picker tabs" className={styles.tabs}>
+        <nav aria-label="Primary sections" className={styles.tabs} data-testid="primary-top-bar">
           {TAB_ITEMS.map(tab => {
-            const isActive = tab.label === activeTab
+            const isActive = tab.label === 'Create' ? isTemplateModalOpen || activeTab === 'Create' : tab.label === activeTab && !isTemplateModalOpen
 
             return (
               <button
@@ -946,16 +962,18 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           </main>
         ) : !isCreateMode ? (
           <main className={`${styles.main} ${isCollectionTab ? styles.browseMain : ''}`}>
-            <button
-              type="button"
-              className={`${styles.detailsToggle} ${showDetails ? styles.detailsToggleActive : ''}`}
-              aria-label={showDetails ? 'Hide Details' : 'Show Details'}
-              aria-pressed={showDetails}
-              title={showDetails ? 'Hide scaling values' : 'Show scaling values'}
-              onClick={handleShowDetailsToggle}
-            >
-              <span aria-hidden="true" />
-            </button>
+            {(isCollectionTab ? Boolean(selectedCollectionHero) : hasSelectedHero) ? (
+              <button
+                type="button"
+                className={`${styles.detailsToggle} ${showDetails ? styles.detailsToggleActive : ''}`}
+                aria-label={showDetails ? 'Hide Details' : 'Show Details'}
+                aria-pressed={showDetails}
+                title={showDetails ? 'Hide scaling values' : 'Show scaling values'}
+                onClick={handleShowDetailsToggle}
+              >
+                <span aria-hidden="true" />
+              </button>
+            ) : null}
             {activeTab === 'Browse' && browseStatus ? <p className={styles.browseStatus} role="status">{browseStatus}</p> : null}
             {activeTab === 'Bookmarks' && bookmarksStatus ? <p className={styles.browseStatus} role="status">{bookmarksStatus}</p> : null}
             <section className={styles.grid}>
@@ -1025,7 +1043,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
                   return <div key={`empty-${index}`} data-testid="hero-empty-slot" aria-hidden="true" className={styles.emptySlot} />
                 }
 
-                const isSelected = hero.slug === activeHero.slug
+                const isSelected = hasSelectedHero && hero.slug === activeHero.slug
 
                 return (
                   <button
@@ -1095,12 +1113,13 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           onRenderSelectionChange={setEditorRenderSelection}
           onDraftChange={setEditorDraft}
           onSaveHero={handleSaveHero}
+          onExitEditor={handleExitCreateEditor}
         />
       ) : isCollectionTab ? (
         selectedCollectionHero ? <HeroInfoCluster hero={selectedCollectionHero} showDetails={showDetails} /> : null
-      ) : (
+      ) : activeTab === 'Select' && hasSelectedHero ? (
         <HeroInfoCluster hero={activeHero} showDetails={showDetails} onCreateFromHero={() => void handleCreateFromSelectedHero(activeHero)} />
-      )}
+      ) : null}
 
       {isCreateMode ? (
         <BackstoryModule

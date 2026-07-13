@@ -73,8 +73,26 @@
 }
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f0e10;
+  --foreground: #ffefd6;
+  --citadel-bg: #0f0e10;
+  --citadel-bg-raised: #1b1a1c;
+  --citadel-bg-muted: #111113;
+  --citadel-panel: #0f0e10;
+  --citadel-panel-inner-border: #232122;
+  --citadel-border: #474446;
+  --citadel-border-muted: rgba(71, 68, 70, 0.72);
+  --citadel-gold: #11b8a1;
+  --citadel-gold-soft: rgba(17, 184, 161, 0.18);
+  --citadel-gold-faint: rgba(17, 184, 161, 0.1);
+  --citadel-text: #ffefd6;
+  --citadel-text-muted: rgba(255, 239, 214, 0.68);
+  --citadel-metadata: #888888;
+  --citadel-danger: #ff6868;
+  --citadel-danger-bg: rgba(158, 28, 25, 0.22);
+  --citadel-button-cut: polygon(0 0, 92% 0, 100% 25%, 100% 100%, 8% 100%, 0 75%);
+  --citadel-container: 1200px;
+  --citadel-editor-container: 1600px;
 }
 
 @theme inline {
@@ -86,13 +104,125 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f0e10;
+    --foreground: #ffefd6;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: Radiance, Arial, Helvetica, sans-serif;
+}
+
+.citadel-container {
+  width: min(var(--citadel-container), calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.citadel-editor-container {
+  width: min(var(--citadel-editor-container), calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.citadel-page-title {
+  margin: 0;
+  color: var(--citadel-text);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  letter-spacing: 0.1em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.citadel-section-subheader {
+  margin: 0;
+  color: var(--citadel-text);
+  font-family: Radiance, Arial, sans-serif;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.citadel-metadata {
+  color: var(--citadel-metadata);
+  font-family: var(--font-mono), var(--font-geist-mono), "Roboto Mono", monospace;
+  letter-spacing: 0;
+}
+
+.citadel-button-primary,
+.citadel-button-secondary,
+.citadel-button-danger {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid;
+  clip-path: var(--citadel-button-cut);
+  cursor: pointer;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out,
+    opacity 150ms ease-out;
+}
+
+.citadel-button-primary {
+  border-color: var(--citadel-gold);
+  background: var(--citadel-bg-raised);
+  color: var(--citadel-gold);
+}
+
+.citadel-button-secondary {
+  border-color: var(--citadel-border);
+  background: rgba(15, 14, 16, 0.72);
+  color: var(--citadel-text);
+}
+
+.citadel-button-danger {
+  border-color: var(--citadel-danger);
+  background: var(--citadel-danger-bg);
+  color: #ffd6d7;
+}
+
+.citadel-button-primary:hover,
+.citadel-button-primary:focus-visible {
+  background: var(--citadel-gold-soft);
+}
+
+.citadel-button-secondary:hover,
+.citadel-button-secondary:focus-visible {
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
+}
+
+.citadel-button-danger:hover,
+.citadel-button-danger:focus-visible {
+  background: rgba(158, 28, 25, 0.36);
+}
+
+.citadel-button-primary:focus-visible,
+.citadel-button-secondary:focus-visible,
+.citadel-button-danger:focus-visible,
+.citadel-focus-field:focus,
+.citadel-focus-field:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
+}
+
+.citadel-modal-backdrop {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.citadel-modal-surface {
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-panel);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 1px var(--citadel-panel-inner-border);
 }
