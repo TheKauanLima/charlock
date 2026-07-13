@@ -91,6 +91,7 @@ describe('design pass styles', () => {
     const controlRailToggleLabelRule = heroInfoEditor.match(/\.controlRailToggle strong\s*\{([^}]*)\}/)?.[1] ?? ''
     const controlPaneRule = heroInfoEditor.match(/^\.controlPane\s*\{([^}]*)\}/m)?.[1] ?? ''
     const collapsedRailRule = heroInfoEditor.match(/\.controlRailCollapsed\s*\{([^}]*)\}/)?.[1] ?? ''
+    const collapsedControlPaneRule = heroInfoEditor.match(/\.controlRailCollapsed \.controlPane\s*\{([^}]*)\}/)?.[1] ?? ''
     const collapsedPreviewRule = heroInfoEditor.match(/\.previewStageRailCollapsed\s*\{([^}]*)\}/)?.[1] ?? ''
     const activeAbilityPreviewRule = heroInfoEditor.match(/\.previewStageAbilityEditorActive\s*\{([^}]*)\}/)?.[1] ?? ''
     const hiddenPaneRule = heroInfoEditor.match(/\.controlPaneSection\[hidden\]\s*\{([^}]*)\}/)?.[1] ?? ''
@@ -100,7 +101,12 @@ describe('design pass styles', () => {
     expect(controlRailRule).toMatch(/left:\s*0/)
     expect(controlRailRule).toMatch(/grid-template-columns:\s*54px minmax\(0, 356px\)/)
     expect(controlRailRule).toMatch(/overflow:\s*visible/)
-    expect(collapsedRailRule).toMatch(/transform:\s*translateX\(calc\(-100% \+ 28px\)\)/)
+    expect(collapsedRailRule).toMatch(/grid-template-columns:\s*54px minmax\(0, 0\)/)
+    expect(collapsedRailRule).toMatch(/width:\s*54px/)
+    expect(collapsedRailRule).toMatch(/min-width:\s*54px/)
+    expect(collapsedRailRule).not.toMatch(/transform:\s*translateX/)
+    expect(collapsedControlPaneRule).toMatch(/visibility:\s*hidden/)
+    expect(collapsedControlPaneRule).toMatch(/pointer-events:\s*none/)
     expect(controlRailToggleRule).toMatch(/position:\s*absolute/)
     expect(controlRailToggleRule).toMatch(/right:\s*-28px/)
     expect(controlRailToggleRule).toMatch(/overflow:\s*hidden/)
@@ -112,6 +118,7 @@ describe('design pass styles', () => {
     expect(activeAbilityPreviewRule).toMatch(/pointer-events:\s*none/)
     expect(controlTabRailRule).toMatch(/flex-direction:\s*column/)
     expect(controlPaneRule).toMatch(/flex-direction:\s*column/)
+    expect(controlPaneRule).toMatch(/overflow:\s*hidden/)
     expect(hiddenPaneRule).toMatch(/display:\s*none/)
   })
 })

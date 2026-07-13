@@ -27,6 +27,14 @@ import {
   type HeroDefinition,
   type HeroInfoDefinition,
 } from '@/lib/hero-data'
+import {
+  SQUARE_ICON_SIZE_OPTIONS,
+  getSquareIconOption,
+  getSquareIconStyle,
+  getSquareIconToken,
+  isSquareIcon,
+  type SquareIconSize,
+} from '@/lib/square-icon'
 import cn from '@/lib/utilsd'
 
 import styles from './AbilityEditor.module.css'
@@ -160,16 +168,28 @@ type RichTextEffect =
   | { type: 'color'; token: string }
 
 function getIconName(path: string) {
+  if (isSquareIcon(path)) {
+    return path
+  }
+
   return (path.split('/').at(-1) ?? path).replace('.svg', '')
 }
 
 function isIntrinsicColorPropertyIcon(pathOrName: string) {
+  if (isSquareIcon(pathOrName)) {
+    return false
+  }
+
   const fileName = pathOrName.split('/').at(-1)?.toLowerCase() ?? pathOrName.toLowerCase()
 
   return fileName.includes('color') || fileName.endsWith('.png')
 }
 
 function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties {
+  if (isSquareIcon(path)) {
+    return getSquareIconStyle(path, iconColor || '#ffffff', 'stat')
+  }
+
   if (isIntrinsicColorPropertyIcon(path)) {
     return {
       backgroundImage: `url('${path}')`,
@@ -184,6 +204,10 @@ function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties
 }
 
 function getWhiteAbilityIconVisualStyle(path: string): CSSProperties {
+  if (isSquareIcon(path)) {
+    return getSquareIconStyle(path, '#ffffff')
+  }
+
   return {
     backgroundColor: '#ffffff',
     WebkitMaskImage: `url('${path}')`,
@@ -195,7 +219,10 @@ function getInlineIconHtml(iconName: string, iconColor = '') {
   const iconPath = `/panorama/images/icons/properties/${iconName}.svg`
   const hasIntrinsicColor = isIntrinsicColorPropertyIcon(iconName)
   const className = hasIntrinsicColor ? `${styles.inlineIcon} ${styles.inlineIconOriginalColor}` : styles.inlineIcon
-  const style = isIntrinsicColorPropertyIcon(iconName)
+  const squareOption = isSquareIcon(iconName) ? getSquareIconOption(iconName) : null
+  const style = squareOption
+    ? `width:${squareOption.statSize};height:${squareOption.statSize};background-color:${iconColor || '#fff8ec'};-webkit-mask-image:none;mask-image:none`
+    : isIntrinsicColorPropertyIcon(iconName)
     ? `background-image:url('${iconPath}')`
     : `${iconColor ? `background-color:${iconColor};` : ''}-webkit-mask-image:url('${iconPath}');mask-image:url('${iconPath}')`
   const colorAttribute = !hasIntrinsicColor && iconColor ? ` data-inline-icon-color="${iconColor}"` : ''
@@ -826,12 +853,25 @@ function cloneAbility(ability: AbilityDefinition): AbilityDefinition {
   return syncAbilityNames(structuredClone(ability))
 }
 
+function formatAbilityIconAssetLabel(path: string) {
+  const fileName = path.split('/').at(-1) ?? path
+  const rawName = fileName
+    .replace(/\.(png|svg)$/i, '')
+    .replace(/_(psd|png)$/i, '')
+
+  return rawName
+    .split('_')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 function getAbilityIconGroupsAsAssets(groups: AbilityIconGroup[]): EditorAssetGroup[] {
   return groups.map(group => ({
     id: `ability-icons-${group.heroSlug}`,
     label: group.heroName,
     assets: group.icons.map((icon, index) => ({
-      label: `${group.heroName} ${index + 1}`,
+      label: group.useFileLabels ? formatAbilityIconAssetLabel(icon) : `${group.heroName} ${index + 1}`,
       path: icon,
     })),
   }))
@@ -1586,7 +1626,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               <div className={styles.titleGroup}>
                 {capabilities.canChangeIcons ? (
                   <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => openIconModal({ type: 'abilityIcon' })}>
-                  <span aria-hidden="true" style={{ WebkitMaskImage: `url('${activeAbility.icon}')`, maskImage: `url('${activeAbility.icon}')` }} />
+                  <span aria-hidden="true" style={getWhiteAbilityIconVisualStyle(activeAbility.icon)} />
                   </button>
                 ) : null}
                 <label className={styles.nameInputWrap}>
@@ -2836,8 +2876,23 @@ interface IconSearchModalProps {
 
 function IconSearchModal({ groups, statGroups = [], search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
   const isAbilityPicker = previewMode === 'ability'
-  const [abilityIconTab, setAbilityIconTab] = useState<'abilities' | 'stats'>('abilities')
-  const showsAbilityIcons = isAbilityPicker && abilityIconTab === 'abilities'
+  const [abilityIconTab, setAbilityIconTab] = useState('heroes')
+  const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
+  const squareIconOption = getSquareIconOption(squareIconSize)
+  const upgradeAbilityGroups = isAbilityPicker ? groups.filter(group => group.id.startsWith('ability-icons-upgrade')) : []
+  const heroAbilityGroups = isAbilityPicker ? groups.filter(group => !group.id.startsWith('ability-icons-upgrade')) : groups
+  const activeAbilityGroups = abilityIconTab === 'heroes'
+    ? heroAbilityGroups
+    : upgradeAbilityGroups.filter(group => group.id === abilityIconTab)
+  const showsAbilityIcons = isAbilityPicker && abilityIconTab !== 'stats'
+  const activeIconGroups = isAbilityPicker
+    ? abilityIconTab === 'stats' ? statGroups : activeAbilityGroups
+    : groups
+  const tabPanelLabelId = abilityIconTab === 'stats'
+    ? 'ability-icon-tab-stats'
+    : abilityIconTab === 'heroes'
+      ? 'ability-icon-tab-heroes'
+      : `ability-icon-tab-${abilityIconTab}`
 
   function handleBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
     if (event.target === event.currentTarget) {
@@ -2894,19 +2949,65 @@ function IconSearchModal({ groups, statGroups = [], search, selectedIconColor, t
             ))}
           </section>
         ) : null}
+        <section className={styles.squareIconPicker} aria-label="Square icon">
+          <button type="button" className={styles.squareIconSelect} aria-label="Use Square Icon" onClick={() => onSelect(getSquareIconToken(squareIconSize))}>
+            <span
+              className={styles.squareIconPreview}
+              aria-hidden="true"
+              style={{
+                width: squareIconOption.previewSize,
+                height: squareIconOption.previewSize,
+                backgroundColor: selectedIconColor || '#ffffff',
+              }}
+            />
+            <span>
+              <strong>Square Icon</strong>
+              <em>{squareIconOption.label}</em>
+            </span>
+          </button>
+          <div className={styles.iconSizePicker} aria-label="Square icon size">
+            {SQUARE_ICON_SIZE_OPTIONS.map(sizeOption => (
+              <button
+                key={sizeOption.id}
+                type="button"
+                className={cn(styles.iconSizeSwatch, squareIconSize === sizeOption.id && styles.iconSizeSwatchActive)}
+                aria-label={`${sizeOption.label} square icon size`}
+                aria-pressed={squareIconSize === sizeOption.id}
+                onClick={() => setSquareIconSize(sizeOption.id)}
+              >
+                <span aria-hidden="true" style={{ width: sizeOption.swatchSize, height: sizeOption.swatchSize }} />
+                <em>{sizeOption.label}</em>
+              </button>
+            ))}
+          </div>
+        </section>
         {isAbilityPicker ? (
           <div className={styles.iconTabs} role="tablist" aria-label="Ability icon categories">
             <button
               type="button"
-              id="ability-icon-tab-abilities"
+              id="ability-icon-tab-heroes"
               role="tab"
               aria-controls="ability-icon-tabpanel"
-              aria-selected={abilityIconTab === 'abilities'}
-              className={cn(abilityIconTab === 'abilities' && styles.iconTabActive)}
-              onClick={() => setAbilityIconTab('abilities')}
+              aria-selected={abilityIconTab === 'heroes'}
+              className={cn(abilityIconTab === 'heroes' && styles.iconTabActive)}
+              onClick={() => setAbilityIconTab('heroes')}
             >
               Hero abilities
             </button>
+            {upgradeAbilityGroups.map(group => (
+              <button
+                key={group.id}
+                type="button"
+                id={`ability-icon-tab-${group.id}`}
+                role="tab"
+                aria-controls="ability-icon-tabpanel"
+                aria-selected={abilityIconTab === group.id}
+                className={cn(abilityIconTab === group.id && styles.iconTabActive)}
+                onClick={() => setAbilityIconTab(group.id)}
+              >
+                {group.label}
+              </button>
+            ))}
             <button
               type="button"
               id="ability-icon-tab-stats"
@@ -2924,16 +3025,16 @@ function IconSearchModal({ groups, statGroups = [], search, selectedIconColor, t
           className={cn(styles.iconGrid, showsAbilityIcons && styles.iconGridAbility)}
           id={isAbilityPicker ? 'ability-icon-tabpanel' : undefined}
           role={isAbilityPicker ? 'tabpanel' : undefined}
-          aria-labelledby={isAbilityPicker ? `ability-icon-tab-${abilityIconTab}` : undefined}
+          aria-labelledby={isAbilityPicker ? tabPanelLabelId : undefined}
         >
           {showsAbilityIcons
-            ? groups.map(group => (
+            ? activeIconGroups.map(group => (
                 <div key={group.id} className={styles.iconAbilityGroup} role="group" aria-label={group.label}>
                   <p className={styles.iconAbilityGroupTitle}>{group.label}</p>
-                  {group.assets.slice(0, 4).map(asset => renderIconButton(asset, 'ability'))}
+                  {group.assets.map(asset => renderIconButton(asset, 'ability'))}
                 </div>
               ))
-            : (isAbilityPicker ? statGroups : groups).flatMap(group => group.assets).map(asset => renderIconButton(asset, previewMode === 'ability' ? 'property' : previewMode))}
+            : activeIconGroups.flatMap(group => group.assets).map(asset => renderIconButton(asset, previewMode === 'ability' ? 'property' : previewMode))}
         </div>
       </div>
     </div>

@@ -84,6 +84,8 @@ describe('Mongoose model schemas', () => {
     expect(BoonStats.schema.path('stats.scaling')).toHaveProperty('enumValues', ['boon'])
     expect(BoonStats.schema.path('panels.stats.scaling')).toHaveProperty('enumValues', ['boon'])
     expect(BoonStats.schema.path('stats.scalingValue')).toBeDefined()
+    expect(BoonStats.schema.path('stats.iconColor')).toBeDefined()
+    expect(BoonStats.schema.path('panels.stats.iconColor')).toBeDefined()
   })
 
   it('stores profile preferences and privacy settings', () => {

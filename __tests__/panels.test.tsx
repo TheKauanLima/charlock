@@ -106,11 +106,19 @@ describe('migrated stat panels', () => {
     expect(boonStyles).not.toMatch(/\.unlockIcon\s*\{[^}]*mask:/)
     expect(boonStyles).toMatch(/\.apIcon\s*\{[^}]*background:\s*#e6cafc/)
     expect(boonStyles).toMatch(/\.healthIcon\s*\{[^}]*background:\s*#01fe9c/)
-    expect(boonStyles).toMatch(/\.iconPickerBackdrop\s*\{[^}]*background:\s*transparent/)
-    expect(boonStyles).toMatch(/\.iconPicker\s*\{[^}]*position:\s*absolute/)
+    expect(boonStyles).toMatch(/\.iconPickerBackdrop\s*\{[^}]*place-items:\s*center/)
+    expect(boonStyles).toMatch(/\.iconPickerBackdrop\s*\{[^}]*background:\s*rgba\(0,\s*0,\s*0,\s*0\.52\)/)
+    expect(boonStyles).toMatch(/\.iconPicker\s*\{[^}]*width:\s*min\(760px,\s*calc\(100vw - 44px\)\)/)
+    expect(boonStyles).toMatch(/\.iconColorPicker\s*\{/)
+    expect(boonStyles).toMatch(/\.squareIconPicker\s*\{/)
+    expect(boonStyles).toMatch(/\.squareIconSelect\s*\{/)
+    expect(boonStyles).toMatch(/\.iconSizePicker\s*\{/)
     expect(boonStyles).toMatch(/\.iconPickerDefault button\s*\{/)
+    expect(boonStyles).toMatch(/\.iconPickerGrid button\s*\{[^}]*grid-template-columns:\s*26px minmax\(0,\s*1fr\)/)
+    expect(boonStyles).toMatch(/\.iconPickerGrid button span\s*\{[^}]*width:\s*24px/)
+    expect(boonStyles).not.toMatch(/--icon-preview-size/)
     expect(boonStyles).toMatch(/\.iconPickerGrid button span\s*\{[^}]*background-size:\s*contain/)
-    expect(boonStyles).not.toMatch(/\.iconPickerGrid button span\s*\{[^}]*mask-position/)
+    expect(boonStyles).toMatch(/\.iconPickerGrid button span\s*\{[^}]*mask-position:\s*center/)
 
     const unlockIcon = readFileSync('public/panorama/images/hud/unlock_icon.svg', 'utf8')
     expect(unlockIcon).toContain('path[fill="white"] { fill: #e6cafc; }')
@@ -136,15 +144,36 @@ describe('migrated stat panels', () => {
     await user.type(screen.getByLabelText('Boon stat 1 label'), 'Bullet Bonus')
     await user.click(screen.getByRole('button', { name: 'Change Bullet Bonus icon' }))
     let iconModal = screen.getByTestId('boon-stat-icon-modal')
-    const nativeSpiritIcon = within(iconModal).getByRole('button', { name: 'Use Spirit' }).querySelector('[aria-hidden="true"]')
+    const nativeDamageIcon = within(iconModal).getByRole('button', { name: 'Use Damage Bullet Color' }).querySelector('[aria-hidden="true"]')
 
     expect(within(iconModal).getByRole('button', { name: 'Use Default Icon' })).toHaveTextContent('Native colors')
-    expect(nativeSpiritIcon?.getAttribute('style')).toContain('background-image')
-    expect(nativeSpiritIcon?.getAttribute('style')).not.toContain('mask')
+    expect(within(iconModal).getByRole('button', { name: 'Default icon color' })).toHaveAttribute('aria-pressed', 'true')
+    expect(nativeDamageIcon?.getAttribute('style')).toContain('background-image')
+    expect(nativeDamageIcon?.getAttribute('style')).not.toContain('mask')
+    expect(within(iconModal).getByRole('button', { name: 'Use Square Icon' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('button', { name: 'Medium square icon size' })).toHaveAttribute('aria-pressed', 'true')
 
-    await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
+    await user.click(within(iconModal).getByRole('button', { name: 'Tiny square icon size' }))
 
-    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: '/panorama/images/icons/properties/heal.svg' })
+    expect(within(iconModal).getByRole('button', { name: 'Tiny square icon size' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(iconModal).getByRole('button', { name: 'Use Spirit' })).not.toHaveAttribute('style')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Spirit icon color' }))
+    expect(within(iconModal).getByRole('button', { name: 'Spirit icon color' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(iconModal).getByRole('button', { name: 'Large square icon size' }))
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Square Icon' }))
+
+    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: 'square:large', iconColor: '#7e61a1' })
+    expect(screen.getByRole('button', { name: 'Change Bullet Bonus icon' }).querySelector('[aria-hidden="true"]')).toHaveAttribute(
+      'style',
+      expect.stringContaining('width: 22px'),
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Change Bullet Bonus icon' }))
+    iconModal = screen.getByTestId('boon-stat-icon-modal')
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Spirit' }))
+
+    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: '/panorama/images/icons/properties/spirit.svg', iconColor: '#7e61a1' })
     expect(screen.queryByRole('button', { name: 'Remove Bullet Bonus' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add Boon Stat' }))

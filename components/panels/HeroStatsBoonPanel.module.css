@@ -161,6 +161,12 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
 }
 
 .iconButton:hover,
@@ -271,18 +277,20 @@
 .iconPickerBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 2100;
-  background: transparent;
+  z-index: 2200;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.52);
   pointer-events: auto;
 }
 
 .iconPicker {
-  position: absolute;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 12px;
-  width: min(430px, calc(100vw - 32px));
-  max-height: min(680px, calc(100dvh - 84px));
+  width: min(760px, calc(100vw - 44px));
+  max-height: min(720px, calc(100dvh - 44px));
   overflow: hidden;
   border: 1px solid rgba(230, 202, 252, 0.42);
   border-radius: 3px;
@@ -309,6 +317,15 @@
   text-transform: uppercase;
 }
 
+.iconPickerHeader p {
+  margin: 4px 0 0;
+  color: rgba(255, 248, 236, 0.58);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+
 .iconPickerHeader button {
   display: inline-flex;
   width: 32px;
@@ -328,6 +345,153 @@
 .iconPickerHeader button:focus-visible {
   border-color: rgba(255, 248, 236, 0.68);
   outline: none;
+}
+
+.iconColorPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 248, 236, 0.1);
+  padding-bottom: 12px;
+}
+
+.iconColorPicker button {
+  display: inline-flex;
+  min-width: 30px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(230, 202, 252, 0.34);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #efe2ff;
+  cursor: pointer;
+  font-size: 0.64rem;
+  font-weight: 900;
+  padding: 0 8px;
+  text-transform: uppercase;
+}
+
+.iconColorPicker button:not(:empty) {
+  min-width: 70px;
+}
+
+.iconColorPicker button:hover,
+.iconColorPicker button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.78);
+  outline: none;
+}
+
+.iconColorPicker .iconColorSwatchActive {
+  border-color: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 0 0 1px rgba(198, 127, 255, 0.42);
+}
+
+.squareIconPicker {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.15fr);
+  gap: 10px;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(255, 248, 236, 0.1);
+  padding-bottom: 12px;
+}
+
+.squareIconSelect {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 1px solid rgba(230, 202, 252, 0.34);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #efe2ff;
+  cursor: pointer;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.squareIconSelect:hover,
+.squareIconSelect:focus-visible {
+  border-color: rgba(255, 255, 255, 0.78);
+  outline: none;
+}
+
+.squareIconPreview {
+  display: block;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 14px rgba(198, 127, 255, 0.24);
+}
+
+.squareIconSelect strong,
+.squareIconSelect em {
+  display: block;
+  min-width: 0;
+}
+
+.squareIconSelect strong {
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.squareIconSelect em {
+  margin-top: 2px;
+  color: rgba(255, 248, 236, 0.62);
+  font-size: 0.66rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.iconSizePicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.iconSizePicker button {
+  display: inline-grid;
+  grid-template-columns: 28px max-content;
+  gap: 7px;
+  min-height: 28px;
+  align-items: center;
+  border: 1px solid rgba(230, 202, 252, 0.34);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+  color: #efe2ff;
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-weight: 900;
+  padding: 0 9px;
+  text-transform: uppercase;
+}
+
+.iconSizePicker button span {
+  display: block;
+  justify-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(230, 202, 252, 0.64);
+  box-shadow: 0 0 10px rgba(198, 127, 255, 0.22);
+}
+
+.iconSizePicker button em {
+  font-style: normal;
+}
+
+.iconSizePicker button:hover,
+.iconSizePicker button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.78);
+  outline: none;
+}
+
+.iconSizePicker .iconSizeSwatchActive {
+  border-color: rgba(255, 255, 255, 0.86);
+  background: rgba(198, 127, 255, 0.16);
+  box-shadow: 0 0 0 1px rgba(198, 127, 255, 0.42);
 }
 
 .iconPickerDefault button {
@@ -359,6 +523,12 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
 }
 
 .iconPickerDefault strong,
@@ -384,7 +554,7 @@
 
 .iconPickerGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 8px;
   min-height: 0;
   overflow-x: hidden;
@@ -429,6 +599,12 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
 }
 
 .srOnly {

@@ -253,7 +253,7 @@ describe('AbilityEditor', () => {
 
     expect(statIconsTab).toHaveAttribute('aria-selected', 'true')
     expect(within(iconModal).getAllByRole('button', { name: /^Use / })).toHaveLength(
-      PROPERTY_ICON_GROUPS.flatMap(group => group.assets).length,
+      PROPERTY_ICON_GROUPS.flatMap(group => group.assets).length + 1,
     )
 
     await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
@@ -262,6 +262,120 @@ describe('AbilityEditor', () => {
       { set: 'primary', index: 0 },
       '/panorama/images/icons/properties/heal.svg',
     )
+  })
+
+  it('offers upgrade and mod icons in the ability icon picker', async () => {
+    const user = userEvent.setup()
+    const onAbilityIconChange = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+    const abilityIconPaths = ABILITY_ICON_GROUPS.flatMap(group => group.icons)
+
+    expect(abilityIconPaths).toContain('/panorama/images/upgrades/property_cast_psd.png')
+    expect(abilityIconPaths).toContain('/panorama/images/upgrades/mods_armor/advanced_armor_psd.png')
+    expect(abilityIconPaths).toContain('/panorama/images/upgrades/mods_tech/quantum_chimaera_psd.png')
+    expect(abilityIconPaths).toContain('/panorama/images/upgrades/mods_utility/zipline_mastery_psd.png')
+    expect(abilityIconPaths).toContain('/panorama/images/upgrades/mods_weapon/warp_stone_psd.png')
+    expect(abilityIconPaths).toContain('/panorama/images/hud/abilities/werewolf/5.png')
+    expect(abilityIconPaths).toContain('/panorama/images/hud/abilities/werewolf/6.png')
+    expect(abilityIconPaths).toContain('/panorama/images/hud/abilities/werewolf/7.png')
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onHeroInfoChange={vi.fn()}
+        onAbilityIconChange={onAbilityIconChange}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Change Ability 1 icon' }))
+
+    const iconModal = screen.getByTestId('ability-icon-modal')
+
+    expect(within(iconModal).getByRole('tab', { name: 'Hero abilities' })).toHaveAttribute('aria-selected', 'true')
+    const silverGroup = within(iconModal).getByRole('group', { name: 'Silver' })
+    expect(within(silverGroup).getByRole('button', { name: 'Use Silver 5' })).toBeInTheDocument()
+    expect(within(silverGroup).getByRole('button', { name: 'Use Silver 6' })).toBeInTheDocument()
+    expect(within(silverGroup).getByRole('button', { name: 'Use Silver 7' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('tab', { name: 'Upgrade Icons' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('tab', { name: 'Armor Mods' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('tab', { name: 'Tech Mods' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('tab', { name: 'Utility Mods' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('tab', { name: 'Weapon Mods' })).toBeInTheDocument()
+    expect(within(iconModal).queryByRole('group', { name: 'Weapon Mods' })).not.toBeInTheDocument()
+
+    await user.click(within(iconModal).getByRole('tab', { name: 'Upgrade Icons' }))
+    expect(within(iconModal).getByRole('button', { name: 'Use Upgrade Active' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('button', { name: 'Use Square Icon' })).toBeInTheDocument()
+    expect(within(iconModal).getByRole('button', { name: 'Medium square icon size' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(iconModal).getByRole('button', { name: 'Large square icon size' }))
+    expect(within(iconModal).getByRole('button', { name: 'Large square icon size' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(within(iconModal).getByRole('tab', { name: 'Weapon Mods' }))
+    expect(within(iconModal).getByRole('group', { name: 'Weapon Mods' })).toBeInTheDocument()
+    await user.type(within(iconModal).getByPlaceholderText('Search ability icons'), 'warp stone')
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Warp Stone' }))
+
+    expect(onAbilityIconChange).toHaveBeenCalledWith(
+      { set: 'primary', index: 0 },
+      '/panorama/images/upgrades/mods_weapon/warp_stone_psd.png',
+    )
+  })
+
+  it('saves the sized square icon from the ability icon picker', async () => {
+    const user = userEvent.setup()
+    const onAbilityIconChange = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+
+    const view = render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={hero.heroInfo}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onHeroInfoChange={vi.fn()}
+        onAbilityIconChange={onAbilityIconChange}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Change Ability 1 icon' }))
+
+    const iconModal = screen.getByTestId('ability-icon-modal')
+    await user.click(within(iconModal).getByRole('button', { name: 'Tiny square icon size' }))
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Square Icon' }))
+
+    expect(onAbilityIconChange).toHaveBeenCalledWith(
+      { set: 'primary', index: 0 },
+      'square:tiny',
+    )
+
+    view.rerender(
+      <AbilityEditor
+        ability={{ ...ability, icon: 'square:tiny' }}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        hero={hero}
+        heroInfo={{ ...hero.heroInfo, ability1Icon: 'square:tiny' }}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onHeroInfoChange={vi.fn()}
+        onAbilityIconChange={onAbilityIconChange}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const renderedSquare = screen.getByTestId('ability-editor-hero-info-ability-1').querySelector('[aria-hidden="true"]')
+    expect(renderedSquare).toHaveAttribute('style', expect.stringContaining('width: 34%'))
+    expect(renderedSquare).toHaveAttribute('style', expect.stringContaining('mask-image: none'))
   })
 
   it('marks the active ability and commits the draft when selecting another ability from the hero cluster', async () => {

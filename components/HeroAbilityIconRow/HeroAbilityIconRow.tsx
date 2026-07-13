@@ -6,6 +6,7 @@ import type { CSSProperties, MouseEventHandler } from 'react'
 import { DEFAULT_SECONDARY_ABILITY_SLOTS, getSecondaryAbilityIndexForPrimary, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityDefinition } from '@/lib/ability-editor-types'
 import type { HeroInfoDefinition } from '@/lib/hero-data'
+import { getSquareIconStyle, isSquareIcon } from '@/lib/square-icon'
 import cn from '@/lib/utilsd'
 
 import styles from './HeroAbilityIconRow.module.css'
@@ -36,6 +37,18 @@ interface HeroAbilityIconRowProps {
 
 const ABILITY_ICON_KEYS: AbilityIconKey[] = ['ability1Icon', 'ability2Icon', 'ability3Icon', 'ability4Icon']
 const getSecondaryCutout = (fill: string) => `radial-gradient(circle at 80% 80%, transparent 0 32%, ${fill} 33%)`
+
+function getAbilityIconStyle(icon: string, color: string): CSSProperties {
+  if (isSquareIcon(icon)) {
+    return getSquareIconStyle(icon, color)
+  }
+
+  return {
+    backgroundColor: color,
+    WebkitMaskImage: `url('${icon}')`,
+    maskImage: `url('${icon}')`,
+  }
+}
 
 export default function HeroAbilityIconRow({
   heroInfo,
@@ -76,11 +89,7 @@ export default function HeroAbilityIconRow({
             : heroInfo.abilityCircleColor,
           color: heroInfo.abilityCircleColor,
         } as CSSProperties
-        const primaryIconStyle = {
-          backgroundColor: heroInfo.abilityIconColor,
-          WebkitMaskImage: `url('${heroInfo[iconKey]}')`,
-          maskImage: `url('${heroInfo[iconKey]}')`,
-        } as CSSProperties
+        const primaryIconStyle = getAbilityIconStyle(heroInfo[iconKey], heroInfo.abilityIconColor)
         const primaryIcon = (
           <span
             className={cn(styles.abilityIconClip, hasSecondary && styles.abilityIconClipWithSecondary)}
@@ -134,11 +143,7 @@ export default function HeroAbilityIconRow({
                   <span
                     className={styles.secondaryAbilityIcon}
                     aria-hidden="true"
-                    style={{
-                      backgroundColor: heroInfo.abilityIconColor,
-                      WebkitMaskImage: `url('${secondaryAbility.icon}')`,
-                      maskImage: `url('${secondaryAbility.icon}')`,
-                    }}
+                    style={getAbilityIconStyle(secondaryAbility.icon, heroInfo.abilityIconColor)}
                   />
                 </button>
               ) : (
@@ -150,11 +155,7 @@ export default function HeroAbilityIconRow({
                   <span
                     className={styles.secondaryAbilityIcon}
                     aria-hidden="true"
-                    style={{
-                      backgroundColor: heroInfo.abilityIconColor,
-                      WebkitMaskImage: `url('${secondaryAbility.icon}')`,
-                      maskImage: `url('${secondaryAbility.icon}')`,
-                    }}
+                    style={getAbilityIconStyle(secondaryAbility.icon, heroInfo.abilityIconColor)}
                   />
                 </span>
               )

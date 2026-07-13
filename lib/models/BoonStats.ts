@@ -21,6 +21,7 @@ const boonStatSchema = new Schema<IPanelStat>({
   value: { type: String, required: true },
   unit: { type: String, default: '' },
   icon: { type: String, default: 'dot' },
+  iconColor: { type: String, default: '' },
   scaling: { type: String, enum: ['boon'], default: 'boon' },
   scalingValue: { type: String, required: true },
 }, { _id: false })

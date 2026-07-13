@@ -21,6 +21,7 @@ export function createBoonStat(label = 'Extra Stat'): PanelStat {
     value: '0',
     unit: '',
     icon: 'damage_magic_color',
+    iconColor: '',
     scaling: 'boon',
     scalingValue: '0',
   }
@@ -34,6 +35,7 @@ function normalizeCustomBoonStat(stat: PanelStat): PanelStat {
     value,
     unit: '',
     icon: stat.icon ?? 'damage_magic_color',
+    iconColor: stat.iconColor ?? '',
     scaling: 'boon',
     scalingValue: value,
   }
@@ -65,6 +67,7 @@ export function buildBoonStatsArray(stats?: PanelStat[]): PanelStat[] {
       value: scalingValue,
       unit: '',
       icon: stored?.icon ?? definition.icon,
+      iconColor: stored?.iconColor ?? '',
       scaling: 'boon',
       scalingValue,
     }

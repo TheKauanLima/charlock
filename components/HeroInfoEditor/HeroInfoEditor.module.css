@@ -404,11 +404,16 @@
   color: #ffefd6;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(24px);
-  transition: transform 180ms ease;
+  transition:
+    grid-template-columns 180ms ease,
+    min-width 180ms ease,
+    width 180ms ease;
 }
 
 .controlRailCollapsed {
-  transform: translateX(calc(-100% + 28px));
+  grid-template-columns: 54px minmax(0, 0);
+  width: 54px;
+  min-width: 54px;
 }
 
 .controlTabRail {
@@ -619,6 +624,16 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+  overflow: hidden;
+  transition:
+    opacity 140ms ease,
+    visibility 140ms ease;
+}
+
+.controlRailCollapsed .controlPane {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .railHeader {
@@ -1453,6 +1468,12 @@
     width: min(40vw, 360px);
     min-width: 320px;
   }
+
+  .controlRailCollapsed {
+    grid-template-columns: 50px minmax(0, 0);
+    width: 50px;
+    min-width: 50px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -1473,5 +1494,10 @@
     grid-template-columns: 48px minmax(0, 1fr);
     width: 100%;
     min-width: 0;
+  }
+
+  .controlRailCollapsed {
+    grid-template-columns: 48px minmax(0, 0);
+    width: 48px;
   }
 }
