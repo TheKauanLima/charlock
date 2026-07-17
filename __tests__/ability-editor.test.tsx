@@ -96,10 +96,16 @@ describe('AbilityEditor', () => {
     expect(tierSystemRule).toMatch(/overflow-y:\s*visible/)
   })
 
-  it('reduces the ability name font size after fifteen characters', () => {
+  it('reduces the ability name font size after fifteen and twenty-six characters', () => {
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
     const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const focusShellRule = stylesheet.match(/\.focusShell\s*\{([^}]*)\}/)?.[1]
+    const editorLayoutRule = stylesheet.match(/^\.editorLayout\s*\{([^}]*)\}/m)?.[1]
+    const editorLayoutPreviewRule = stylesheet.match(/^\.editorLayoutPreview\s*\{([^}]*)\}/m)?.[1]
+    const mainColumnRule = stylesheet.match(/^\.mainEditorColumn\s*\{([^}]*)\}/m)?.[1]
+    const editorPreviewColumnRule = stylesheet.match(/\.mainEditorColumnEditorPreview\s*\{([^}]*)\}/)?.[1]
     const longNameRule = stylesheet.match(/\.nameInputWrap input\.nameInputLong\s*\{([^}]*)\}/)?.[1]
+    const extraLongNameRule = stylesheet.match(/\.nameInputWrap input\.nameInputExtraLong\s*\{([^}]*)\}/)?.[1]
     const { rerender } = render(
       <AbilityEditor
         key="short-name"
@@ -111,7 +117,15 @@ describe('AbilityEditor', () => {
     )
 
     expect(screen.getByLabelText('Ability Name').className).not.toContain('nameInputLong')
+    expect(focusShellRule).toMatch(/--ability-tooltip-column-width:\s*min\(560px, calc\(100vw - 72px\)\)/)
+    expect(editorLayoutRule).toMatch(/grid-template-columns:\s*46px var\(--ability-tooltip-column-width\)/)
+    expect(editorLayoutPreviewRule).toMatch(/width:\s*var\(--ability-tooltip-column-width\)/)
+    expect(mainColumnRule).toMatch(/width:\s*var\(--ability-tooltip-column-width\)/)
+    expect(editorPreviewColumnRule).toMatch(/width:\s*var\(--ability-tooltip-column-width\)/)
+    expect(editorPreviewColumnRule).toMatch(/margin-right:\s*0/)
+    expect(editorPreviewColumnRule).toMatch(/padding-right:\s*0/)
     expect(longNameRule).toMatch(/font-size:\s*1\.55rem/)
+    expect(extraLongNameRule).toMatch(/font-size:\s*1\.25rem/)
 
     rerender(
       <AbilityEditor
@@ -124,6 +138,33 @@ describe('AbilityEditor', () => {
     )
 
     expect(screen.getByLabelText('Ability Name').className).toContain('nameInputLong')
+    expect(screen.getByLabelText('Ability Name').className).not.toContain('nameInputExtraLong')
+
+    rerender(
+      <AbilityEditor
+        key="twenty-six-character-name"
+        ability={{ ...ability, name: '12345678901234567890123456' }}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ability Name').className).toContain('nameInputLong')
+    expect(screen.getByLabelText('Ability Name').className).not.toContain('nameInputExtraLong')
+
+    rerender(
+      <AbilityEditor
+        key="extra-long-name"
+        ability={{ ...ability, name: '123456789012345678901234567' }}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByLabelText('Ability Name').className).toContain('nameInputLong')
+    expect(screen.getByLabelText('Ability Name').className).toContain('nameInputExtraLong')
   })
 
   it('centers the focused editor stage around the hero info cluster', () => {
@@ -712,6 +753,8 @@ describe('AbilityEditor', () => {
     expect(screen.getByTestId('ability-editor')).toBeInTheDocument()
     expect(screen.getByLabelText('Cooldown')).toBeChecked()
     expect(screen.getByTestId('ability-stat-timing-cooldown')).toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Unit')).toHaveValue('s')
 
     await user.click(screen.getByLabelText('Cooldown'))
     expect(screen.queryByTestId('ability-stat-timing-cooldown')).not.toBeInTheDocument()
@@ -731,10 +774,16 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByLabelText('Charges'))
     expect(screen.getByLabelText('Choose Recharge Time icon')).toBeInTheDocument()
-    const chargesIcon = within(screen.getByTestId('ability-stat-timing-charges')).getByRole('button', { name: 'Choose Charges icon' }).querySelector('[aria-hidden="true"]')
+    const chargesStat = screen.getByTestId('ability-stat-timing-charges')
+    const rechargeStat = screen.getByTestId('ability-stat-timing-recharge-time')
+    const chargesIcon = within(chargesStat).getByRole('button', { name: 'Choose Charges icon' }).querySelector('[aria-hidden="true"]')
     expect(chargesIcon).toHaveStyle({ backgroundImage: "url('/panorama/images/upgrades/property_cast_psd.png')" })
     expect(chargesIcon?.getAttribute('style')).not.toContain('mask-image')
-    await user.click(within(screen.getByTestId('ability-stat-timing-charges')).getByRole('button', { name: 'Edit Charges scaling' }))
+    expect(within(chargesStat).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(chargesStat).queryByLabelText('Unit')).not.toBeInTheDocument()
+    expect(within(rechargeStat).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(rechargeStat).getByLabelText('Unit')).toHaveValue('s')
+    await user.click(within(chargesStat).getByRole('button', { name: 'Edit Charges scaling' }))
     expect(screen.getByRole('dialog', { name: 'Charges scaling controls' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Range scaling controls' })).not.toBeInTheDocument()
     await user.click(screen.getByLabelText('Ability Name'))
@@ -1002,7 +1051,7 @@ describe('AbilityEditor', () => {
     expectCooldown('31')
   })
 
-  it('keeps cooldown append text through tier cascades, saves, and preview rendering', async () => {
+  it('omits cooldown append while preserving its unit through save and preview rendering', async () => {
     const user = userEvent.setup()
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
     const onSave = vi.fn()
@@ -1017,19 +1066,21 @@ describe('AbilityEditor', () => {
     )
 
     const cooldown = screen.getByTestId('ability-stat-timing-cooldown')
-    const appendInput = within(cooldown).getByLabelText('Append')
 
-    await user.type(appendInput, '+')
+    expect(within(cooldown).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(cooldown).getByLabelText('Unit')).toHaveValue('s')
     await user.click(screen.getByRole('button', { name: 'Tier 1 upgrade' }))
-    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Unit')).toHaveValue('s')
     await user.click(screen.getByRole('button', { name: 'Tier 3 upgrade' }))
-    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Append')).toHaveValue('+')
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).queryByLabelText('Append')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByLabelText('Unit')).toHaveValue('s')
     await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
 
-    expect(savedAbility?.cooldown.append).toBe('+')
-    expect(savedAbility?.tiers.every(tier => tier.variant.cooldown.append === '+')).toBe(true)
+    expect(savedAbility?.cooldown.unit).toBe('s')
+    expect(savedAbility?.tiers.every(tier => tier.variant.cooldown.unit === 's')).toBe(true)
 
     unmount()
     render(
@@ -1042,7 +1093,8 @@ describe('AbilityEditor', () => {
       />,
     )
 
-    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByText('+')).toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).queryByText('+')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('ability-stat-timing-cooldown')).getByText('s')).toBeInTheDocument()
   })
 
   it('cascades ability text edits from lower tiers into higher tiers', async () => {

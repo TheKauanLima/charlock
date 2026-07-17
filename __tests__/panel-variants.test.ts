@@ -9,7 +9,17 @@ describe('named stat panel variants', () => {
     const stats = buildHeroStatsSeed(HEROES[0])
 
     stats.boon.panels = [{ id: 'boon-alt', name: 'Aggressive', stats: structuredClone(stats.boon.stats) }]
-    stats.weapon.panels = [{ id: 'weapon-alt', name: 'Shotgun', bulletDPS: 120, weaponMinRange: 8, weaponMaxRange: 24, stats: structuredClone(stats.weapon.stats) }]
+    stats.weapon.panels = [{
+      id: 'weapon-alt',
+      name: 'Shotgun',
+      weaponDesc: 'Close range pressure.',
+      gunImageSrc: '/shotgun.png',
+      weaponAttributes: ['Scatter', 'Burst'],
+      bulletDPS: 120,
+      weaponMinRange: 8,
+      weaponMaxRange: 24,
+      stats: structuredClone(stats.weapon.stats),
+    }]
     stats.vitality.name = 'Fortitude'
     stats.vitality.panels = [{ id: 'vitality-alt', name: 'Tank', stats: structuredClone(stats.vitality.stats) }]
     stats.spirit.name = 'Mysticism'
@@ -29,6 +39,9 @@ describe('named stat panel variants', () => {
     if (result.success) {
       expect(result.data.boon.panels?.[0].name).toBe('Aggressive')
       expect(result.data.weapon.panels?.[0].name).toBe('Shotgun')
+      expect(result.data.weapon.panels?.[0].weaponDesc).toBe('Close range pressure.')
+      expect(result.data.weapon.panels?.[0].gunImageSrc).toBe('/shotgun.png')
+      expect(result.data.weapon.panels?.[0].weaponAttributes).toEqual(['Scatter', 'Burst'])
       expect(result.data.vitality.panels?.[0].name).toBe('Tank')
       expect(result.data.vitality.name).toBe('Fortitude')
       expect(result.data.spirit.panels?.[0].name).toBe('Caster')

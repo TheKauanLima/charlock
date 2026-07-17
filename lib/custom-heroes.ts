@@ -57,6 +57,9 @@ interface WeaponStatsRecord {
   panels?: Array<{
     id: string
     name: string
+    weaponDesc?: string
+    gunImageSrc?: string
+    weaponAttributes?: string[]
     bulletDPS: number
     weaponMinRange: number
     weaponMaxRange: number
@@ -195,7 +198,13 @@ function normalizeBoonPanels(value: unknown) {
   })
 }
 
-function normalizeWeaponPanels(value: unknown) {
+interface WeaponPanelFallback {
+  weaponDesc: string
+  gunImageSrc: string
+  weaponAttributes: string[]
+}
+
+function normalizeWeaponPanels(value: unknown, fallback?: WeaponPanelFallback) {
   if (!Array.isArray(value)) return []
 
   return value.map((panel, index) => {
@@ -204,6 +213,11 @@ function normalizeWeaponPanels(value: unknown) {
     return {
       id: getString(record.id, `weapon-panel-${index + 1}`),
       name: getString(record.name, `Weapon ${index + 2}`),
+      weaponDesc: getString(record.weaponDesc, fallback?.weaponDesc ?? ''),
+      gunImageSrc: getString(record.gunImageSrc, fallback?.gunImageSrc ?? ''),
+      weaponAttributes: Array.isArray(record.weaponAttributes)
+        ? getStringArray(record.weaponAttributes)
+        : fallback?.weaponAttributes ?? [],
       bulletDPS: getNumber(record.bulletDPS),
       weaponMinRange: getNumber(record.weaponMinRange),
       weaponMaxRange: getNumber(record.weaponMaxRange),
@@ -325,7 +339,11 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
       weaponMinRange: getNumber(weaponRecord.weaponMinRange),
       weaponMaxRange: getNumber(weaponRecord.weaponMaxRange),
       stats: normalizeStats(weaponRecord.stats),
-      panels: normalizeWeaponPanels(weaponRecord.panels),
+      panels: normalizeWeaponPanels(weaponRecord.panels, {
+        weaponDesc: getString(weaponRecord.weaponDesc),
+        gunImageSrc: getString(weaponRecord.gunImageSrc),
+        weaponAttributes: getStringArray(weaponRecord.weaponAttributes),
+      }),
     },
     vitality: {
       name: getString(vitalityRecord.name, 'Vitality'),
@@ -514,7 +532,11 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
       weaponMinRange: bundle.weapon?.weaponMinRange ?? 0,
       weaponMaxRange: bundle.weapon?.weaponMaxRange ?? 0,
       stats: normalizeStats(bundle.weapon?.stats),
-      panels: normalizeWeaponPanels(bundle.weapon?.panels),
+      panels: normalizeWeaponPanels(bundle.weapon?.panels, {
+        weaponDesc: bundle.weapon?.weaponDesc ?? '',
+        gunImageSrc: bundle.weapon?.gunImageSrc ?? '',
+        weaponAttributes: bundle.weapon?.weaponAttributes ?? [],
+      }),
     },
     vitality: {
       name: bundle.vitality?.name ?? 'Vitality',

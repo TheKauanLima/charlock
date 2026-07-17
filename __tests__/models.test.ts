@@ -69,6 +69,9 @@ describe('Mongoose model schemas', () => {
   it('stores named panel variants for every stat category', () => {
     expect(WeaponStats.schema.path('panels')).toBeDefined()
     expect(WeaponStats.schema.path('panels.name')).toBeDefined()
+    expect(WeaponStats.schema.path('panels.weaponDesc')).toBeDefined()
+    expect(WeaponStats.schema.path('panels.gunImageSrc')).toBeDefined()
+    expect(WeaponStats.schema.path('panels.weaponAttributes')).toBeDefined()
     expect(WeaponStats.schema.path('panels.stats')).toBeDefined()
     expect(VitalityStats.schema.path('panels')).toBeDefined()
     expect(VitalityStats.schema.path('name')).toBeDefined()

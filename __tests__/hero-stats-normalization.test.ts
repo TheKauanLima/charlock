@@ -117,6 +117,9 @@ describe('getHeroStatsBySlug stat normalization', () => {
         panels: [{
           id: 'weapon-alt',
           name: 'Shotgun',
+          weaponDesc: 'Panel-only description',
+          gunImageSrc: '/panel-shotgun.png',
+          weaponAttributes: ['Spread', 'Burst'],
           bulletDPS: 120,
           weaponMinRange: 8,
           weaponMaxRange: 24,
@@ -189,7 +192,14 @@ describe('getHeroStatsBySlug stat normalization', () => {
     expect(stats?.boon.panels?.[0]).toMatchObject({ name: 'Aggressive', stats: expect.arrayContaining([expect.objectContaining({ label: 'Base Bullet Damage', value: '2.5' })]) })
     expect(stats?.vitality.stats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
     expect(stats?.vitality.stats[15]).toMatchObject({ label: 'Dash Speed', value: '0' })
-    expect(stats?.weapon.panels?.[0]).toMatchObject({ name: 'Shotgun', bulletDPS: 120, stats: expect.arrayContaining([expect.objectContaining({ label: 'Bullet Damage', value: '20' })]) })
+    expect(stats?.weapon.panels?.[0]).toMatchObject({
+      name: 'Shotgun',
+      weaponDesc: 'Panel-only description',
+      gunImageSrc: '/panel-shotgun.png',
+      weaponAttributes: ['Spread', 'Burst'],
+      bulletDPS: 120,
+      stats: expect.arrayContaining([expect.objectContaining({ label: 'Bullet Damage', value: '20' })]),
+    })
     expect(stats?.vitality.panels?.[0]).toMatchObject({ name: 'Tank', stats: expect.arrayContaining([expect.objectContaining({ label: 'Max Health', value: '999' })]) })
     expect(stats?.spirit.panels?.[0]).toMatchObject({ name: 'Caster', spiritPowerStat: expect.objectContaining({ value: '80' }) })
   })

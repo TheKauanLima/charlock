@@ -408,6 +408,9 @@ describe('HeroInfoCluster', () => {
     stats.weapon.panels = [{
       id: 'shotgun-panel',
       name: 'Shotgun',
+      weaponDesc: 'A close range scatter profile.',
+      gunImageSrc: '/panel-shotgun.png',
+      weaponAttributes: ['Close Range', 'Pellet'],
       bulletDPS: 180,
       weaponMinRange: 8,
       weaponMaxRange: 22,
@@ -431,8 +434,13 @@ describe('HeroInfoCluster', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Shotgun' }))
     expect(screen.getByTestId('weapon-panel')).toHaveAccessibleName('Shotgun weapon stats')
+    expect(screen.getByText('A close range scatter profile.')).toBeInTheDocument()
+    expect(screen.getByText('Close Range')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Shotgun weapon' })).toHaveAttribute('style', expect.stringContaining('/panel-shotgun.png'))
     expect(screen.getByRole('button', { name: /Bullet Damage: 99/ })).toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: stats.weapon.weaponName, exact: true }))
+    expect(screen.queryByText('A close range scatter profile.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Close Range')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Bullet Damage: / })).not.toHaveAccessibleName(/99/)
 
     rerender(<HeroInfoCluster hero={hero} showDetails />)

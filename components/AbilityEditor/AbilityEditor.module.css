@@ -1,4 +1,6 @@
 .focusShell {
+  --ability-tooltip-column-width: min(560px, calc(100vw - 72px));
+
   position: fixed;
   inset: 0;
   z-index: 360;
@@ -251,7 +253,7 @@
   left: calc(50% + clamp(54px, 6vw, 120px));
   z-index: 4;
   display: grid;
-  grid-template-columns: 46px minmax(500px, 560px);
+  grid-template-columns: 46px var(--ability-tooltip-column-width);
   gap: 10px;
   align-items: start;
   transform: translateY(-50%);
@@ -262,7 +264,7 @@
   top: auto;
   right: clamp(72px, 5vw, 120px);
   bottom: calc(clamp(36px, 4vw, 60px) + 58px + 14px + clamp(54px, 4.5vw, 75px) + 20px);
-  width: min(43vw, 560px);
+  width: var(--ability-tooltip-column-width);
   grid-template-columns: minmax(0, 1fr);
   transform: none;
   pointer-events: none;
@@ -277,7 +279,7 @@
   position: relative;
   display: grid;
   gap: 10px;
-  width: min(560px, calc(100vw - 72px));
+  width: var(--ability-tooltip-column-width);
   max-height: calc(100dvh - 170px);
   overflow-y: auto;
   overflow-x: hidden;
@@ -453,6 +455,10 @@
 
 .nameInputWrap input.nameInputLong {
   font-size: 1.55rem;
+}
+
+.nameInputWrap input.nameInputExtraLong {
+  font-size: 1.25rem;
 }
 
 .nameInputWrap input:focus,
@@ -1770,8 +1776,10 @@
 }
 
 .mainEditorColumnEditorPreview {
-  width: min(560px, calc(100vw - 72px));
+  width: var(--ability-tooltip-column-width);
   max-height: calc(100dvh - 170px);
+  margin-right: 0;
+  padding-right: 0;
 }
 
 .baseTierButton {
@@ -2462,7 +2470,6 @@
 
   .editorLayoutPreview {
     right: clamp(24px, 5vw, 72px);
-    width: min(52vw, 500px);
   }
 
   .modeToggleButton {

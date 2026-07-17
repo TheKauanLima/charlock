@@ -30,6 +30,9 @@ export interface IWeaponStats {
 export interface IWeaponPanelVariant {
   id: string
   name: string
+  weaponDesc?: string
+  gunImageSrc?: string
+  weaponAttributes?: string[]
   bulletDPS: number
   weaponMinRange: number
   weaponMaxRange: number
@@ -55,6 +58,9 @@ export const statSchema = new Schema<IPanelStat>({
 const weaponPanelVariantSchema = new Schema<IWeaponPanelVariant>({
   id: { type: String, required: true },
   name: { type: String, required: true },
+  weaponDesc: { type: String, default: '' },
+  gunImageSrc: { type: String, default: '' },
+  weaponAttributes: [{ type: String }],
   bulletDPS: { type: Number, default: 0 },
   weaponMinRange: { type: Number, default: 0 },
   weaponMaxRange: { type: Number, default: 0 },

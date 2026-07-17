@@ -56,6 +56,9 @@ interface WeaponStatsRecord {
   panels?: Array<{
     id: string
     name: string
+    weaponDesc?: string
+    gunImageSrc?: string
+    weaponAttributes?: string[]
     bulletDPS: number
     weaponMinRange: number
     weaponMaxRange: number
@@ -339,6 +342,9 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
       panels: (weapon.panels ?? []).map(panel => ({
         id: panel.id,
         name: panel.name,
+        weaponDesc: panel.weaponDesc ?? weapon.weaponDesc,
+        gunImageSrc: panel.gunImageSrc ?? weapon.gunImageSrc,
+        weaponAttributes: panel.weaponAttributes ?? weapon.weaponAttributes,
         bulletDPS: panel.bulletDPS,
         weaponMinRange: panel.weaponMinRange,
         weaponMaxRange: panel.weaponMaxRange,

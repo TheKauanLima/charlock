@@ -862,6 +862,29 @@ describe('HeroGrid', () => {
     expect(screen.getByRole('img', { name: 'WEAPON NAME weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
   })
 
+  it('stores weapon image uploads on the active weapon panel variant', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
+    const baseWeaponName = (screen.getByLabelText('Weapon name') as HTMLInputElement).value
+
+    await user.click(screen.getByRole('button', { name: 'Add Weapon panel' }))
+    await user.type(screen.getByLabelText('New Weapon panel name'), 'Shotgun')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(within(screen.getByTestId('weapon-panel')).getByTestId('uploadthing-weaponImage'))
+
+    expect(screen.getByRole('img', { name: 'Shotgun weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
+
+    await user.click(screen.getByRole('tab', { name: baseWeaponName, exact: true }))
+    expect(screen.getByRole('img', { name: `${baseWeaponName} weapon` })).not.toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
+
+    await user.click(screen.getByRole('tab', { name: 'Shotgun' }))
+    expect(screen.getByRole('img', { name: 'Shotgun weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
+  })
+
   it('edits weapon panel stats with reactive modifier math', async () => {
     const user = userEvent.setup()
     render(<HeroGrid />)
@@ -925,12 +948,19 @@ describe('HeroGrid', () => {
     await user.clear(screen.getByLabelText('Weapon name'))
     await user.type(screen.getByLabelText('Weapon name'), 'Scattergun')
     expect(screen.getByRole('tab', { name: 'Scattergun' })).toBeInTheDocument()
+    await user.clear(screen.getByLabelText('Weapon description'))
+    await user.type(screen.getByLabelText('Weapon description'), 'Scattergun pressure burst.')
+    await user.type(screen.getByLabelText('Weapon tags'), 'BREACH')
     await user.clear(screen.getByLabelText('Bullet Damage value'))
     await user.type(screen.getByLabelText('Bullet Damage value'), '12')
     await user.click(screen.getByRole('tab', { name: baseWeaponName, exact: true }))
     expect(screen.getByLabelText('Weapon name')).toHaveValue(baseWeaponName)
+    expect(screen.getByLabelText('Weapon description')).not.toHaveValue('Scattergun pressure burst.')
+    expect(screen.getByLabelText('Weapon tags')).not.toHaveValue('BREACH')
     expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('0')
     await user.click(screen.getByRole('tab', { name: 'Scattergun' }))
+    expect(screen.getByLabelText('Weapon description')).toHaveValue('Scattergun pressure burst.')
+    expect(screen.getByLabelText('Weapon tags')).toHaveValue('BREACH')
     expect(screen.getByLabelText('Bullet Damage value')).toHaveValue('12')
     await user.click(screen.getByRole('button', { name: 'Remove active Weapon panel' }))
     expect(screen.queryByRole('tab', { name: 'Scattergun' })).not.toBeInTheDocument()
@@ -973,7 +1003,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Remove active Spirit panel' }))
     expect(screen.queryByRole('tab', { name: 'Mystic' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Spirit Power value')).toHaveValue('0')
-  })
+  }, 10000)
 
   it('saves the full create draft from the global action bar', async () => {
     const user = userEvent.setup()

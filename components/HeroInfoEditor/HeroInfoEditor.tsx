@@ -35,7 +35,7 @@ import {
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
 import { buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
-import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
+import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponPanelVariant, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import { UploadButton } from '@/lib/uploadthing'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
@@ -318,6 +318,13 @@ function buildWeaponPanelBaseValues(weapon: WeaponStatsPayload) {
   ])
 }
 
+function buildWeaponTagsInputByPanel(weapon: WeaponStatsPayload) {
+  return Object.fromEntries([
+    [BASE_PANEL_ID, weapon.weaponAttributes.join(', ')],
+    ...(weapon.panels ?? []).map(panel => [panel.id, (panel.weaponAttributes ?? weapon.weaponAttributes).join(', ')]),
+  ])
+}
+
 function ColorField({ label, value, onChange }: ColorFieldProps) {
   const inputId = `editor-${label.toLowerCase().replaceAll(' ', '-')}`
 
@@ -438,7 +445,7 @@ export default function HeroInfoEditor({
   const [activeVitalityPanelId, setActiveVitalityPanelId] = useState(BASE_PANEL_ID)
   const [activeSpiritPanelId, setActiveSpiritPanelId] = useState(BASE_PANEL_ID)
   const [weaponBaseValuesByPanel, setWeaponBaseValuesByPanel] = useState<Record<string, Record<string, number>>>(() => buildWeaponPanelBaseValues(initialStatsDraft.weapon))
-  const [weaponTagsInput, setWeaponTagsInput] = useState(() => initialStatsDraft.weapon.weaponAttributes.join(', '))
+  const [weaponTagsInputByPanel, setWeaponTagsInputByPanel] = useState<Record<string, string>>(() => buildWeaponTagsInputByPanel(initialStatsDraft.weapon))
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
   const [heroPortraitInput, setHeroPortraitInput] = useState(hero.portrait)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
@@ -459,7 +466,7 @@ export default function HeroInfoEditor({
         setAbilityStatsDraft(snapshot.abilityStats)
         setSecondarySlotSelection(snapshot.abilityStats.secondaryAbilitySlots ?? [])
         setWeaponBaseValuesByPanel(buildWeaponPanelBaseValues(snapshot.stats.weapon))
-        setWeaponTagsInput(snapshot.stats.weapon.weaponAttributes.join(', '))
+        setWeaponTagsInputByPanel(buildWeaponTagsInputByPanel(snapshot.stats.weapon))
         setHeroNameInput(snapshot.heroName)
         setHeroPortraitInput(snapshot.portrait)
         setAllowCopiesInput(snapshot.allowCopies)
@@ -541,6 +548,10 @@ export default function HeroInfoEditor({
   const activeSpiritPanel = statsDraft.spirit.panels?.find(panel => panel.id === activeSpiritPanelId)
   const activeBoonStats = activeBoonPanel?.stats ?? statsDraft.boon.stats
   const activeWeaponStats = activeWeaponPanel?.stats ?? statsDraft.weapon.stats
+  const activeWeaponDesc = activeWeaponPanel?.weaponDesc ?? statsDraft.weapon.weaponDesc
+  const activeWeaponImage = activeWeaponPanel?.gunImageSrc ?? statsDraft.weapon.gunImageSrc
+  const activeWeaponAttributes = activeWeaponPanel?.weaponAttributes ?? statsDraft.weapon.weaponAttributes
+  const activeWeaponTagsInput = weaponTagsInputByPanel[activeWeaponPanelId] ?? activeWeaponAttributes.join(', ')
   const activeWeaponBulletDps = activeWeaponPanel?.bulletDPS ?? statsDraft.weapon.bulletDPS
   const activeWeaponMinRange = activeWeaponPanel?.weaponMinRange ?? statsDraft.weapon.weaponMinRange
   const activeWeaponMaxRange = activeWeaponPanel?.weaponMaxRange ?? statsDraft.weapon.weaponMaxRange
@@ -590,7 +601,7 @@ export default function HeroInfoEditor({
   }
 
   function handleWeaponImageUpload(uploadUrl: string) {
-    updateWeaponDraft({
+    updateActiveWeaponPanel({
       gunImageSrc: uploadUrl,
     })
   }
@@ -677,12 +688,17 @@ export default function HeroInfoEditor({
   }
 
   function handleWeaponTagChange(value: string) {
-    setWeaponTagsInput(value)
-    updateWeaponDraft({
-      weaponAttributes: value
-        .split(',')
-        .map(attribute => attribute.trim())
-        .filter(Boolean),
+    const weaponAttributes = value
+      .split(',')
+      .map(attribute => attribute.trim())
+      .filter(Boolean)
+
+    setWeaponTagsInputByPanel(currentTags => ({
+      ...currentTags,
+      [activeWeaponPanelId]: value,
+    }))
+    updateActiveWeaponPanel({
+      weaponAttributes,
     })
   }
 
@@ -817,7 +833,7 @@ export default function HeroInfoEditor({
     }))
   }
 
-  function updateActiveWeaponPanel(nextPanel: Partial<Pick<WeaponStatsPayload, 'stats' | 'bulletDPS' | 'weaponMinRange' | 'weaponMaxRange'>>) {
+  function updateActiveWeaponPanel(nextPanel: Partial<Omit<WeaponPanelVariant, 'id' | 'name'>>) {
     if (!activeWeaponPanel) {
       updateWeaponDraft(nextPanel)
       return
@@ -858,6 +874,9 @@ export default function HeroInfoEditor({
         panels: [...(currentDraft.weapon.panels ?? []), {
           id,
           name,
+          weaponDesc: activeWeaponDesc,
+          gunImageSrc: activeWeaponImage,
+          weaponAttributes: [...activeWeaponAttributes],
           bulletDPS: activeWeaponBulletDps,
           weaponMinRange: activeWeaponMinRange,
           weaponMaxRange: activeWeaponMaxRange,
@@ -866,6 +885,7 @@ export default function HeroInfoEditor({
       },
     }))
     setWeaponBaseValuesByPanel(current => ({ ...current, [id]: buildWeaponBaseValues(stats) }))
+    setWeaponTagsInputByPanel(current => ({ ...current, [id]: activeWeaponTagsInput }))
     setActiveWeaponPanelId(id)
   }
 
@@ -916,6 +936,7 @@ export default function HeroInfoEditor({
       },
     }))
     setWeaponBaseValuesByPanel(current => Object.fromEntries(Object.entries(current).filter(([panelId]) => panelId !== id)))
+    setWeaponTagsInputByPanel(current => Object.fromEntries(Object.entries(current).filter(([panelId]) => panelId !== id)))
     setActiveWeaponPanelId(BASE_PANEL_ID)
   }
 
@@ -1486,17 +1507,17 @@ export default function HeroInfoEditor({
                 isEditable={!isPreviewMode}
                 showDetails={isPreviewMode}
                 weaponName={activeWeaponPanel?.name ?? statsDraft.weapon.weaponName}
-                weaponDesc={statsDraft.weapon.weaponDesc}
-                gunImageSrc={statsDraft.weapon.gunImageSrc}
-                weaponAttributes={statsDraft.weapon.weaponAttributes}
+                weaponDesc={activeWeaponDesc}
+                gunImageSrc={activeWeaponImage}
+                weaponAttributes={activeWeaponAttributes}
                 weaponStats={activeWeaponStats}
                 bulletDPS={activeWeaponBulletDps}
                 weaponMinRange={activeWeaponMinRange}
                 weaponMaxRange={activeWeaponMaxRange}
                 onStatsChange={handleWeaponStatsChange}
-                weaponAttributesText={weaponTagsInput}
+                weaponAttributesText={activeWeaponTagsInput}
                 onWeaponNameChange={updateActiveWeaponName}
-                onWeaponDescChange={value => updateWeaponDraft({ weaponDesc: value })}
+                onWeaponDescChange={value => updateActiveWeaponPanel({ weaponDesc: value })}
                 onWeaponAttributesTextChange={handleWeaponTagChange}
                 onWeaponMinRangeChange={value => updateActiveWeaponPanel({ weaponMinRange: parseEditableNumber(value) })}
                 onWeaponMaxRangeChange={value => updateActiveWeaponPanel({ weaponMaxRange: parseEditableNumber(value) })}
@@ -2083,11 +2104,11 @@ export default function HeroInfoEditor({
           testId="weapon-image-modal"
           onClose={() => setIsWeaponAssetModalOpen(false)}
           onSelect={assetPath => {
-            updateWeaponDraft({ gunImageSrc: assetPath })
+            updateActiveWeaponPanel({ gunImageSrc: assetPath })
             setIsWeaponAssetModalOpen(false)
           }}
           onUpload={uploadUrl => {
-            updateWeaponDraft({ gunImageSrc: uploadUrl })
+            updateActiveWeaponPanel({ gunImageSrc: uploadUrl })
             setIsWeaponAssetModalOpen(false)
           }}
         />

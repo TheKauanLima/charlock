@@ -38,6 +38,9 @@ const namedPanelSchema = {
 
 const weaponPanelVariantSchema = z.object({
   ...namedPanelSchema,
+  weaponDesc: z.string().max(3000).optional(),
+  gunImageSrc: z.string().max(500).optional(),
+  weaponAttributes: z.array(z.string().max(80)).max(20).optional(),
   bulletDPS: z.number().optional(),
   weaponMinRange: z.number().optional(),
   weaponMaxRange: z.number().optional(),

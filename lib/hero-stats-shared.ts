@@ -30,6 +30,9 @@ export interface NamedStatPanel {
 }
 
 export interface WeaponPanelVariant extends NamedStatPanel {
+  weaponDesc?: string
+  gunImageSrc?: string
+  weaponAttributes?: string[]
   bulletDPS: number
   weaponMinRange: number
   weaponMaxRange: number

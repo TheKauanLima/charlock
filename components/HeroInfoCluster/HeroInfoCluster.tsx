@@ -422,9 +422,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         <PanelVariantTabs baseName="Weapon" baseTabName={statsData.weapon.weaponName} variants={statsData.weapon.panels} activeId={activeWeaponPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveWeaponPanelId} />
         <WeaponPanel
           weaponName={activeWeaponPanel?.name ?? statsData.weapon.weaponName}
-          weaponDesc={statsData.weapon.weaponDesc}
-          gunImageSrc={statsData.weapon.gunImageSrc}
-          weaponAttributes={statsData.weapon.weaponAttributes}
+          weaponDesc={activeWeaponPanel?.weaponDesc ?? statsData.weapon.weaponDesc}
+          gunImageSrc={activeWeaponPanel?.gunImageSrc ?? statsData.weapon.gunImageSrc}
+          weaponAttributes={activeWeaponPanel?.weaponAttributes ?? statsData.weapon.weaponAttributes}
           weaponStats={activeWeaponPanel?.stats ?? statsData.weapon.stats}
           bulletDPS={activeWeaponPanel?.bulletDPS ?? statsData.weapon.bulletDPS}
           weaponMinRange={activeWeaponPanel?.weaponMinRange ?? statsData.weapon.weaponMinRange}

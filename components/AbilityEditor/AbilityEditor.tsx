@@ -1003,6 +1003,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     })).filter(group => group.assets.length)
   }, [abilityIconAssetGroups, iconSearch])
   const isAbilityNameLong = abilityName.length > 15
+  const isAbilityNameExtraLong = abilityName.length > 26
 
   useEffect(() => () => {
     if (flashTimeoutRef.current) {
@@ -1406,8 +1407,10 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
   function renderInlineStat(stat: AbilityStat, label: string, onChange: (stat: AbilityStat) => void, onIconClick: () => void, variant: 'timing' | 'sub' | 'main' | 'lower' = 'sub') {
     const canEditStat = capabilities.canEditStats
-    const showAppend = (variant === 'timing' || variant === 'main' || variant === 'lower') && (capabilities.canEditStats || Boolean(stat.append))
-    const showDetail = variant !== 'lower'
+    const isChargesTimingStat = variant === 'timing' && label === 'Charges'
+    const showAppend = (variant === 'main' || variant === 'lower')
+      && (capabilities.canEditStats || Boolean(stat.append))
+    const showDetail = variant !== 'lower' && !isChargesTimingStat
     const valueInputStyle = { width: `${Math.max(2, String(stat.value).length + 1)}ch` }
     const unitInputStyle = variant === 'main'
       ? { width: `${Math.max(6, (stat.unit ?? '').length + 1)}ch`, visibility: 'visible' as const }
@@ -1631,7 +1634,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 ) : null}
                 <label className={styles.nameInputWrap}>
                   <span className={styles.srOnly}>Ability Name</span>
-                  <input className={cn(isAbilityNameLong && styles.nameInputLong)} value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
+                  <input className={cn(isAbilityNameLong && styles.nameInputLong, isAbilityNameExtraLong && styles.nameInputExtraLong)} value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
                 </label>
               </div>
 
