@@ -909,7 +909,7 @@ describe('HeroGrid', () => {
     expect(renderLayer).toHaveAccessibleName('Custom editor hero render')
     expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/generic_bg_psd.png'))
 
-    expect(screen.getByTestId('hero-grid-shell').className).toContain('renderDragEnabled')
+    await waitFor(() => expect(screen.getByTestId('hero-grid-shell').className).toContain('renderDragEnabled'))
 
     fireEvent.pointerDown(screen.getByTestId('hero-grid-shell'), { pointerId: 9, button: 0, clientX: 120, clientY: 140 })
     fireEvent.pointerMove(window, { pointerId: 9, clientX: 162, clientY: 168 })
@@ -933,6 +933,41 @@ describe('HeroGrid', () => {
     expect(requestBody.hero.renderPosition).toEqual({ x: 42, y: 28 })
     await screen.findByText('Private hero saved to your profile.')
     await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 42px) calc(0% + 28px)')))
+  })
+
+  it('disables uploaded render dragging while ability editor text is editable', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('button', { name: 'image' }))
+    await user.click(screen.getByTestId('uploadthing-heroRender'))
+
+    await screen.findByTestId('editor-custom-render-layer')
+    await waitFor(() => expect(screen.getByTestId('hero-grid-shell').className).toContain('renderDragEnabled'))
+
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+
+    expect(screen.getByTestId('ability-editor')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId('hero-grid-shell').className).not.toContain('renderDragEnabled'))
+
+    fireEvent.pointerDown(screen.getByTestId('hero-grid-shell'), { pointerId: 12, button: 0, clientX: 140, clientY: 150 })
+    fireEvent.pointerMove(window, { pointerId: 12, clientX: 175, clientY: 185 })
+    fireEvent.pointerUp(window, { pointerId: 12, clientX: 175, clientY: 185 })
+
+    expect(screen.getByTestId('editor-custom-render-layer')).not.toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 35px) calc(0% + 35px)'))
+
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Editable Ability Text')
+
+    const tierOneText = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
+
+    tierOneText.textContent = 'Editable tier text'
+    fireEvent.input(tierOneText)
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Editable Ability Text')
+    expect(tierOneText).toHaveTextContent('Editable tier text')
   })
 
   it('stores weapon image uploads on the active weapon panel variant', async () => {

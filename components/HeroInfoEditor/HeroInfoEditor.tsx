@@ -63,6 +63,7 @@ interface HeroInfoEditorProps {
   onRenderSelectionChange: (renderSelection: EditorRenderSelection) => void
   onDraftChange: (draft: HeroInfoDefinition) => void
   onSaveHero: (payload: CustomHeroSavePayload) => void
+  onInteractionPanelOpenChange?: (isOpen: boolean) => void
   onExitEditor?: () => void
 }
 
@@ -421,6 +422,7 @@ export default function HeroInfoEditor({
   onRenderSelectionChange,
   onDraftChange,
   onSaveHero,
+  onInteractionPanelOpenChange,
   onExitEditor,
 }: HeroInfoEditorProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>('overview')
@@ -1274,6 +1276,10 @@ export default function HeroInfoEditor({
       : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)[activeAbilityTarget.index]
     : null
   const isFocusedAbilityEditorOpen = Boolean(activeAbilityTarget && activeAbilityDraft)
+
+  useEffect(() => {
+    onInteractionPanelOpenChange?.(Boolean(activeTabId || isFocusedAbilityEditorOpen))
+  }, [activeTabId, isFocusedAbilityEditorOpen, onInteractionPanelOpenChange])
 
   function saveFocusedAbilityEditorDraft() {
     if (!isFocusedAbilityEditorOpen || !activeAbilityTarget) {

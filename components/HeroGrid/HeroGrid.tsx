@@ -165,7 +165,7 @@ function shouldIgnoreRenderDragTarget(target: EventTarget | null) {
       ? target.parentElement
       : null
 
-  return Boolean(element?.closest('button, a, input, textarea, select, [role="dialog"], [data-hero-stat-panel="true"], [data-testid="primary-top-bar"]'))
+  return Boolean(element?.closest('button, a, input, textarea, select, [contenteditable="true"], [role="dialog"], [role="textbox"], [data-hero-stat-panel="true"], [data-testid="ability-editor"], [data-testid="primary-top-bar"]'))
 }
 
 function getSavedRenderSelection(renderPath: string, renderPosition?: RenderPosition): { background: string; renderSelection: EditorRenderSelection } {
@@ -252,6 +252,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [saveFailure, setSaveFailure] = useState<string | null>(null)
   const [lastSavePayload, setLastSavePayload] = useState<CustomHeroSavePayload | null>(null)
   const [isSessionExpired, setIsSessionExpired] = useState(false)
+  const [isEditorInteractionPanelOpen, setIsEditorInteractionPanelOpen] = useState(false)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
   const renderHero = HEROES.find(hero => hero.slug === renderHeroSlug) ?? activeHero
   const editorHero = editingCustomHero ?? templateHero ?? activeHero
@@ -294,7 +295,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       ? selectedCollectionHero?.render ?? null
       : null
   const customRenderPosition = isCreateCustomRender ? editorRenderSelection.position : selectedCollectionHero?.renderPosition
-  const isEditorRenderMovable = isCreateCustomRender
+  const isEditorRenderMovable = isCreateCustomRender && !isEditorInteractionPanelOpen
   const baseRenderLabel = isCreateMode
     ? editorRenderSelection.mode === 'hero'
       ? 'Selected editor hero render'
@@ -1287,6 +1288,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           onRenderSelectionChange={setEditorRenderSelection}
           onDraftChange={setEditorDraft}
           onSaveHero={handleSaveHero}
+          onInteractionPanelOpenChange={setIsEditorInteractionPanelOpen}
           onExitEditor={handleExitCreateEditor}
         />
       ) : isCollectionTab ? (
