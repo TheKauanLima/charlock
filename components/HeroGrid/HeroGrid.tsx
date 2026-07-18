@@ -2,14 +2,15 @@
 
 import { Heart } from 'lucide-react'
 import Image from 'next/image'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
 import { ConnectionStatus, LoadingOverlay, SessionExpiredModal } from '@/components/system-feedback/SystemFeedback'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
-import type { EditorRenderSelection } from '@/lib/editor-assets'
+import type { EditorRenderSelection, RenderPosition } from '@/lib/editor-assets'
 import { buildDefaultAbilityStats, type AbilityStatsPayload } from '@/lib/ability-editor-types'
 import type { CustomHeroDetail, CustomHeroSavePayload, CustomHeroSort, CustomHeroSummary } from '@/lib/custom-hero-types'
 import { getNetworkRequestError, getUserFacingSaveError, parseClientRequestError, readApiResponse, type ApiErrorPayload } from '@/lib/client-errors'
@@ -34,6 +35,13 @@ interface HeroGridProps {
   initialTab?: PrimaryTab
 }
 
+interface RenderDragState {
+  pointerId: number
+  startClientX: number
+  startClientY: number
+  startPosition: RenderPosition
+}
+
 const TAB_ITEMS: TabItem[] = [
   { label: 'Select' },
   { label: 'Browse' },
@@ -45,6 +53,7 @@ const INITIAL_BROWSE_PAGE_SIZE = 24
 const NEXT_BROWSE_PAGE_SIZE = 12
 const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
 const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
+const RENDER_POSITION_LIMIT = 2000
 const HERO_BACKGROUND_SLUG_OVERRIDES: Record<string, string> = {
   ladygeist: 'geist',
 }
@@ -109,8 +118,58 @@ function getEditorBackgroundForHero(hero: HeroDefinition) {
   return backgroundMatch?.path ?? FALLBACK_EDITOR_BACKGROUND
 }
 
-function getSavedRenderSelection(renderPath: string): { background: string; renderSelection: EditorRenderSelection } {
-  if (HERO_BACKGROUND_OPTIONS.some(option => option.path === renderPath)) {
+function clampRenderOffset(value: number) {
+  return Math.min(RENDER_POSITION_LIMIT, Math.max(-RENDER_POSITION_LIMIT, Math.round(value)))
+}
+
+function normalizeRenderPosition(position: RenderPosition | null | undefined): RenderPosition {
+  return {
+    x: clampRenderOffset(position?.x ?? 0),
+    y: clampRenderOffset(position?.y ?? 0),
+  }
+}
+
+function normalizeRenderSelection(renderSelection: EditorRenderSelection): EditorRenderSelection {
+  if (renderSelection.mode === 'background' || !renderSelection.src) {
+    return { mode: 'background', src: null }
+  }
+
+  return {
+    ...renderSelection,
+    position: normalizeRenderPosition(renderSelection.position),
+  }
+}
+
+function getRenderBackgroundPosition(position: RenderPosition | null | undefined) {
+  const normalizedPosition = normalizeRenderPosition(position)
+
+  return `calc(100% + ${normalizedPosition.x}px) calc(0% + ${normalizedPosition.y}px)`
+}
+
+function isBackgroundRenderPath(path: string) {
+  return HERO_BACKGROUND_OPTIONS.some(option => option.path === path)
+}
+
+function isPresetRenderPath(path: string) {
+  return path.startsWith('/render/')
+}
+
+function isCustomRenderPath(path: string) {
+  return Boolean(path) && !isBackgroundRenderPath(path) && !isPresetRenderPath(path)
+}
+
+function shouldIgnoreRenderDragTarget(target: EventTarget | null) {
+  const element = target instanceof Element
+    ? target
+    : target instanceof Node
+      ? target.parentElement
+      : null
+
+  return Boolean(element?.closest('button, a, input, textarea, select, [role="dialog"], [data-hero-stat-panel="true"], [data-testid="primary-top-bar"]'))
+}
+
+function getSavedRenderSelection(renderPath: string, renderPosition?: RenderPosition): { background: string; renderSelection: EditorRenderSelection } {
+  if (isBackgroundRenderPath(renderPath)) {
     return {
       background: renderPath,
       renderSelection: { mode: 'background', src: null },
@@ -120,13 +179,13 @@ function getSavedRenderSelection(renderPath: string): { background: string; rend
   if (renderPath.startsWith('/render/')) {
     return {
       background: FALLBACK_EDITOR_BACKGROUND,
-      renderSelection: { mode: 'hero', src: renderPath },
+      renderSelection: { mode: 'hero', src: renderPath, position: normalizeRenderPosition(renderPosition) },
     }
   }
 
   return {
     background: FALLBACK_EDITOR_BACKGROUND,
-    renderSelection: { mode: 'custom', src: renderPath },
+    renderSelection: { mode: 'custom', src: renderPath, position: normalizeRenderPosition(renderPosition) },
   }
 }
 
@@ -152,6 +211,8 @@ function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload
 }
 
 export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
+  const renderDragStateRef = useRef<RenderDragState | null>(null)
+  const latestEditorRenderSelectionRef = useRef<EditorRenderSelection>({ mode: 'background', src: null })
   const startsInCreate = initialTab === 'Create'
   const [activeTab, setActiveTab] = useState<PrimaryTab>(startsInCreate ? 'Select' : initialTab)
   const [browseSort, setBrowseSort] = useState<CustomHeroSort>('new')
@@ -205,17 +266,49 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const selectedCollectionHero = activeTab === 'Browse' ? selectedBrowseHero : activeTab === 'Bookmarks' ? selectedBookmarkedHero : null
   const [editorDraft, setEditorDraft] = useState<HeroInfoDefinition>(() => cloneHeroInfo(activeHero.heroInfo))
   const [editorBackground, setEditorBackground] = useState(() => getEditorBackgroundForHero(activeHero))
-  const [editorRenderSelection, setEditorRenderSelection] = useState<EditorRenderSelection>({ mode: 'background', src: null })
+  const [editorRenderSelection, setEditorRenderSelectionState] = useState<EditorRenderSelection>({ mode: 'background', src: null })
+  const setEditorRenderSelection = useCallback((renderSelection: EditorRenderSelection) => {
+    const normalizedSelection = normalizeRenderSelection(renderSelection)
+
+    latestEditorRenderSelectionRef.current = normalizedSelection
+    setEditorRenderSelectionState(normalizedSelection)
+  }, [])
   const isCreateMode = activeTab === 'Create'
   const isCollectionTab = activeTab === 'Browse' || activeTab === 'Bookmarks'
   const shouldShowRender = isCreateMode || (isCollectionTab ? Boolean(selectedCollectionHero) : activeTab === 'Select' && hasSelectedHero)
-  const editorRenderImage = editorRenderSelection.mode === 'hero' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
-  const displayRenderImage = isCreateMode ? editorRenderImage : selectedCollectionHero ? selectedCollectionHero.render : renderHero.render
-  const displayRenderLabel = isCreateMode
-    ? (editorRenderSelection.mode === 'hero' ? 'Selected editor hero render' : 'Selected editor background')
+  const editorRenderImage = editorRenderSelection.mode !== 'background' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
+  const isCreateCustomRender = isCreateMode && editorRenderSelection.mode === 'custom' && Boolean(editorRenderSelection.src)
+  const isCollectionCustomRender = Boolean(selectedCollectionHero && isCustomRenderPath(selectedCollectionHero.render))
+  const baseRenderImage = isCreateMode
+    ? isCreateCustomRender
+      ? editorBackground
+      : editorRenderImage
+    : selectedCollectionHero
+      ? isCollectionCustomRender
+        ? selectedCollectionHero.background || FALLBACK_EDITOR_BACKGROUND
+        : selectedCollectionHero.render
+      : renderHero.render
+  const customRenderImage = isCreateCustomRender
+    ? editorRenderSelection.src
+    : isCollectionCustomRender
+      ? selectedCollectionHero?.render ?? null
+      : null
+  const customRenderPosition = isCreateCustomRender ? editorRenderSelection.position : selectedCollectionHero?.renderPosition
+  const isEditorRenderMovable = isCreateCustomRender
+  const baseRenderLabel = isCreateMode
+    ? editorRenderSelection.mode === 'hero'
+      ? 'Selected editor hero render'
+      : 'Selected editor background'
+    : selectedCollectionHero
+      ? isCollectionCustomRender
+        ? `${selectedCollectionHero.displayName} background`
+        : `${selectedCollectionHero.displayName} render`
+      : `${activeHero.displayName} render`
+  const customRenderLabel = isCreateCustomRender
+    ? 'Custom editor hero render'
     : selectedCollectionHero
       ? `${selectedCollectionHero.displayName} render`
-      : `${activeHero.displayName} render`
+      : 'Custom hero render'
   const backstoryHero = useMemo(
     () =>
       isCreateMode
@@ -229,7 +322,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
   const applySavedHeroToEditor = useCallback((hero: CustomHeroDetail) => {
     clearEditorRecovery()
-    const renderState = getSavedRenderSelection(hero.render)
+    const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
 
     setEditingCustomHero(hero)
     setTemplateHero(null)
@@ -240,10 +333,10 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorRenderSelection(renderState.renderSelection)
     setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
-  }, [])
+  }, [setEditorRenderSelection])
 
   const applyTemplateHeroToEditor = useCallback((hero: CustomHeroDetail) => {
-    const renderState = getSavedRenderSelection(hero.render)
+    const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
 
     setEditingCustomHero(null)
     setTemplateHero({
@@ -262,7 +355,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
     setSaveStatusMessage('Template loaded as a new draft.')
-  }, [])
+  }, [setEditorRenderSelection])
 
   const applyOfficialHeroToEditor = useCallback((hero: HeroDefinition, stats: HeroStatsPayload, abilityStats: AbilityStatsPayload) => {
     const renderState = getSavedRenderSelection(hero.render)
@@ -296,12 +389,12 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorRenderSelection(renderState.renderSelection)
     setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
-  }, [])
+  }, [setEditorRenderSelection])
 
   const startCreateFromTemplate = useCallback((template: HeroTemplateDefinition) => {
     clearEditorRecovery()
     const hero = template.hero
-    const renderState = getSavedRenderSelection(hero.render)
+    const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
 
     setEditingCustomHero(null)
     setTemplateHero(hero)
@@ -314,7 +407,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setActiveTab('Create')
     setIsTemplateModalOpen(false)
     setSaveStatusMessage(`${template.label} template loaded.`)
-  }, [])
+  }, [setEditorRenderSelection])
 
   const loadSavedHero = useCallback(async (heroId: string) => {
     await Promise.resolve()
@@ -354,6 +447,66 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
     return () => window.clearTimeout(timeoutId)
   }, [pendingRenderHeroSlug, renderPhase])
+
+  useEffect(() => {
+    function handleRenderDragPointerMove(event: PointerEvent) {
+      const dragState = renderDragStateRef.current
+
+      if (!dragState || event.pointerId !== dragState.pointerId) {
+        return
+      }
+
+      const nextPosition = {
+        x: clampRenderOffset(dragState.startPosition.x + event.clientX - dragState.startClientX),
+        y: clampRenderOffset(dragState.startPosition.y + event.clientY - dragState.startClientY),
+      }
+
+      setEditorRenderSelectionState(currentSelection => {
+        if (currentSelection.mode === 'background') {
+          return currentSelection
+        }
+
+        const nextSelection = normalizeRenderSelection({
+          ...currentSelection,
+          position: nextPosition,
+        })
+
+        latestEditorRenderSelectionRef.current = nextSelection
+
+        return nextSelection
+      })
+    }
+
+    function handleRenderDragPointerUp(event: PointerEvent) {
+      if (renderDragStateRef.current?.pointerId === event.pointerId) {
+        renderDragStateRef.current = null
+      }
+    }
+
+    window.addEventListener('pointermove', handleRenderDragPointerMove)
+    window.addEventListener('pointerup', handleRenderDragPointerUp)
+    window.addEventListener('pointercancel', handleRenderDragPointerUp)
+
+    return () => {
+      window.removeEventListener('pointermove', handleRenderDragPointerMove)
+      window.removeEventListener('pointerup', handleRenderDragPointerUp)
+      window.removeEventListener('pointercancel', handleRenderDragPointerUp)
+    }
+  }, [])
+
+  function handleRenderDragPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!isEditorRenderMovable || event.button !== 0 || shouldIgnoreRenderDragTarget(event.target)) {
+      return
+    }
+
+    renderDragStateRef.current = {
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPosition: normalizeRenderPosition(editorRenderSelection.position),
+    }
+    event.preventDefault()
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -567,11 +720,25 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
   async function handleSaveHero(payload: CustomHeroSavePayload) {
     const isUnpublishing = editingCustomHero?.status === 'published' && payload.status === 'private'
+    const latestRenderSelection = latestEditorRenderSelectionRef.current
+    const latestRenderPosition =
+      latestRenderSelection.mode !== 'background' &&
+      latestRenderSelection.src &&
+      latestRenderSelection.src === payload.hero.render
+        ? normalizeRenderPosition(latestRenderSelection.position)
+        : normalizeRenderPosition(payload.hero.renderPosition)
+    const payloadToSave: CustomHeroSavePayload = {
+      ...payload,
+      hero: {
+        ...payload.hero,
+        renderPosition: latestRenderPosition,
+      },
+    }
 
     setIsSavingHero(true)
-    setLastSavePayload(payload)
+    setLastSavePayload(payloadToSave)
     setSaveFailure(null)
-    setSaveStatusMessage(isUnpublishing ? 'Unpublishing hero...' : payload.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
+    setSaveStatusMessage(isUnpublishing ? 'Unpublishing hero...' : payloadToSave.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
 
     try {
       if (navigator.onLine === false) {
@@ -583,7 +750,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloadToSave),
       })
       const body = await readApiResponse<{ hero?: CustomHeroDetail } & ApiErrorPayload>(response)
 
@@ -602,7 +769,8 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       applySavedHeroToEditor({
         ...body.hero,
-        abilityStats: mergeSubmittedSecondaryAbilities(body.hero.abilityStats, payload.abilityStats),
+        renderPosition: body.hero.renderPosition ?? payloadToSave.hero.renderPosition,
+        abilityStats: mergeSubmittedSecondaryAbilities(body.hero.abilityStats, payloadToSave.abilityStats),
       })
       clearEditorRecovery()
       setLastSavePayload(null)
@@ -830,7 +998,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   }
 
   return (
-    <div className={styles.shell}>
+    <div className={`${styles.shell} ${isEditorRenderMovable ? styles.renderDragEnabled : ''}`} onPointerDown={isEditorRenderMovable ? handleRenderDragPointerDown : undefined} data-testid="hero-grid-shell">
       <div className={styles.backgroundLayer} />
       <div className={styles.smokeLayer} />
       <div className={styles.washLayer} />
@@ -839,22 +1007,28 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         <div className={styles.renderFade} />
         {shouldShowRender ? (
           <div
-            key={isCreateMode ? editorBackground : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
+            key={isCreateMode ? `${editorRenderSelection.mode}:${baseRenderImage}` : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
             className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
             role="img"
-            aria-label={displayRenderLabel}
+            aria-label={baseRenderLabel}
             aria-hidden={renderPhase === 'fade-out'}
             data-testid="hero-render-layer"
-            style={{ backgroundImage: `url('${displayRenderImage}')` }}
+            style={{
+              backgroundImage: `url('${baseRenderImage}')`,
+            }}
           />
         ) : null}
-        {isCreateMode && editorRenderSelection.mode === 'custom' && editorRenderSelection.src ? (
+        {customRenderImage ? (
           <div
-            className={styles.renderFrame}
+            className={`${styles.renderFrame} ${isEditorRenderMovable ? styles.renderDraggableFrame : ''}`}
             role="img"
-            aria-label="Custom editor hero render"
+            aria-label={customRenderLabel}
             data-testid="editor-custom-render-layer"
-            style={{ backgroundImage: `url('${editorRenderSelection.src}')` }}
+            onPointerDown={isEditorRenderMovable ? handleRenderDragPointerDown : undefined}
+            style={{
+              backgroundImage: `url('${customRenderImage}')`,
+              backgroundPosition: getRenderBackgroundPosition(customRenderPosition),
+            }}
           />
         ) : null}
       </div>
@@ -1124,6 +1298,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       {isCreateMode ? (
         <BackstoryModule
           hero={backstoryHero}
+          accentImageSrc={editorRenderImage}
           isEditable
           onBackstoryChange={value => setEditorDraft(currentDraft => ({ ...currentDraft, backstory: value }))}
         />

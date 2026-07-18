@@ -522,6 +522,13 @@ describe('HeroGrid', () => {
 
     expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('/render/Grey_Talon_Render.png'))
     expect(screen.getByTestId('hero-render-layer')).not.toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/yamato_bg_psd.png'))
+    expect(screen.queryByTestId('editor-custom-render-layer')).not.toBeInTheDocument()
+
+    fireEvent.pointerDown(screen.getByTestId('hero-render-layer'), { pointerId: 5, button: 0, clientX: 120, clientY: 140 })
+    fireEvent.pointerMove(window, { pointerId: 5, clientX: 170, clientY: 190 })
+    fireEvent.pointerUp(window, { pointerId: 5, clientX: 170, clientY: 190 })
+
+    expect(screen.getByTestId('hero-render-layer')).not.toHaveAttribute('style', expect.stringContaining('background-position'))
   })
 
   it('edits hero identity fields in create mode in real time', async () => {
@@ -852,6 +859,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByTestId('uploadthing-heroRender'))
 
     await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/heroRender.png')))
+    expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/generic_bg_psd.png'))
 
     await user.click(screen.getByTestId('uploadthing-heroPortrait'))
     expect(screen.getByTestId('editor-portrait-preview-image')).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/heroPortrait.png'))
@@ -860,6 +868,71 @@ describe('HeroGrid', () => {
     await user.click(within(screen.getByTestId('weapon-panel')).getByTestId('uploadthing-weaponImage'))
 
     expect(screen.getByRole('img', { name: 'WEAPON NAME weapon' })).toHaveAttribute('style', expect.stringContaining('https://utfs.io/f/weaponImage.png'))
+  })
+
+  it('drags uploaded hero renders and saves their render position', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      hero: {
+        id: 'saved-hero',
+        displayName: 'NAME',
+        slug: 'saved-hero',
+        assetSlug: 'saved-hero',
+        portrait: '/portrait.png',
+        render: 'https://utfs.io/f/heroRender.png',
+        background: '/panorama/images/heroes/backgrounds/generic_bg_psd.png',
+        heroInfo: HEROES[0].heroInfo,
+        status: 'private',
+        likesCount: 0,
+        likedByCurrentUser: false,
+        allowCopies: false,
+        viewerCanEdit: true,
+        publishedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stats: buildHeroStatsSeed(HEROES[0]),
+        abilityStats: buildDefaultAbilityStats(HEROES[0]),
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('button', { name: 'image' }))
+    await user.click(screen.getByTestId('uploadthing-heroRender'))
+
+    const renderLayer = await screen.findByTestId('editor-custom-render-layer')
+
+    expect(renderLayer).toHaveAccessibleName('Custom editor hero render')
+    expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/generic_bg_psd.png'))
+
+    expect(screen.getByTestId('hero-grid-shell').className).toContain('renderDragEnabled')
+
+    fireEvent.pointerDown(screen.getByTestId('hero-grid-shell'), { pointerId: 9, button: 0, clientX: 120, clientY: 140 })
+    fireEvent.pointerMove(window, { pointerId: 9, clientX: 162, clientY: 168 })
+    fireEvent.pointerUp(window, { pointerId: 9, clientX: 162, clientY: 168 })
+
+    await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 42px) calc(0% + 28px)')))
+    expect(screen.getByTestId('hero-render-layer')).not.toHaveAttribute('style', expect.stringContaining('background-position'))
+
+    await user.clear(screen.getByPlaceholderText('Name this save'))
+    await user.type(screen.getByPlaceholderText('Name this save'), 'Positioned Render')
+    const saveButton = screen.getByRole('button', { name: 'Save Private' })
+
+    expect(saveButton).not.toBeDisabled()
+    fireEvent.click(saveButton)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
+
+    const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as { hero: { render: string; renderPosition: { x: number; y: number } } }
+
+    expect(requestBody.hero.render).toBe('https://utfs.io/f/heroRender.png')
+    expect(requestBody.hero.renderPosition).toEqual({ x: 42, y: 28 })
+    await screen.findByText('Private hero saved to your profile.')
+    await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 42px) calc(0% + 28px)')))
   })
 
   it('stores weapon image uploads on the active weapon panel variant', async () => {
@@ -925,17 +998,29 @@ describe('HeroGrid', () => {
     render(<HeroGrid />)
     await openEmptyCreateEditor(user)
 
+    await user.click(screen.getByRole('button', { name: 'Rename active Boon panel' }))
+    await user.clear(screen.getByLabelText('Rename Boon panel'))
+    await user.type(screen.getByLabelText('Rename Boon panel'), 'Blessings')
+    await user.click(screen.getByRole('button', { name: 'Save Name' }))
+    expect(screen.getByRole('tab', { name: 'Blessings' })).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Add Boon panel' }))
     await user.type(screen.getByLabelText('New Boon panel name'), 'Aggressive')
     await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: 'Rename active Boon panel' }))
+    await user.clear(screen.getByLabelText('Rename Boon panel'))
+    await user.type(screen.getByLabelText('Rename Boon panel'), 'Momentum')
+    await user.click(screen.getByRole('button', { name: 'Save Name' }))
+    expect(screen.getByRole('tab', { name: 'Momentum' })).toBeInTheDocument()
     await user.clear(screen.getByLabelText('Base Bullet Damage value'))
     await user.type(screen.getByLabelText('Base Bullet Damage value'), '2.5')
-    await user.click(screen.getByRole('tab', { name: 'Boon Rewards' }))
+    await user.click(screen.getByRole('tab', { name: 'Blessings' }))
     expect(screen.getByLabelText('Base Bullet Damage value')).toHaveValue('0.31')
-    await user.click(screen.getByRole('tab', { name: 'Aggressive' }))
+    await user.click(screen.getByRole('tab', { name: 'Momentum' }))
     expect(screen.getByLabelText('Base Bullet Damage value')).toHaveValue('2.5')
     await user.click(screen.getByRole('button', { name: 'Remove active Boon panel' }))
-    expect(screen.queryByRole('tab', { name: 'Aggressive' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Momentum' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Blessings' })).toBeInTheDocument()
     expect(screen.getByLabelText('Base Bullet Damage value')).toHaveValue('0.31')
 
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))

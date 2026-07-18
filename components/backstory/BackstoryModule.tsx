@@ -10,6 +10,7 @@ import styles from './BackstoryModule.module.css'
 
 interface BackstoryModuleProps {
   hero: HeroDefinition
+  accentImageSrc?: string
   isEditable?: boolean
   onCreateFromHero?: () => void
   onBackstoryChange?: (value: string) => void
@@ -17,13 +18,110 @@ interface BackstoryModuleProps {
 
 type BackstoryStyle = CSSProperties & {
   '--backstory-accent': string
+  '--backstory-accent-rgb': string
 }
 
 const BOOK_ICON_PATH = '/panorama/images/icons/icon_book.svg'
 const FALLBACK_BACKSTORY = 'No character backstory has been added yet.'
+const BACKSTORY_VISIBLE_ROWS = 15
 
-export default function BackstoryModule({ hero, isEditable = false, onCreateFromHero, onBackstoryChange }: BackstoryModuleProps) {
+interface RgbColor {
+  r: number
+  g: number
+  b: number
+}
+
+interface ColorBucket extends RgbColor {
+  count: number
+  score: number
+}
+
+function clampColorChannel(value: number) {
+  return Math.min(255, Math.max(0, Math.round(value)))
+}
+
+function getHexChannel(value: number) {
+  return clampColorChannel(value).toString(16).padStart(2, '0')
+}
+
+function rgbToHex({ r, g, b }: RgbColor) {
+  return `#${getHexChannel(r)}${getHexChannel(g)}${getHexChannel(b)}`
+}
+
+export function getRgbTriplet(color: string) {
+  const hexMatch = color.trim().match(/^#?([0-9a-f]{6})$/i)
+
+  if (!hexMatch) {
+    return '255, 239, 215'
+  }
+
+  const hex = hexMatch[1]
+  const red = Number.parseInt(hex.slice(0, 2), 16)
+  const green = Number.parseInt(hex.slice(2, 4), 16)
+  const blue = Number.parseInt(hex.slice(4, 6), 16)
+
+  return `${red}, ${green}, ${blue}`
+}
+
+export function getProminentColorFromPixels(pixels: Uint8ClampedArray) {
+  const buckets = new Map<string, ColorBucket>()
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    const alpha = pixels[index + 3]
+
+    if (alpha < 128) {
+      continue
+    }
+
+    const red = pixels[index]
+    const green = pixels[index + 1]
+    const blue = pixels[index + 2]
+    const maxChannel = Math.max(red, green, blue)
+    const minChannel = Math.min(red, green, blue)
+    const saturation = maxChannel === 0 ? 0 : (maxChannel - minChannel) / maxChannel
+    const lightness = (maxChannel + minChannel) / 510
+
+    if (lightness < 0.08 || lightness > 0.92) {
+      continue
+    }
+
+    const bucketRed = Math.round(red / 32) * 32
+    const bucketGreen = Math.round(green / 32) * 32
+    const bucketBlue = Math.round(blue / 32) * 32
+    const key = `${bucketRed}:${bucketGreen}:${bucketBlue}`
+    const bucket = buckets.get(key) ?? { r: 0, g: 0, b: 0, count: 0, score: 0 }
+
+    bucket.r += red
+    bucket.g += green
+    bucket.b += blue
+    bucket.count += 1
+    bucket.score += 0.45 + saturation + Math.min(lightness, 1 - lightness)
+    buckets.set(key, bucket)
+  }
+
+  const prominentBucket = Array.from(buckets.values()).sort((first, second) => second.score - first.score)[0]
+
+  if (!prominentBucket) {
+    return null
+  }
+
+  return rgbToHex({
+    r: prominentBucket.r / prominentBucket.count,
+    g: prominentBucket.g / prominentBucket.count,
+    b: prominentBucket.b / prominentBucket.count,
+  })
+}
+
+function getBackstoryAccentImage(hero: HeroDefinition) {
+  const heroWithBackground = hero as HeroDefinition & { background?: string }
+
+  return heroWithBackground.background || hero.render
+}
+
+export default function BackstoryModule({ hero, accentImageSrc, isEditable = false, onCreateFromHero, onBackstoryChange }: BackstoryModuleProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const themeAccentColor = hero.heroInfo.abilityCircleColor || hero.heroInfo.tagColor
+  const [sampledAccentColor, setSampledAccentColor] = useState<{ source: string; color: string } | null>(null)
   const modalRef = useRef<HTMLElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -33,8 +131,53 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
   const createTooltipId = `copy-hero-tooltip-${hero.slug}`
   const editableBackstory = hero.heroInfo.backstory ?? ''
   const backstory = isEditable ? editableBackstory : hero.heroInfo.backstory?.trim() || FALLBACK_BACKSTORY
-  const rowCount = Math.min(20, Math.max(5, editableBackstory.split(/\r\n|\r|\n/).length + 2))
-  const accentColor = hero.heroInfo.abilityCircleColor || hero.heroInfo.tagColor
+  const accentSource = accentImageSrc ?? getBackstoryAccentImage(hero)
+  const accentColor = sampledAccentColor?.source === accentSource ? sampledAccentColor.color : themeAccentColor
+
+  useEffect(() => {
+    if (!accentSource || typeof window === 'undefined') {
+      return undefined
+    }
+
+    let isCancelled = false
+    const image = new window.Image()
+
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      if (isCancelled) {
+        return
+      }
+
+      const canvas = document.createElement('canvas')
+      const size = 28
+
+      canvas.width = size
+      canvas.height = size
+
+      const context = canvas.getContext('2d', { willReadFrequently: true })
+
+      if (!context) {
+        return
+      }
+
+      try {
+        context.drawImage(image, 0, 0, size, size)
+
+        const prominentColor = getProminentColorFromPixels(context.getImageData(0, 0, size, size).data)
+
+        if (prominentColor) {
+          setSampledAccentColor({ source: accentSource, color: prominentColor })
+        }
+      } catch {
+        return undefined
+      }
+    }
+    image.src = accentSource
+
+    return () => {
+      isCancelled = true
+    }
+  }, [accentSource])
 
   useEffect(() => {
     if (!isOpen) {
@@ -162,10 +305,13 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
             aria-modal="true"
             aria-labelledby={titleId}
             aria-describedby={bodyId}
-            style={{ '--backstory-accent': accentColor } as BackstoryStyle}
+            style={{
+              '--backstory-accent': accentColor,
+              '--backstory-accent-rgb': getRgbTriplet(accentColor),
+            } as BackstoryStyle}
           >
             <h2 id={titleId} className={styles.title}>
-              BACKSTORY:
+              <span className={styles.titleInitial}>B</span>ACKSTORY:
             </h2>
             {isEditable ? (
               <textarea
@@ -175,7 +321,7 @@ export default function BackstoryModule({ hero, isEditable = false, onCreateFrom
                 className={`${styles.body} ${styles.bodyInput}`}
                 value={editableBackstory}
                 onChange={event => onBackstoryChange?.(event.target.value)}
-                rows={rowCount}
+                rows={BACKSTORY_VISIBLE_ROWS}
                 wrap="soft"
                 placeholder="Write this character's story..."
               />

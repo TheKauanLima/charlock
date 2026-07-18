@@ -153,6 +153,7 @@ const TAG_WHEEL_STEP = 0.5
 const TAG_DRAG_PIXELS_PER_DEGREE = 6
 const TAG_OFFSET_MIN = -28
 const TAG_OFFSET_MAX = 28
+const DEFAULT_RENDER_POSITION = { x: 0, y: 0 }
 
 function hasPersistedHeroId(hero: HeroDefinition) {
   const id = (hero as HeroDefinition & { id?: unknown }).id
@@ -610,6 +611,7 @@ export default function HeroInfoEditor({
     onRenderSelectionChange({
       mode: 'custom',
       src: uploadUrl,
+      position: DEFAULT_RENDER_POSITION,
     })
   }
 
@@ -710,6 +712,10 @@ export default function HeroInfoEditor({
     return selectedBackground
   }
 
+  function getRenderPosition() {
+    return renderSelection.mode === 'background' ? DEFAULT_RENDER_POSITION : renderSelection.position ?? DEFAULT_RENDER_POSITION
+  }
+
   function getDraftName() {
     const explicitName = heroNameInput.trim()
 
@@ -768,6 +774,7 @@ export default function HeroInfoEditor({
         portrait: heroPortraitInput,
         render: getRenderPath(),
         background: selectedBackground,
+        renderPosition: getRenderPosition(),
       },
       allowCopies: allowCopiesInput,
       heroInfo: restoreRequiredAbilityIcons(draft),
@@ -905,10 +912,12 @@ export default function HeroInfoEditor({
   function renameBoonPanel(id: string, name: string) {
     setStatsDraft(currentDraft => ({
       ...currentDraft,
-      boon: {
-        ...currentDraft.boon,
-        panels: (currentDraft.boon.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
-      },
+      boon: id === BASE_PANEL_ID
+        ? { ...currentDraft.boon, name }
+        : {
+          ...currentDraft.boon,
+          panels: (currentDraft.boon.panels ?? []).map(panel => panel.id === id ? { ...panel, name } : panel),
+        },
     }))
   }
 
@@ -1469,11 +1478,11 @@ export default function HeroInfoEditor({
             <div className={styles.weaponStack}>
               <PanelVariantTabs
                 baseName="Boon"
-                baseTabName="Boon Rewards"
+                baseTabName={statsDraft.boon.name ?? 'Boon Rewards'}
                 variants={statsDraft.boon.panels}
                 activeId={activeBoonPanel?.id ?? BASE_PANEL_ID}
                 canAdd={!isPreviewMode}
-                canRename={!isPreviewMode && Boolean(activeBoonPanel)}
+                canRename={!isPreviewMode}
                 canRemove={!isPreviewMode}
                 onSelect={setActiveBoonPanelId}
                 onAdd={addBoonPanel}
@@ -1483,6 +1492,7 @@ export default function HeroInfoEditor({
               <HeroStatsBoonPanel
                 key={`${isPreviewMode ? 'boon-preview' : 'boon-edit'}-${activeBoonPanel?.id ?? BASE_PANEL_ID}`}
                 heroName={boonHeroName}
+                panelName={activeBoonPanel?.name ?? statsDraft.boon.name ?? 'Boon Rewards'}
                 stats={activeBoonStats}
                 isEditable={!isPreviewMode}
                 onStatsChange={handleBoonStatsChange}
@@ -2083,11 +2093,11 @@ export default function HeroInfoEditor({
           testId="hero-render-modal"
           onClose={() => setIsHeroRenderAssetModalOpen(false)}
           onSelect={assetPath => {
-            onRenderSelectionChange({ mode: 'hero', src: assetPath })
+            onRenderSelectionChange({ mode: 'hero', src: assetPath, position: DEFAULT_RENDER_POSITION })
             setIsHeroRenderAssetModalOpen(false)
           }}
           onUpload={uploadUrl => {
-            onRenderSelectionChange({ mode: 'custom', src: uploadUrl })
+            onRenderSelectionChange({ mode: 'custom', src: uploadUrl, position: DEFAULT_RENDER_POSITION })
             setIsHeroRenderAssetModalOpen(false)
           }}
         />

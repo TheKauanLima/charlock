@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 const scalingSchema = z.enum(['none', 'spirit', 'courage', 'melee', 'boon'])
 const stringOrNumberSchema = z.union([z.string(), z.number()])
+const renderPositionSchema = z.object({
+  x: z.number().min(-2000).max(2000),
+  y: z.number().min(-2000).max(2000),
+}).strict()
 
 export function stripDatabaseMetadata(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -145,10 +149,12 @@ export const customHeroSaveSchema = z.object({
     portrait: z.string().max(500).optional(),
     render: z.string().max(500),
     background: z.string().max(500).optional(),
+    renderPosition: renderPositionSchema.optional(),
   }).strict(),
   allowCopies: z.boolean().default(false),
   heroInfo: heroInfoSchema.default({}),
   boon: z.object({
+    name: z.string().trim().min(1).max(80).optional(),
     stats: z.array(panelStatSchema).max(24).optional(),
     panels: z.array(boonPanelVariantSchema).max(8).optional(),
   }).strict().default({}),

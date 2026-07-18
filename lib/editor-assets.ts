@@ -26,6 +26,12 @@ export interface EditorAssetGroup {
 export interface EditorRenderSelection {
   mode: 'background' | 'custom' | 'hero'
   src: string | null
+  position?: RenderPosition
+}
+
+export interface RenderPosition {
+  x: number
+  y: number
 }
 
 const HERO_BACKGROUND_PATHS = [

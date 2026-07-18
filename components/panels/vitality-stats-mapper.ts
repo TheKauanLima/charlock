@@ -27,6 +27,8 @@ const STAT_DEFINITIONS: StatDefinition[] = [
   { label: 'Stamina Recovery', valueField: 'stamina_recovery_percent', fallback: 0, unit: '%', icon: 'staminaRecovery', scalingBase: 'stamina_recovery_percent' },
   { label: 'Stamina', valueField: 'stamina', fallback: 3, unit: '', icon: 'stamina', scalingBase: 'stamina' },
   { label: 'Dash Speed', valueField: 'dash_speed', fallback: 0, unit: 'm', icon: 'stamina', scalingBase: 'dash_speed' },
+  { label: 'Air Control', valueField: 'air_control_percent', fallback: 0, unit: '%', icon: 'stamina', scalingBase: 'air_control_percent' },
+  { label: 'Gravity Scale', valueField: 'gravity_scale_percent', fallback: 0, unit: '%', icon: 'stamina', scalingBase: 'gravity_scale_percent' },
 ]
 
 export function buildVitalityStatsArray(row?: StatsRow): PanelStat[] {

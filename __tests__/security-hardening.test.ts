@@ -75,6 +75,14 @@ describe('security hardening', () => {
       },
     })).toThrow()
 
+    expect(customHeroSaveSchema.parse({
+      name: 'Positioned Hero',
+      hero: {
+        render: '/render/positioned.png',
+        renderPosition: { x: 42, y: -18 },
+      },
+    }).hero.renderPosition).toEqual({ x: 42, y: -18 })
+
     expect(() => contentReportRequestSchema.parse({
       reason: 'Spam / Irrelevant',
       reporterId: 'attacker-selected-id',

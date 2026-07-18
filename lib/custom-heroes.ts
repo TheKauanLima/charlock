@@ -9,6 +9,7 @@ import { normalizeAbilityStats } from '@/lib/ability-editor-types'
 import { ApiRequestError } from '@/lib/api-errors'
 import { customHeroSaveSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
+import type { RenderPosition } from '@/lib/editor-assets'
 import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
@@ -81,6 +82,7 @@ interface SpiritStatsRecord {
 }
 
 interface BoonStatsRecord {
+  name?: string
   stats: IPanelStat[]
   panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
@@ -130,6 +132,13 @@ function getNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
 
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function normalizeRenderPosition(value: RenderPosition | null | undefined): RenderPosition {
+  return {
+    x: getNumber(value?.x),
+    y: getNumber(value?.y),
+  }
 }
 
 function getStringArray(value: unknown) {
@@ -301,6 +310,7 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
   const portrait = getString(heroRecord.portrait)
   const render = getString(heroRecord.render)
   const background = getString(heroRecord.background, render || DEFAULT_BACKGROUND)
+  const renderPosition = normalizeRenderPosition(heroRecord.renderPosition)
   const heroInfo = normalizeHeroInfo(value.heroInfo)
 
   if (!name) {
@@ -323,10 +333,12 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
       portrait,
       render,
       background,
+      renderPosition,
     },
     allowCopies,
     heroInfo,
     boon: {
+      name: getString(boonRecord.name, 'Boon Rewards'),
       stats: normalizeBoonStats(boonRecord.stats),
       panels: normalizeBoonPanels(boonRecord.panels),
     },
@@ -490,6 +502,7 @@ function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, act
     portrait: hero.portrait,
     render: hero.render,
     background: hero.background || hero.render || DEFAULT_BACKGROUND,
+    renderPosition: normalizeRenderPosition(hero.renderPosition),
     heroInfo: heroInfoPayload,
     status: hero.status,
     moderationStatus: hero.moderationStatus ?? 'clean',
@@ -520,6 +533,7 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
     },
     heroInfo: summary.heroInfo,
     boon: {
+      name: bundle.boon?.name ?? 'Boon Rewards',
       stats: normalizeBoonStats(bundle.boon?.stats),
       panels: normalizeBoonPanels(bundle.boon?.panels),
     },
@@ -1054,6 +1068,8 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
         portrait: payload.hero.portrait,
         render: payload.hero.render,
         background: payload.hero.background,
+        'renderPosition.x': payload.hero.renderPosition?.x ?? 0,
+        'renderPosition.y': payload.hero.renderPosition?.y ?? 0,
         createdByUserId: existingHero?.createdByUserId ?? actor.storageUserId,
         status: payload.status,
         allowCopies: payload.allowCopies,

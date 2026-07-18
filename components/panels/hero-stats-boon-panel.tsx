@@ -21,6 +21,7 @@ import styles from './HeroStatsBoonPanel.module.css'
 
 interface HeroStatsBoonPanelProps {
   heroName: string
+  panelName?: string
   stats?: PanelStat[]
   isEditable?: boolean
   onStatsChange?: (stats: PanelStat[]) => void
@@ -108,7 +109,7 @@ function getIconVisualStyle(icon: string | undefined, iconColor = ''): CSSProper
   }
 }
 
-export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false, onStatsChange }: HeroStatsBoonPanelProps) {
+export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards', stats, isEditable = false, onStatsChange }: HeroStatsBoonPanelProps) {
   const normalizedStats = buildBoonStatsArray(stats)
   const [iconTargetIndex, setIconTargetIndex] = useState<number | null>(null)
   const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
@@ -254,9 +255,9 @@ export default function HeroStatsBoonPanel({ heroName, stats, isEditable = false
   ) : null
 
   return (
-    <section className={styles.panel} data-testid="boon-rewards-panel" data-hero-stat-panel="true" aria-label={`${heroName} boon rewards`}>
+    <section className={styles.panel} data-testid="boon-rewards-panel" data-hero-stat-panel="true" aria-label={`${heroName} ${panelName}`}>
       <header className={styles.header}>
-        <h2 className={styles.title}>Boon Rewards</h2>
+        <h2 className={styles.title}>{panelName}</h2>
         <p className={styles.thresholdCopy}>At each threshold, {heroName} gains:</p>
         <div className={styles.unlockRow}>
           <Image className={styles.unlockIcon} src="/panorama/images/hud/unlock_icon.svg" alt="" width={32} height={32} data-testid="boon-unlock-icon" />

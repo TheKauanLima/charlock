@@ -1,5 +1,6 @@
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
+import type { RenderPosition } from '@/lib/editor-assets'
 import type { BoonStatsPayload, HeroStatsPayload, SpiritStatsPayload, VitalityStatsPayload, WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import type { ModerationStatus } from '@/lib/moderation-types'
 
@@ -34,6 +35,7 @@ export interface CustomHeroSavePayload {
     portrait: string
     render: string
     background: string
+    renderPosition?: RenderPosition
   }
   allowCopies: boolean
   heroInfo: HeroInfoDefinition
@@ -53,6 +55,7 @@ export interface CustomHeroSummary extends HeroDefinition {
   bookmarkedByCurrentUser?: boolean
   allowCopies: boolean
   background: string
+  renderPosition?: RenderPosition
   viewerCanEdit: boolean
   moderationStatus?: ModerationStatus
   abilityStats?: AbilityStatsPayload

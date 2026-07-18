@@ -14,6 +14,10 @@ export interface ICustomHero {
   portrait: string
   render: string
   background: string
+  renderPosition?: {
+    x: number
+    y: number
+  }
   createdByUserId: string
   status: 'published' | 'private'
   likesCount: number
@@ -68,6 +72,10 @@ const customHeroSchema = new Schema<ICustomHero>(
     background: {
       type: String,
       default: '',
+    },
+    renderPosition: {
+      x: { type: Number, default: 0 },
+      y: { type: Number, default: 0 },
     },
     createdByUserId: {
       type: String,

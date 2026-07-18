@@ -73,6 +73,8 @@ describe('hero stat mappers', () => {
   it('falls back to defaults when optional rows are omitted', () => {
     expect(buildVitalityStatsArray()[0]).toMatchObject({ label: 'Max Health', value: '810', scaling: 'none' })
     expect(buildVitalityStatsArray()[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
+    expect(buildVitalityStatsArray()[16]).toMatchObject({ label: 'Air Control', value: '0', unit: '%', icon: 'stamina' })
+    expect(buildVitalityStatsArray()[17]).toMatchObject({ label: 'Gravity Scale', value: '0', unit: '%', icon: 'stamina' })
     expect(buildSpiritPowerStat()).toMatchObject({ label: 'Spirit Power', value: '0', description: expect.stringContaining('Spirit Power') })
   })
 })
@@ -219,16 +221,22 @@ describe('migrated stat panels', () => {
     const legacyStats = buildVitalityStatsArray().filter(stat => stat.label !== 'Lifesteal Effectiveness')
     const normalizedStats = normalizeVitalityStatsArray(legacyStats)
 
-    expect(normalizedStats).toHaveLength(16)
+    expect(normalizedStats).toHaveLength(18)
     expect(normalizedStats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%' })
     expect(normalizedStats[10]).toMatchObject({ label: 'Move Speed' })
+    expect(normalizedStats[16]).toMatchObject({ label: 'Air Control', value: '0', unit: '%', icon: 'stamina' })
+    expect(normalizedStats[17]).toMatchObject({ label: 'Gravity Scale', value: '0', unit: '%', icon: 'stamina' })
 
     render(<HeroStatsVitalityPanel stats={legacyStats} />)
 
     const lifestealCell = screen.getByRole('button', { name: 'Lifesteal Effectiveness: 0%' })
     const moveSpeedCell = screen.getByRole('button', { name: /Move Speed/ })
+    const airControlCell = screen.getByRole('button', { name: 'Air Control: 0%' })
+    const gravityScaleCell = screen.getByRole('button', { name: 'Gravity Scale: 0%' })
     expect(lifestealCell.parentElement?.parentElement?.className).toContain('topStats')
     expect(moveSpeedCell.parentElement?.parentElement?.className).toContain('bottomStats')
+    expect(airControlCell.parentElement?.parentElement?.className).toContain('bottomStats')
+    expect(gravityScaleCell.parentElement?.parentElement?.className).toContain('bottomStats')
   })
 
   it('renders vitality and spirit defaults', () => {
@@ -242,8 +250,14 @@ describe('migrated stat panels', () => {
     expect(screen.getByTestId('hero-stats-vitality-panel')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Max Health: 810/ })).toBeInTheDocument()
     const lifestealCell = screen.getByRole('button', { name: 'Lifesteal Effectiveness: 0%' })
+    const airControlCell = screen.getByRole('button', { name: 'Air Control: 0%' })
+    const gravityScaleCell = screen.getByRole('button', { name: 'Gravity Scale: 0%' })
     expect(lifestealCell.parentElement?.parentElement?.className).toContain('topStats')
     expect(within(lifestealCell).getByText('Lifesteal Effectiveness').parentElement?.previousElementSibling).toHaveStyle({ maskImage: "url('/panorama/images/icons/properties/health_steal.svg')" })
+    expect(airControlCell.parentElement?.parentElement?.className).toContain('bottomStats')
+    expect(gravityScaleCell.parentElement?.parentElement?.className).toContain('bottomStats')
+    expect(within(airControlCell).getByText('Air Control').parentElement?.previousElementSibling).toHaveStyle({ maskImage: "url('/panorama/images/icons/properties/move_stamina.svg')" })
+    expect(within(gravityScaleCell).getByText('Gravity Scale').parentElement?.previousElementSibling).toHaveStyle({ maskImage: "url('/panorama/images/icons/properties/move_stamina.svg')" })
     expect(screen.getByTestId('hero-stats-spirit-panel')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Spirit Power Impact' })).toBeInTheDocument()
     expect(screen.getByText(/increases the effectiveness/i)).toBeInTheDocument()

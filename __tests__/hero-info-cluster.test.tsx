@@ -29,6 +29,7 @@ describe('HeroInfoCluster', () => {
     } satisfies HeroDefinition
 
     const stats = buildHeroStatsSeed(hero)
+    stats.boon.name = 'Blessings'
     stats.boon.panels = [{
       id: 'boon-alt',
       name: 'Aggressive',
@@ -42,13 +43,16 @@ describe('HeroInfoCluster', () => {
     expect(screen.getByTestId('hero-info-name-text')).toHaveTextContent('Grey Talon')
     await user.click(screen.getByRole('tab', { name: 'Overview' }))
     expect(screen.getByRole('tabpanel', { name: 'Grey Talon boon rewards' }).className).toContain('tabPanelVisible')
+    expect(await screen.findByRole('tab', { name: 'Blessings' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('boon-rewards-panel')).getByRole('heading', { name: 'Blessings' })).toBeInTheDocument()
     expect(screen.getByTestId('boon-rewards-panel')).toBeInTheDocument()
     await user.click(await screen.findByRole('tab', { name: 'Aggressive' }))
+    expect(within(screen.getByTestId('boon-rewards-panel')).getByRole('heading', { name: 'Aggressive' })).toBeInTheDocument()
     expect(within(screen.getByTestId('boon-rewards-panel')).getByText('2.5')).toBeInTheDocument()
     await user.click(document.body)
     expect(screen.getByTestId('boon-rewards-panel')).not.toBeVisible()
     await user.click(screen.getByRole('tab', { name: 'Overview' }))
-    expect(screen.getByTestId('boon-rewards-panel')).toHaveAccessibleName('Grey Talon boon rewards')
+    expect(screen.getByTestId('boon-rewards-panel')).toHaveAccessibleName('Grey Talon Aggressive')
   })
 
   it('does not use hero tags or generated stats as a custom hero weapon fallback', async () => {

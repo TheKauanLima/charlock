@@ -160,6 +160,8 @@ const STANDARD_VITALITY_STATS: StandardStatDefinition[] = [
   { label: 'Stamina Recovery', unit: '%', icon: 'staminaRecovery', legacyKey: 'staminaRecovery' },
   { label: 'Stamina', unit: '', icon: 'stamina', legacyKey: 'stamina' },
   { label: 'Dash Speed', unit: 'm', icon: 'stamina', legacyKey: 'dashSpeed' },
+  { label: 'Air Control', unit: '%', icon: 'stamina' },
+  { label: 'Gravity Scale', unit: '%', icon: 'stamina' },
 ]
 
 const STANDARD_SPIRIT_STATS: StandardStatDefinition[] = [
@@ -218,6 +220,7 @@ function normalizeStoredStats(
 }
 
 interface BoonStatsRecord {
+  name?: string
   stats?: IPanelStat[]
   panels?: Array<{ id: string; name: string; stats: IPanelStat[] }>
 }
@@ -295,7 +298,7 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
     HeroInfo.findOne({ heroId: hero._id })
       .select('nameType nameValue nameColor nameFontSize nameFontFamily nameFontWeight tag1Text tag2Text tag3Text tagColor tagTextColor tag1Tilt tag2Tilt tag3Tilt tag1OffsetY tag2OffsetY tag3OffsetY ability1Icon ability2Icon ability3Icon ability4Icon abilityCircleColor abilityIconColor backstory')
       .lean<HeroInfoRecord | null>(),
-    BoonStats.findOne({ heroId: hero._id }).select('stats panels').lean<BoonStatsRecord | null>(),
+    BoonStats.findOne({ heroId: hero._id }).select('name stats panels').lean<BoonStatsRecord | null>(),
     WeaponStats.findOne({ heroId: hero._id }).select('weaponName weaponDesc gunImageSrc weaponAttributes bulletDPS weaponMinRange weaponMaxRange stats panels bulletDamage weaponDamage bulletsPerSec fireRate ammo clipSizeIncrease reloadTime reloadReduction bulletVelocity bulletVelocityIncrease bulletLifesteal critBonusScale lightMelee heavyMelee').lean<WeaponStatsRecord | null>(),
     VitalityStats.findOne({ heroId: hero._id }).select('name stats panels maxHealth healthRegen healAmp nonCombatRegen bulletResist spiritResist meleeResist debuffResist critReduction moveSpeed sprintSpeed staminaCooldown staminaRecovery stamina dashSpeed').lean<VitalityStatsRecord | null>(),
     SpiritStats.findOne({ heroId: hero._id }).select('name topStats spiritPower spiritPowerStat panels abilityCooldown abilityDuration abilityRange spiritLifesteal maxChargesIncrease chargeCooldown').lean<SpiritStatsRecord | null>(),
@@ -323,6 +326,7 @@ export async function getHeroStatsBySlug(slug: string): Promise<HeroStatsWithAbi
       }),
     } : {}),
     boon: {
+      name: boon?.name ?? 'Boon Rewards',
       stats: buildBoonStatsArray(boon?.stats),
       panels: (boon?.panels ?? []).map(panel => ({
         id: panel.id,

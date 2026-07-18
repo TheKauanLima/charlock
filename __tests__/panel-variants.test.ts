@@ -8,6 +8,7 @@ describe('named stat panel variants', () => {
   it('accepts independently named Boon, Weapon, Vitality, and Spirit panels', () => {
     const stats = buildHeroStatsSeed(HEROES[0])
 
+    stats.boon.name = 'Blessings'
     stats.boon.panels = [{ id: 'boon-alt', name: 'Aggressive', stats: structuredClone(stats.boon.stats) }]
     stats.weapon.panels = [{
       id: 'weapon-alt',
@@ -37,6 +38,7 @@ describe('named stat panel variants', () => {
 
     expect(result.success).toBe(true)
     if (result.success) {
+      expect(result.data.boon.name).toBe('Blessings')
       expect(result.data.boon.panels?.[0].name).toBe('Aggressive')
       expect(result.data.weapon.panels?.[0].name).toBe('Shotgun')
       expect(result.data.weapon.panels?.[0].weaponDesc).toBe('Close range pressure.')

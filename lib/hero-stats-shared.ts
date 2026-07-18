@@ -62,6 +62,7 @@ export interface SpiritPanelVariant extends NamedStatPanel {
 }
 
 export interface BoonStatsPayload {
+  name?: string
   stats: PanelStat[]
   panels?: BoonPanelVariant[]
 }
@@ -167,7 +168,7 @@ export function buildEmptyHeroStats(hero: HeroDefinition): HeroStatsPayload {
       render: hero.render,
     },
     heroInfo: hero.heroInfo,
-    boon: { stats: buildBoonStatsArray() },
+    boon: { name: 'Boon Rewards', stats: buildBoonStatsArray() },
     weapon: {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: '',
@@ -203,7 +204,7 @@ export function buildHeroStatsSeed(hero: HeroDefinition): HeroStatsPayload {
       render: hero.render,
     },
     heroInfo: hero.heroInfo,
-    boon: { stats: buildBoonStatsArray() },
+    boon: { name: 'Boon Rewards', stats: buildBoonStatsArray() },
     weapon: {
       weaponName: `${hero.displayName} Weapon`,
       weaponDesc: `${hero.displayName} pressure profile generated from the seeded hero stat table.`,

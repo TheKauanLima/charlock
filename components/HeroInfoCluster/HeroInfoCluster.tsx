@@ -407,8 +407,8 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
         hidden={activeTabId !== 'overview'}
         className={cn(activeTabId === 'overview' ? styles.tabPanelVisible : styles.tabPanelHidden)}
       >
-        <PanelVariantTabs baseName="Boon" baseTabName="Boon Rewards" variants={statsData.boon.panels} activeId={activeBoonPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveBoonPanelId} />
-        <HeroStatsBoonPanel heroName={hero.displayName} stats={activeBoonPanel?.stats ?? statsData.boon.stats} />
+        <PanelVariantTabs baseName="Boon" baseTabName={statsData.boon.name ?? 'Boon Rewards'} variants={statsData.boon.panels} activeId={activeBoonPanel?.id ?? BASE_PANEL_ID} onSelect={setActiveBoonPanelId} />
+        <HeroStatsBoonPanel heroName={hero.displayName} panelName={activeBoonPanel?.name ?? statsData.boon.name ?? 'Boon Rewards'} stats={activeBoonPanel?.stats ?? statsData.boon.stats} />
       </div>
 
       <div

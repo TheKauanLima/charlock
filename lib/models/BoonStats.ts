@@ -4,6 +4,7 @@ import type { IPanelStat } from './WeaponStats'
 
 export interface IBoonStats {
   heroId: Types.ObjectId
+  name?: string
   stats: IPanelStat[]
   panels?: IBoonPanelVariant[]
   createdAt: Date
@@ -40,6 +41,7 @@ const boonStatsSchema = new Schema<IBoonStats>({
     unique: true,
     index: true,
   },
+  name: { type: String, default: 'Boon Rewards' },
   stats: {
     type: [boonStatSchema],
     default: [],

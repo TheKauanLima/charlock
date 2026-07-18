@@ -4,7 +4,7 @@ import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import BackstoryModule from '@/components/backstory/BackstoryModule'
+import BackstoryModule, { getProminentColorFromPixels, getRgbTriplet } from '@/components/backstory/BackstoryModule'
 import type { HeroDefinition } from '@/lib/hero-data'
 
 const TEST_HERO = {
@@ -53,6 +53,7 @@ describe('BackstoryModule', () => {
     expect(screen.getByRole('dialog', { name: 'BACKSTORY:' })).toBeInTheDocument()
     expect(screen.getByText(/A first line of backstory/)).toBeInTheDocument()
     expect(screen.getByRole('dialog')).toHaveAttribute('style', expect.stringContaining('--backstory-accent: #2fc890'))
+    expect(screen.getByRole('dialog')).toHaveAttribute('style', expect.stringContaining('--backstory-accent-rgb: 47, 200, 144'))
   })
 
   it('closes from the close button and Escape key', async () => {
@@ -105,6 +106,7 @@ describe('BackstoryModule', () => {
     const closeButton = screen.getByRole('button', { name: 'CLOSE' })
 
     expect(backstoryInput).toHaveFocus()
+    expect(backstoryInput).toHaveAttribute('rows', '15')
     expect(document.body).toHaveStyle({ overflow: 'hidden' })
 
     await user.tab()
@@ -116,5 +118,21 @@ describe('BackstoryModule', () => {
 
     await user.click(closeButton)
     expect(document.body.style.overflow).toBe('')
+  })
+
+  it('derives a prominent sampled color while ignoring transparent pixels', () => {
+    const transparent = [255, 0, 0, 0]
+    const teal = [34, 180, 140, 255]
+    const grey = [92, 92, 92, 255]
+    const pixels = new Uint8ClampedArray([
+      ...transparent,
+      ...teal,
+      ...teal,
+      ...teal,
+      ...grey,
+    ])
+
+    expect(getProminentColorFromPixels(pixels)).toBe('#22b48c')
+    expect(getRgbTriplet('#2fc890')).toBe('47, 200, 144')
   })
 })

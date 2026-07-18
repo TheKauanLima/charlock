@@ -93,6 +93,7 @@ describe('getHeroStatsBySlug stat normalization', () => {
     heroFindOneMock.mockReturnValueOnce(createQueryMock({ _id: 'hero-1', slug: 'apollo', name: 'Apollo', portrait: '/portrait.png', render: '/render.png' }))
     heroInfoFindOneMock.mockReturnValueOnce(createQueryMock(null))
     boonFindOneMock.mockReturnValueOnce(createQueryMock({
+      name: 'Blessings',
       stats: [{ label: 'Base Bullet Damage', value: '0.5', unit: '', icon: 'damage_bullet_color', scaling: 'boon', scalingValue: '0.5' }],
       panels: [{
         id: 'boon-alt',
@@ -177,7 +178,7 @@ describe('getHeroStatsBySlug stat normalization', () => {
       'Heavy Melee',
       'Pellet Count',
     ])
-    expect(stats?.vitality.stats).toHaveLength(16)
+    expect(stats?.vitality.stats).toHaveLength(18)
     expect(stats?.spirit.topStats.map(stat => stat.label)).toEqual([
       'Ability Cooldown',
       'Ability Duration',
@@ -188,10 +189,13 @@ describe('getHeroStatsBySlug stat normalization', () => {
     ])
     expect(stats?.weapon.stats[0]).toMatchObject({ value: '18', icon: 'bulletDamage' })
     expect(stats?.weapon.stats[14]).toMatchObject({ label: 'Pellet Count', value: '6' })
+    expect(stats?.boon.name).toBe('Blessings')
     expect(stats?.boon.stats[0]).toMatchObject({ label: 'Base Bullet Damage', value: '0.5', scaling: 'boon' })
     expect(stats?.boon.panels?.[0]).toMatchObject({ name: 'Aggressive', stats: expect.arrayContaining([expect.objectContaining({ label: 'Base Bullet Damage', value: '2.5' })]) })
     expect(stats?.vitality.stats[4]).toMatchObject({ label: 'Lifesteal Effectiveness', value: '0', unit: '%', icon: 'lifestealEffectiveness' })
     expect(stats?.vitality.stats[15]).toMatchObject({ label: 'Dash Speed', value: '0' })
+    expect(stats?.vitality.stats[16]).toMatchObject({ label: 'Air Control', value: '0', unit: '%', icon: 'stamina' })
+    expect(stats?.vitality.stats[17]).toMatchObject({ label: 'Gravity Scale', value: '0', unit: '%', icon: 'stamina' })
     expect(stats?.weapon.panels?.[0]).toMatchObject({
       name: 'Shotgun',
       weaponDesc: 'Panel-only description',
