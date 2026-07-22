@@ -1016,6 +1016,7 @@
 .heroNamePrompt,
 .portraitUploadPanel,
 .copyToggle,
+.draftAutosavePanel,
 .saveError,
 .actionStatus,
 .exportActionButton {
@@ -1373,6 +1374,72 @@
   text-transform: uppercase;
 }
 
+.draftAutosavePanel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(229, 184, 71, 0.34);
+  background: rgba(229, 184, 71, 0.08);
+  padding: 10px 12px;
+  color: rgba(255, 239, 214, 0.82);
+}
+
+.draftAutosaveStatus {
+  display: grid;
+  gap: 4px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  line-height: 1.15rem;
+}
+
+.draftAutosaveStatus strong {
+  color: var(--citadel-gold);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.draftAutosaveStatus span {
+  color: rgba(255, 239, 214, 0.68);
+}
+
+.draftAutosaveControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(92px, 0.8fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.draftAutosaveControls label {
+  display: grid;
+  gap: 4px;
+  color: rgba(255, 239, 214, 0.62);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.draftAutosaveControls input,
+.draftAutosaveControls select {
+  min-width: 0;
+  border: 1px solid rgba(255, 239, 214, 0.18);
+  background: rgba(0, 0, 0, 0.34);
+  color: #ffefd6;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.72rem;
+  padding: 8px 9px;
+}
+
+.draftAutosaveControls input:focus,
+.draftAutosaveControls select:focus {
+  border-color: var(--citadel-gold);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
+}
+
 .exitConfirmDialog h2,
 .exitConfirmDialog p {
   margin: 0;
@@ -1422,6 +1489,11 @@
   border-color: rgba(255, 188, 172, 0.62);
   background: rgba(139, 23, 20, 0.9);
   color: #fff7ee;
+}
+
+.exitConfirmButton:disabled {
+  cursor: wait;
+  opacity: 0.62;
 }
 
 .exitStayButton:hover,

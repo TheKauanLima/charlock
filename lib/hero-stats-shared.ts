@@ -3,7 +3,7 @@ import { buildVitalityStatsArray } from '@/components/panels/vitality-stats-mapp
 import { buildWeaponStatsArray } from '@/components/panels/weapon-stats-mapper'
 import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
 import { HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
-import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
+import { normalizeCustomScaling, type PanelStat, type StatsRow } from '@/components/panels/scaling-utils'
 
 interface HeroStatsHero {
   slug: string
@@ -89,7 +89,7 @@ function roundStat(value: number, decimals = 1) {
 }
 
 function normalizeStat(stat: PanelStat): PanelStat {
-  const scaling = stat.scaling === 'boon' ? 'none' : stat.scaling ?? 'none'
+  const scaling = stat.scaling ?? 'none'
 
   return {
     label: stat.label,
@@ -98,6 +98,7 @@ function normalizeStat(stat: PanelStat): PanelStat {
     icon: stat.icon ?? 'dot',
     scaling,
     scalingValue: scaling === 'none' ? '0' : stat.scalingValue ?? '0',
+    ...(scaling === 'custom' ? { customScaling: normalizeCustomScaling(stat.customScaling) } : {}),
     ...(stat.description ? { description: stat.description } : {}),
   }
 }

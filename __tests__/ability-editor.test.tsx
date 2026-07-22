@@ -211,6 +211,31 @@ describe('AbilityEditor', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: ability.name }))
   })
 
+  it('saves rich text from the latest input event even when returning immediately', () => {
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+    const onSave = vi.fn()
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+    richTextEditor.textContent = 'Immediate payload text'
+    fireEvent.input(richTextEditor)
+    fireEvent.click(screen.getByRole('button', { name: 'Go Back' }))
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toBe('Immediate payload text')
+  })
+
   it('exposes every property icon asset in the icon picker groups', () => {
     const exportedPaths = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.path)).sort()
     const exportedLabels = PROPERTY_ICON_GROUPS.flatMap(group => group.assets.map(asset => asset.label))
@@ -350,6 +375,17 @@ describe('AbilityEditor', () => {
     expect(within(iconModal).getByRole('tab', { name: 'Utility Mods' })).toBeInTheDocument()
     expect(within(iconModal).getByRole('tab', { name: 'Weapon Mods' })).toBeInTheDocument()
     expect(within(iconModal).queryByRole('group', { name: 'Weapon Mods' })).not.toBeInTheDocument()
+
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const iconModalAbilityRule = stylesheet.match(/\.iconModalAbility\s*\{([^}]*)\}/)?.[1]
+    const iconTabsRule = stylesheet.match(/\.iconTabs\s*\{([^}]*)\}/)?.[1]
+    const iconAbilityGroupRule = stylesheet.match(/\.iconAbilityGroup\s*\{([^}]*)\}/)?.[1]
+    const iconAbilityGroupTitleRule = stylesheet.match(/\.iconAbilityGroupTitle\s*\{([^}]*)\}/)?.[1]
+
+    expect(iconModalAbilityRule).toMatch(/grid-template-rows:\s*auto auto auto auto minmax\(0,\s*1fr\)/)
+    expect(iconTabsRule).toMatch(/min-height:\s*38px/)
+    expect(iconAbilityGroupRule).toMatch(/grid-template-rows:\s*minmax\(14px,\s*auto\) repeat\(1,\s*72px\)/)
+    expect(iconAbilityGroupTitleRule).not.toMatch(/margin:\s*0 0 -/)
 
     await user.click(within(iconModal).getByRole('tab', { name: 'Upgrade Icons' }))
     expect(within(iconModal).getByRole('button', { name: 'Use Upgrade Active' })).toBeInTheDocument()
@@ -1562,7 +1598,7 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Add Main Cell' }))
     expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))')
-    expect(screen.getByRole('button', { name: 'Add Main Cell' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add Main Cell' })).toHaveAttribute('aria-disabled', 'true')
 
     const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
     const mainRowRule = stylesheet.match(/^\.mainRow\s*\{([^}]*)\}/m)?.[1]
@@ -1575,7 +1611,7 @@ describe('AbilityEditor', () => {
 
     await user.click(screen.getByRole('button', { name: 'Remove main cell 3' }))
     expect(mainCellGrid?.style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
-    expect(screen.getByRole('button', { name: 'Add Main Cell' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Add Main Cell' })).not.toHaveAttribute('aria-disabled', 'true')
 
     await user.clear(screen.getByLabelText('Main cell 1 title'))
     await user.type(screen.getByLabelText('Main cell 1 title'), 'Impact Damage')
@@ -1689,7 +1725,7 @@ describe('AbilityEditor', () => {
     expect(new Set(savedIds).size).toBe(savedIds.length)
   })
 
-  it('disables adding lower stats at the save limit', () => {
+  it('marks adding lower stats as blocked at the save limit', () => {
     const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
     const grid = ability.sections.find(section => section.type === 'grid')
 
@@ -1711,7 +1747,7 @@ describe('AbilityEditor', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Add Lower Cell' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add Lower Cell' })).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('keeps intrinsic-color inline icons from being tinted by rich text colors', async () => {
@@ -1824,6 +1860,59 @@ describe('AbilityEditor', () => {
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
 
     expect(savedRichText?.text).toContain('[i:heal|#84c955]')
+  })
+
+  it('inserts hero ability icons from the inline icon selector', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const hero = HEROES[0]
+    const ability = buildDefaultAbilityStats(hero).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        abilityIconGroups={ABILITY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+    const firstTextNode = richTextEditor.firstChild
+    const range = document.createRange()
+
+    expect(firstTextNode).not.toBeNull()
+    range.setStart(firstTextNode!, 6)
+    range.collapse(true)
+    richTextEditor.focus()
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+
+    await user.click(screen.getByRole('button', { name: 'Inline Icon' }))
+
+    const iconModal = screen.getByTestId('property-icon-modal')
+    const heroAbilitiesTab = within(iconModal).getByRole('tab', { name: 'Hero abilities' })
+
+    expect(screen.getByRole('dialog', { name: 'Inline icon selector' })).toBeInTheDocument()
+    expect(heroAbilitiesTab).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Abrams 2' }))
+
+    await waitFor(() => {
+      expect(richTextEditor.querySelector(`[data-inline-icon="${hero.heroInfo.ability2Icon}"]`)).not.toBeNull()
+    })
+
+    const inlineAbilityIcon = richTextEditor.querySelector<HTMLElement>(`[data-inline-icon="${hero.heroInfo.ability2Icon}"]`)
+
+    expect(inlineAbilityIcon?.getAttribute('style')).toContain(hero.heroInfo.ability2Icon)
+
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toContain(`[i:${hero.heroInfo.ability2Icon}]`)
   })
 
   it('persists selected icon swatch colors on tintable stat icons', async () => {

@@ -8,7 +8,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
-import { ConnectionStatus, LoadingOverlay, SessionExpiredModal } from '@/components/system-feedback/SystemFeedback'
+import { ConnectionStatus, LoadingOverlay, SessionExpiredModal, SystemToast } from '@/components/system-feedback/SystemFeedback'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, RenderPosition } from '@/lib/editor-assets'
 import { buildDefaultAbilityStats, type AbilityStatsPayload } from '@/lib/ability-editor-types'
@@ -33,6 +33,7 @@ type PrimaryTab = 'Select' | 'Browse' | 'Bookmarks' | 'Notifications' | 'Create'
 
 interface HeroGridProps {
   initialTab?: PrimaryTab
+  initialHeroId?: string
 }
 
 interface RenderDragState {
@@ -40,6 +41,10 @@ interface RenderDragState {
   startClientX: number
   startClientY: number
   startPosition: RenderPosition
+}
+
+interface SaveHeroOptions {
+  mode?: 'manual' | 'draft' | 'exit'
 }
 
 const TAB_ITEMS: TabItem[] = [
@@ -210,10 +215,11 @@ function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload
   }
 }
 
-export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
+export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroGridProps) {
   const renderDragStateRef = useRef<RenderDragState | null>(null)
   const latestEditorRenderSelectionRef = useRef<EditorRenderSelection>({ mode: 'background', src: null })
   const startsInCreate = initialTab === 'Create'
+  const startsInCreateForExistingHero = startsInCreate && Boolean(initialHeroId)
   const [activeTab, setActiveTab] = useState<PrimaryTab>(startsInCreate ? 'Select' : initialTab)
   const [browseSort, setBrowseSort] = useState<CustomHeroSort>('new')
   const [browseSearch, setBrowseSearch] = useState('')
@@ -240,7 +246,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
   const [editingAbilityStats, setEditingAbilityStats] = useState<AbilityStatsPayload | null>(null)
   const [editorRevision, setEditorRevision] = useState(0)
   const [showDetails, setShowDetails] = useState(false)
-  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(startsInCreate)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(startsInCreate && !startsInCreateForExistingHero)
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setShowDetails(getStoredShowDetails()), 0)
@@ -248,11 +254,14 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     return () => window.clearTimeout(timeoutId)
   }, [])
   const [isSavingHero, setIsSavingHero] = useState(false)
+  const [isDraftSaving, setIsDraftSaving] = useState(false)
   const [saveStatusMessage, setSaveStatusMessage] = useState<string | null>(null)
   const [saveFailure, setSaveFailure] = useState<string | null>(null)
   const [lastSavePayload, setLastSavePayload] = useState<CustomHeroSavePayload | null>(null)
+  const [lastSaveOptions, setLastSaveOptions] = useState<SaveHeroOptions | null>(null)
   const [isSessionExpired, setIsSessionExpired] = useState(false)
   const [isEditorInteractionPanelOpen, setIsEditorInteractionPanelOpen] = useState(false)
+  const [blockedActionToast, setBlockedActionToast] = useState<{ id: number; message: string } | null>(null)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
   const renderHero = HEROES.find(hero => hero.slug === renderHeroSlug) ?? activeHero
   const editorHero = editingCustomHero ?? templateHero ?? activeHero
@@ -334,6 +343,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setEditorRenderSelection(renderState.renderSelection)
     setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
+    setIsTemplateModalOpen(false)
   }, [setEditorRenderSelection])
 
   const applyTemplateHeroToEditor = useCallback((hero: CustomHeroDetail) => {
@@ -515,7 +525,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     }
 
     const searchParams = new URLSearchParams(window.location.search)
-    const heroId = searchParams.get('heroId')
+    const heroId = initialHeroId ?? searchParams.get('heroId')
     const requestedTab = searchParams.get('tab')
 
     if (heroId && requestedTab !== 'browse' && requestedTab !== 'bookmarks') {
@@ -527,7 +537,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     }
 
     return undefined
-  }, [loadSavedHero])
+  }, [initialHeroId, loadSavedHero])
 
   const getBrowseUrl = useCallback((offset: number, limit = offset === 0 ? INITIAL_BROWSE_PAGE_SIZE : NEXT_BROWSE_PAGE_SIZE) => {
     const searchParams = new URLSearchParams({
@@ -719,8 +729,9 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
     setRenderPhase('fade-out')
   }
 
-  async function handleSaveHero(payload: CustomHeroSavePayload) {
+  async function handleSaveHero(payload: CustomHeroSavePayload, options: SaveHeroOptions = {}) {
     const isUnpublishing = editingCustomHero?.status === 'published' && payload.status === 'private'
+    const isDraftSave = options.mode === 'draft' || options.mode === 'exit'
     const latestRenderSelection = latestEditorRenderSelectionRef.current
     const latestRenderPosition =
       latestRenderSelection.mode !== 'background' &&
@@ -736,10 +747,25 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
       },
     }
 
-    setIsSavingHero(true)
+    if (isDraftSave) {
+      setIsDraftSaving(true)
+    } else {
+      setIsSavingHero(true)
+    }
     setLastSavePayload(payloadToSave)
+    setLastSaveOptions(options)
     setSaveFailure(null)
-    setSaveStatusMessage(isUnpublishing ? 'Unpublishing hero...' : payloadToSave.status === 'published' ? 'Publishing hero...' : 'Saving private hero...')
+    setSaveStatusMessage(
+      isUnpublishing
+        ? 'Unpublishing hero...'
+        : payloadToSave.status === 'published'
+          ? 'Publishing hero...'
+          : options.mode === 'exit'
+            ? 'Saving draft before leaving...'
+            : isDraftSave
+              ? 'Autosaving draft...'
+              : 'Saving draft...',
+    )
 
     try {
       if (navigator.onLine === false) {
@@ -765,33 +791,49 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
         setSaveFailure(getUserFacingSaveError(requestError.message, requestError.code))
         setSaveStatusMessage(null)
         if (requestError.isSessionExpired) setIsSessionExpired(true)
-        return
+        return false
       }
 
-      applySavedHeroToEditor({
+      const savedHero = {
         ...body.hero,
         renderPosition: body.hero.renderPosition ?? payloadToSave.hero.renderPosition,
         abilityStats: mergeSubmittedSecondaryAbilities(body.hero.abilityStats, payloadToSave.abilityStats),
-      })
+      }
+
+      if (isDraftSave) {
+        setEditingCustomHero(savedHero)
+        setTemplateHero(null)
+        setEditingHeroStats(savedHero.stats)
+        setEditingAbilityStats(savedHero.abilityStats)
+      } else {
+        applySavedHeroToEditor(savedHero)
+      }
       clearEditorRecovery()
       setLastSavePayload(null)
+      setLastSaveOptions(null)
       if (isUnpublishing) {
         setBrowseHeroes(currentHeroes => currentHeroes.filter(hero => hero.id !== body.hero?.id))
         setBookmarkedHeroes(currentHeroes => currentHeroes.filter(hero => hero.id !== body.hero?.id))
       }
-      setSaveStatusMessage(isUnpublishing ? 'Hero unpublished and moved to your private saves.' : body.hero.status === 'published' ? 'Hero published to Browse.' : 'Private hero saved to your profile.')
+      setSaveStatusMessage(isUnpublishing ? 'Hero unpublished and moved to your private saves.' : body.hero.status === 'published' ? 'Hero published to Browse.' : 'Draft saved to your profile.')
+      return true
     } catch (error) {
       const requestError = getNetworkRequestError(error, 'Failed to save hero.')
 
       setSaveFailure(getUserFacingSaveError(requestError.message, requestError.code))
       setSaveStatusMessage(null)
+      return false
     } finally {
-      setIsSavingHero(false)
+      if (isDraftSave) {
+        setIsDraftSaving(false)
+      } else {
+        setIsSavingHero(false)
+      }
     }
   }
 
   function retrySaveHero() {
-    if (lastSavePayload) void handleSaveHero(lastSavePayload)
+    if (lastSavePayload) void handleSaveHero(lastSavePayload, lastSaveOptions ?? {})
   }
 
   async function handleLikeHero(heroId: string) {
@@ -991,6 +1033,13 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       return nextValue
     })
+  }
+
+  function showBlockedAction(message: string) {
+    setBlockedActionToast(currentToast => ({
+      id: (currentToast?.id ?? 0) + 1,
+      message,
+    }))
   }
 
   function handleExitCreateEditor() {
@@ -1268,7 +1317,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
 
       {isCreateMode ? (
         <HeroInfoEditor
-          key={`${editingCustomHero ? `${editingCustomHero.id}:${editingCustomHero.displayName}` : templateHero ? templateHero.id : activeHero.slug}:${editorRevision}`}
+          key={`editor:${editorRevision}`}
           hero={editorHero}
           draft={editorDraft}
           backgroundOptions={HERO_BACKGROUND_OPTIONS}
@@ -1281,6 +1330,7 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           initialStats={editingHeroStats}
           initialAbilityStats={editingAbilityStats}
           isSaving={isSavingHero}
+          isDraftSaving={isDraftSaving}
           saveStatusMessage={saveStatusMessage}
           saveFailure={saveFailure}
           onRetrySave={retrySaveHero}
@@ -1303,8 +1353,11 @@ export default function HeroGrid({ initialTab = 'Select' }: HeroGridProps) {
           accentImageSrc={editorRenderImage}
           isEditable
           onBackstoryChange={value => setEditorDraft(currentDraft => ({ ...currentDraft, backstory: value }))}
+          onBlockedAction={showBlockedAction}
         />
       ) : null}
+
+      {blockedActionToast ? <SystemToast key={blockedActionToast.id} message={blockedActionToast.message} variant="error" position="top" /> : null}
 
       {isTemplateModalOpen ? (
         <div className={styles.templateModalBackdrop}>

@@ -59,6 +59,8 @@
 .connectionWarning { position: fixed; z-index: 410; top: 14px; left: 50%; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 28px); transform: translateX(-50%); padding: 9px 12px; border: 1px solid #e5b847; color: #ffe7b0; background: rgb(24 18 7 / 94%); font: 700 0.68rem var(--font-geist-mono), monospace; }
 .connectionWarning svg { width: 16px; height: 16px; }
 .toast { position: fixed; z-index: 1000; bottom: 24px; left: 50%; max-width: min(420px, calc(100% - 48px)); margin: 0; transform: translateX(-50%); padding: 11px 14px; border-left: 3px solid var(--citadel-gold); color: var(--citadel-gold); background: rgb(15 14 16 / 94%); box-shadow: 0 12px 38px #000; font: 0.7rem/1.4 var(--font-geist-mono), monospace; pointer-events: none; }
+.toastTop { top: 24px; bottom: auto; }
+.toastError { border-left-color: #ff4d4d; color: #ffd1d1; background: rgb(58 10 14 / 96%); box-shadow: 0 12px 38px #000, 0 0 0 1px rgb(255 77 77 / 30%); }
 
 .profileLoading { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; min-height: 100vh; padding: 88px max(24px, calc((100vw - 1200px) / 2)); color: #ffefd6; background: #050506; }
 .profileLoading aside, .profileLoading section { display: grid; align-content: start; gap: 14px; }

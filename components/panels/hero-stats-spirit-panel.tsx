@@ -73,8 +73,8 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isPower = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: SpiritStatCellProps) {
-  const panelScaling = normalizePanelScaling(scaling, scalingValue)
+function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', customScaling, isPower = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: SpiritStatCellProps) {
+  const panelScaling = normalizePanelScaling(scaling, scalingValue, customScaling)
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
@@ -108,6 +108,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
           label={label}
           scaling={panelScaling.scaling}
           scalingValue={panelScaling.scalingValue}
+          customScaling={panelScaling.customScaling}
           boundaryRef={boundaryRef}
           menuPosition={isPower ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
@@ -116,7 +117,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
           onOpenPickerChange={onOpenScalingPickerChange}
         />
       ) : (
-        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
+        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} customScaling={panelScaling.customScaling} showValue={showDetails} position="raised" />
       )}
     </>
   )

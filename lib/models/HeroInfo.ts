@@ -113,19 +113,15 @@ const heroInfoSchema = new Schema<IHeroInfo>(
     },
     ability1Icon: {
       type: String,
-      required: true,
     },
     ability2Icon: {
       type: String,
-      required: true,
     },
     ability3Icon: {
       type: String,
-      required: true,
     },
     ability4Icon: {
       type: String,
-      required: true,
     },
     abilityCircleColor: {
       type: String,

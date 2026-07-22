@@ -154,6 +154,17 @@ describe('error and loading states', () => {
     }
   })
 
+  it('renders blocked-action notices as top-positioned alerts', () => {
+    render(<SystemToast message="Hero name can be at most 120 characters." variant="error" position="top" />)
+
+    const toast = screen.getByRole('alert')
+
+    expect(toast).toHaveTextContent('Hero name can be at most 120 characters.')
+    expect(toast.className).toContain('toastError')
+    expect(toast.className).toContain('toastTop')
+    expect(toast.parentElement).toBe(document.body)
+  })
+
   it('preserves a draft and offers retry when the save session expires', async () => {
     const user = userEvent.setup()
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
@@ -164,18 +175,19 @@ describe('error and loading states', () => {
 
     render(<HeroGrid initialTab="Create" />)
     await user.click(screen.getByRole('button', { name: 'Use EMPTY template' }))
-    await user.type(screen.getByPlaceholderText('Name this save'), 'Offline Arc')
-    await user.click(screen.getByRole('button', { name: 'Save Private' }))
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Offline Arc')
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(await screen.findByRole('button', { name: 'Yes, Go Back' }))
 
     expect(await screen.findByRole('dialog', { name: 'SESSION CONNECTION TERMINATED' })).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveTextContent('Save rejected by server node')
+    expect(screen.getByRole('alert')).toHaveTextContent('We could not save this draft.')
     const submittedPayload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as { heroInfo: { ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string } }
     expect([
       submittedPayload.heroInfo.ability1Icon,
       submittedPayload.heroInfo.ability2Icon,
       submittedPayload.heroInfo.ability3Icon,
       submittedPayload.heroInfo.ability4Icon,
-    ]).not.toContain('')
+    ]).toEqual(['', '', '', ''])
     await waitFor(() => expect(window.localStorage.getItem(EDITOR_RECOVERY_STORAGE_KEY)).toContain('Offline Arc'))
 
     await user.click(screen.getByRole('button', { name: 'Retry Save' }))

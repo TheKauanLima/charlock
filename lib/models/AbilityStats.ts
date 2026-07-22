@@ -1,6 +1,6 @@
 import { Schema, model, models, type Model, type Types } from 'mongoose'
 
-import { statSchema, type IPanelStat } from './WeaponStats'
+import { customScalingSchema, statSchema, type IPanelStat } from './WeaponStats'
 
 export interface IAbilityGridCell extends IPanelStat {
   id: string
@@ -58,10 +58,11 @@ const abilityGridCellSchema = new Schema<IAbilityGridCell>({
   iconColor: { type: String, default: '' },
   scaling: {
     type: String,
-    enum: ['none', 'spirit', 'courage', 'melee', 'boon'],
+    enum: ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'],
     default: 'none',
   },
   scalingValue: { type: String, default: '0' },
+  customScaling: { type: customScalingSchema, default: undefined },
   description: { type: String },
 }, { _id: false })
 

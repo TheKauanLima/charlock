@@ -33,9 +33,11 @@ import {
   normalizeAbilityStats,
 } from '@/lib/ability-editor-types'
 import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
+import { getCustomHeroSaveIssueMessages } from '@/lib/custom-hero-validation'
 import { buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
-import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
+import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponPanelVariant, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
+import { getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 import { UploadButton } from '@/lib/uploadthing'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
@@ -56,15 +58,79 @@ interface HeroInfoEditorProps {
   initialStats?: HeroStatsPayload | null
   initialAbilityStats?: AbilityStatsPayload | null
   isSaving?: boolean
+  isDraftSaving?: boolean
   saveStatusMessage?: string | null
   saveFailure?: string | null
   onRetrySave?: () => void
   onBackgroundChange: (backgroundPath: string) => void
   onRenderSelectionChange: (renderSelection: EditorRenderSelection) => void
   onDraftChange: (draft: HeroInfoDefinition) => void
-  onSaveHero: (payload: CustomHeroSavePayload) => void
+  onSaveHero: (payload: CustomHeroSavePayload, options?: { mode?: 'manual' | 'draft' | 'exit' }) => Promise<boolean>
   onInteractionPanelOpenChange?: (isOpen: boolean) => void
   onExitEditor?: () => void
+}
+
+type DraftAutosaveUnit = 'minutes'
+
+interface DraftAutosavePreference {
+  amount: number
+  unit: DraftAutosaveUnit
+}
+
+const DRAFT_AUTOSAVE_STORAGE_KEY = 'charlock_draft_autosave_interval'
+const DEFAULT_DRAFT_AUTOSAVE_PREFERENCE: DraftAutosavePreference = { amount: 1, unit: 'minutes' }
+const DRAFT_AUTOSAVE_AMOUNT_MIN = 1
+const DRAFT_AUTOSAVE_AMOUNT_MAX = 60
+
+function clampDraftAutosaveAmount(value: string | number) {
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_DRAFT_AUTOSAVE_PREFERENCE.amount
+  }
+
+  return Math.min(DRAFT_AUTOSAVE_AMOUNT_MAX, Math.max(DRAFT_AUTOSAVE_AMOUNT_MIN, Math.round(numericValue)))
+}
+
+function isDraftAutosaveUnit(value: unknown): value is DraftAutosaveUnit {
+  return value === 'minutes'
+}
+
+function normalizeDraftAutosavePreference(value: Partial<DraftAutosavePreference> | null | undefined): DraftAutosavePreference {
+  if (value?.unit !== 'minutes') {
+    return DEFAULT_DRAFT_AUTOSAVE_PREFERENCE
+  }
+
+  return {
+    amount: clampDraftAutosaveAmount(value.amount ?? DEFAULT_DRAFT_AUTOSAVE_PREFERENCE.amount),
+    unit: 'minutes',
+  }
+}
+
+function readDraftAutosavePreference(): DraftAutosavePreference {
+  if (typeof window === 'undefined') {
+    return DEFAULT_DRAFT_AUTOSAVE_PREFERENCE
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(DRAFT_AUTOSAVE_STORAGE_KEY)
+    const parsedValue = storedValue ? JSON.parse(storedValue) as Partial<DraftAutosavePreference> : null
+
+    return normalizeDraftAutosavePreference(parsedValue)
+  } catch {
+    return DEFAULT_DRAFT_AUTOSAVE_PREFERENCE
+  }
+}
+
+function getDraftAutosaveIntervalMs(preference: DraftAutosavePreference) {
+  return Math.max(60_000, preference.amount * 60_000)
+}
+
+function getDraftAutosaveIntervalLabel(preference: DraftAutosavePreference) {
+  const singularUnit = 'minute'
+  const unitLabel = preference.amount === 1 ? singularUnit : `${singularUnit}s`
+
+  return `${preference.amount} ${unitLabel}`
 }
 
 interface ColorFieldProps {
@@ -155,6 +221,10 @@ const TAG_DRAG_PIXELS_PER_DEGREE = 6
 const TAG_OFFSET_MIN = -28
 const TAG_OFFSET_MAX = 28
 const DEFAULT_RENDER_POSITION = { x: 0, y: 0 }
+const HERO_NAME_TEXT_MAX_LENGTH = 500
+const HERO_TAG_TEXT_MAX_LENGTH = 80
+const DRAFT_NAME_MAX_LENGTH = 120
+const SECONDARY_ABILITY_SLOT_MAX_COUNT = 4
 
 function hasPersistedHeroId(hero: HeroDefinition) {
   const id = (hero as HeroDefinition & { id?: unknown }).id
@@ -199,18 +269,6 @@ function parseEditableNumber(value: string | number | null | undefined) {
 
 function sanitizeNumberInput(value: string | number) {
   return String(value).replace(/[^\d.-]/g, '')
-}
-
-function restoreRequiredAbilityIcons(heroInfo: HeroInfoDefinition): HeroInfoDefinition {
-  const fallback = HEROES[0].heroInfo
-
-  return {
-    ...heroInfo,
-    ability1Icon: heroInfo.ability1Icon || fallback.ability1Icon,
-    ability2Icon: heroInfo.ability2Icon || fallback.ability2Icon,
-    ability3Icon: heroInfo.ability3Icon || fallback.ability3Icon,
-    ability4Icon: heroInfo.ability4Icon || fallback.ability4Icon,
-  }
 }
 
 function clampTagTilt(value: number) {
@@ -415,6 +473,7 @@ export default function HeroInfoEditor({
   initialStats = null,
   initialAbilityStats = null,
   isSaving = false,
+  isDraftSaving = false,
   saveStatusMessage = null,
   saveFailure = null,
   onRetrySave,
@@ -452,11 +511,15 @@ export default function HeroInfoEditor({
   const [heroNameInput, setHeroNameInput] = useState(savedHeroName)
   const [heroPortraitInput, setHeroPortraitInput] = useState(hero.portrait)
   const [allowCopiesInput, setAllowCopiesInput] = useState(allowCopies)
+  const [draftAutosavePreference, setDraftAutosavePreference] = useState<DraftAutosavePreference>(readDraftAutosavePreference)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [blockedActionToast, setBlockedActionToast] = useState<{ id: number; message: string } | null>(null)
   const [isUnpublishConfirmOpen, setIsUnpublishConfirmOpen] = useState(false)
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null)
   const recoveryReadyRef = useRef(false)
+  const draftAutosaveIntervalMs = useMemo(() => getDraftAutosaveIntervalMs(draftAutosavePreference), [draftAutosavePreference])
+  const draftAutosaveIntervalLabel = useMemo(() => getDraftAutosaveIntervalLabel(draftAutosavePreference), [draftAutosavePreference])
 
   useEffect(() => {
     const snapshot = readEditorRecovery()
@@ -489,7 +552,7 @@ export default function HeroInfoEditor({
       writeEditorRecovery(buildEditorRecoverySnapshot({
         heroSlug: hero.slug,
         savedHeroId,
-        heroInfo: restoreRequiredAbilityIcons(draft),
+        heroInfo: draft,
         background: selectedBackground,
         renderSelection,
         heroName: heroNameInput,
@@ -502,6 +565,15 @@ export default function HeroInfoEditor({
 
     return () => window.clearTimeout(timeoutId)
   }, [abilityStatsDraft, allowCopiesInput, draft, hero.slug, heroNameInput, heroPortraitInput, renderSelection, savedHeroId, selectedBackground, statsDraft])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DRAFT_AUTOSAVE_STORAGE_KEY, JSON.stringify(draftAutosavePreference))
+    } catch {
+      // Keep the active in-memory setting even if local storage is unavailable.
+    }
+  }, [draftAutosavePreference])
+
   const heroNamePreview = draft.nameValue.trim() || hero.displayName
   const heroNameTextStyle = getHeroNameTextStyle(draft)
   const nameSizeControlValue = getNameSizeControlValue(draft.nameFontSize)
@@ -513,7 +585,7 @@ export default function HeroInfoEditor({
       ...hero,
       displayName: exportHeroName,
       render: getRenderPath(),
-      heroInfo: restoreRequiredAbilityIcons(draft),
+      heroInfo: draft,
     },
     {
       hero: {
@@ -522,7 +594,7 @@ export default function HeroInfoEditor({
         portrait: heroPortraitInput,
         render: getRenderPath(),
       },
-      heroInfo: restoreRequiredAbilityIcons(draft),
+      heroInfo: draft,
       boon: statsDraft.boon,
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
@@ -531,7 +603,7 @@ export default function HeroInfoEditor({
     {
       name: exportHeroName,
       render: getRenderPath(),
-      heroInfo: restoreRequiredAbilityIcons(draft),
+      heroInfo: draft,
     },
   )
 
@@ -584,6 +656,13 @@ export default function HeroInfoEditor({
       ...draft,
       ...nextDraft,
     })
+  }
+
+  function showBlockedAction(message: string) {
+    setBlockedActionToast(currentToast => ({
+      id: (currentToast?.id ?? 0) + 1,
+      message,
+    }))
   }
 
   function updateWeaponDraft(nextWeapon: Partial<HeroStatsPayload['weapon']>) {
@@ -759,18 +838,44 @@ export default function HeroInfoEditor({
     ? abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)
     : []
 
-  function handleGlobalSave(status: CustomHeroStatus) {
-    const name = getDraftName()
+  const shouldAutoSaveDraft = savedHeroStatus !== 'published'
+  const lastSavedDraftSignatureRef = useRef<string | null>(null)
+  const draftSaveInFlightRef = useRef(false)
 
-    if (!name) {
-      setSaveError('Enter a hero name before saving this draft.')
-      return
-    }
+  function getAbilityStatsForSave() {
+    const focusedAbilityDraft = focusedAbilityDraftRef.current
+    const focusedDraft = focusedAbilityDraft && activeAbilityTarget
+      ? {
+        ...abilityStatsDraft,
+        abilities: activeAbilityTarget.set === 'primary'
+          ? abilityStatsDraft.abilities.map((ability, index) => (index === activeAbilityTarget.index ? focusedAbilityDraft : ability))
+          : abilityStatsDraft.abilities,
+        secondaryAbilities: activeAbilityTarget.set === 'secondary'
+          ? (abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, getDraftSecondaryAbilitySlots(abilityStatsDraft))).map((ability, index) => (index === activeAbilityTarget.index ? focusedAbilityDraft : ability))
+          : abilityStatsDraft.secondaryAbilities,
+      }
+      : abilityStatsDraft
+    const slots = getDraftSecondaryAbilitySlots(focusedDraft)
 
-    setSaveError(null)
-    onSaveHero({
+    return slots.length > 0
+      ? {
+        ...focusedDraft,
+        secondaryAbilities: focusedDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, slots),
+        secondaryAbilitySlots: slots,
+        secondaryAbilityAnchorIndex: undefined,
+      }
+      : {
+        ...focusedDraft,
+        secondaryAbilities: undefined,
+        secondaryAbilitySlots: undefined,
+        secondaryAbilityAnchorIndex: undefined,
+      }
+  }
+
+  function buildSavePayload(status: CustomHeroStatus): CustomHeroSavePayload {
+    return {
       id: savedHeroId,
-      name,
+      name: getDraftName(),
       status,
       hero: {
         portrait: heroPortraitInput,
@@ -779,26 +884,104 @@ export default function HeroInfoEditor({
         renderPosition: getRenderPosition(),
       },
       allowCopies: allowCopiesInput,
-      heroInfo: restoreRequiredAbilityIcons(draft),
+      heroInfo: draft,
       boon: statsDraft.boon,
       weapon: statsDraft.weapon,
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
-      abilityStats: isSecondAbilitySetEnabled
-        ? {
-          ...abilityStatsDraft,
-          secondaryAbilities: abilityStatsDraft.secondaryAbilities ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots),
-          secondaryAbilitySlots,
-          secondaryAbilityAnchorIndex: undefined,
-        }
-        : {
-          ...abilityStatsDraft,
-          secondaryAbilities: undefined,
-          secondaryAbilitySlots: undefined,
-          secondaryAbilityAnchorIndex: undefined,
-        },
-    })
+      abilityStats: getAbilityStatsForSave(),
+    }
   }
+
+  function getDraftSaveSignature(payload: CustomHeroSavePayload) {
+    return JSON.stringify(payload)
+  }
+
+  function getSaveIssueMessage(payload: CustomHeroSavePayload, label: 'Draft' | 'Hero') {
+    const issues = getCustomHeroSaveIssueMessages(payload)
+
+    return issues.length ? `${label} not saved. ${issues.join(' ')}` : null
+  }
+
+  async function handleGlobalSave(status: CustomHeroStatus) {
+    const payload = buildSavePayload(status)
+    const issueMessage = getSaveIssueMessage(payload, status === 'private' ? 'Draft' : 'Hero')
+
+    if (issueMessage) {
+      setSaveError(issueMessage)
+      showBlockedAction(issueMessage)
+      return
+    }
+
+    setSaveError(null)
+    const didSave = await onSaveHero(payload, { mode: 'manual' })
+
+    if (didSave && status === 'private') {
+      lastSavedDraftSignatureRef.current = getDraftSaveSignature(payload)
+    }
+  }
+
+  async function savePrivateDraft(mode: 'draft' | 'exit', force = false) {
+    if (!shouldAutoSaveDraft || draftSaveInFlightRef.current) {
+      return true
+    }
+
+    const payload = buildSavePayload('private')
+    const signature = getDraftSaveSignature(payload)
+
+    if (!force && lastSavedDraftSignatureRef.current === signature) {
+      return true
+    }
+
+    const issueMessage = getSaveIssueMessage(payload, 'Draft')
+
+    if (issueMessage) {
+      setSaveError(issueMessage)
+      if (mode === 'exit') {
+        showBlockedAction(issueMessage)
+      }
+      return false
+    }
+
+    draftSaveInFlightRef.current = true
+
+    try {
+      setSaveError(null)
+      const didSave = await onSaveHero(payload, { mode })
+
+      if (didSave) {
+        lastSavedDraftSignatureRef.current = signature
+      }
+
+      return didSave
+    } finally {
+      draftSaveInFlightRef.current = false
+    }
+  }
+
+  const savePrivateDraftRef = useRef(savePrivateDraft)
+
+  useEffect(() => {
+    if (lastSavedDraftSignatureRef.current === null) {
+      lastSavedDraftSignatureRef.current = getDraftSaveSignature(buildSavePayload('private'))
+    }
+  })
+
+  useEffect(() => {
+    savePrivateDraftRef.current = savePrivateDraft
+  })
+
+  useEffect(() => {
+    if (!shouldAutoSaveDraft) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      void savePrivateDraftRef.current('draft')
+    }, draftAutosaveIntervalMs)
+
+    return () => window.clearInterval(intervalId)
+  }, [draftAutosaveIntervalMs, shouldAutoSaveDraft])
 
   function commitAbilityDraft(nextAbility: AbilityDefinition, target: ActiveAbilityTarget | null = activeAbilityTarget) {
     if (!target) {
@@ -1143,6 +1326,11 @@ export default function HeroInfoEditor({
   }
 
   function toggleSecondarySlotSelection(slot: number) {
+    if (!secondarySlotSelection.includes(slot) && secondarySlotSelection.length >= SECONDARY_ABILITY_SLOT_MAX_COUNT) {
+      showBlockedAction(getItemLimitMessage('Secondary abilities', SECONDARY_ABILITY_SLOT_MAX_COUNT))
+      return
+    }
+
     setSecondarySlotSelection(currentSelection => normalizeSecondaryAbilitySlots(
       currentSelection.includes(slot)
         ? currentSelection.filter(currentSlot => currentSlot !== slot)
@@ -1317,6 +1505,39 @@ export default function HeroInfoEditor({
     setIsExitConfirmOpen(true)
   }
 
+  function handleDraftAutosaveAmountChange(value: string) {
+    const numericValue = Number(value)
+
+    if (Number.isFinite(numericValue) && numericValue > DRAFT_AUTOSAVE_AMOUNT_MAX) {
+      showBlockedAction(`Draft autosave interval can be at most ${DRAFT_AUTOSAVE_AMOUNT_MAX} minutes.`)
+    } else if (Number.isFinite(numericValue) && numericValue < DRAFT_AUTOSAVE_AMOUNT_MIN) {
+      showBlockedAction('Draft autosave interval must be at least 1 minute.')
+    }
+
+    setDraftAutosavePreference(currentPreference => ({
+      ...currentPreference,
+      amount: clampDraftAutosaveAmount(value),
+    }))
+  }
+
+  function handleDraftAutosaveUnitChange(value: string) {
+    setDraftAutosavePreference(currentPreference => ({
+      ...currentPreference,
+      unit: isDraftAutosaveUnit(value) ? value : 'minutes',
+    }))
+  }
+
+  async function handleExitConfirm() {
+    const didSave = await savePrivateDraft('exit', true)
+
+    if (!didSave) {
+      return
+    }
+
+    setIsExitConfirmOpen(false)
+    onExitEditor?.()
+  }
+
   return (
     <section
       className={styles.editor}
@@ -1355,6 +1576,9 @@ export default function HeroInfoEditor({
                   aria-label="Hero name text"
                   value={draft.nameValue}
                   placeholder={heroNamePreview}
+                  maxLength={HERO_NAME_TEXT_MAX_LENGTH}
+                  onKeyDown={event => notifyIfLimitedTextKeyDown(event, draft.nameValue, HERO_NAME_TEXT_MAX_LENGTH, 'Hero name text', showBlockedAction)}
+                  onPaste={event => notifyIfLimitedTextPaste(event, draft.nameValue, HERO_NAME_TEXT_MAX_LENGTH, 'Hero name text', showBlockedAction)}
                   onChange={event => updateDraft({ nameValue: event.target.value })}
                   style={heroNameTextStyle}
                 />
@@ -1382,6 +1606,9 @@ export default function HeroInfoEditor({
                     className={cn(styles.tagTextInput, 'whitespace-nowrap')}
                     value={tag.text}
                     placeholder={tag.label}
+                    maxLength={HERO_TAG_TEXT_MAX_LENGTH}
+                    onKeyDown={event => notifyIfLimitedTextKeyDown(event, tag.text, HERO_TAG_TEXT_MAX_LENGTH, `${tag.label} text`, showBlockedAction)}
+                    onPaste={event => notifyIfLimitedTextPaste(event, tag.text, HERO_TAG_TEXT_MAX_LENGTH, `${tag.label} text`, showBlockedAction)}
                     onChange={event => updateDraft({ [tag.textKey]: event.target.value })}
                     onClick={event => event.stopPropagation()}
                     onPointerDown={event => event.stopPropagation()}
@@ -1502,6 +1729,7 @@ export default function HeroInfoEditor({
                 stats={activeBoonStats}
                 isEditable={!isPreviewMode}
                 onStatsChange={handleBoonStatsChange}
+                onBlockedAction={showBlockedAction}
               />
             </div>
           ) : null}
@@ -1539,6 +1767,7 @@ export default function HeroInfoEditor({
                 onWeaponMaxRangeChange={value => updateActiveWeaponPanel({ weaponMaxRange: parseEditableNumber(value) })}
                 onOpenWeaponAssetPicker={() => setIsWeaponAssetModalOpen(true)}
                 weaponImageUploadControl={<CloudUploadButton endpoint="weaponImage" label="Upload" onUploaded={handleWeaponImageUpload} />}
+                onBlockedAction={showBlockedAction}
               />
             </div>
           ) : null}
@@ -1869,11 +2098,14 @@ export default function HeroInfoEditor({
               id="editor-save-hero-name"
               type="text"
               value={heroNameInput}
+              maxLength={DRAFT_NAME_MAX_LENGTH}
+              onKeyDown={event => notifyIfLimitedTextKeyDown(event, heroNameInput, DRAFT_NAME_MAX_LENGTH, 'Hero name', showBlockedAction)}
+              onPaste={event => notifyIfLimitedTextPaste(event, heroNameInput, DRAFT_NAME_MAX_LENGTH, 'Hero name', showBlockedAction)}
               onChange={event => {
                 setHeroNameInput(event.target.value)
                 setSaveError(null)
               }}
-              placeholder="Name this save"
+              placeholder="Name this draft"
               className={styles.input}
             />
           </label>
@@ -1893,7 +2125,7 @@ export default function HeroInfoEditor({
                 type="button"
                 className={styles.publishActionButton}
                 disabled={isSaving}
-                onClick={() => handleGlobalSave('published')}
+                onClick={() => void handleGlobalSave('published')}
               >
                 Save Published Changes
               </button>
@@ -1908,19 +2140,39 @@ export default function HeroInfoEditor({
             </>
           ) : (
             <>
-              <button
-                type="button"
-                className={styles.saveActionButton}
-                disabled={isSaving}
-                onClick={() => handleGlobalSave('private')}
-              >
-                Save Private
-              </button>
+              <div className={styles.draftAutosavePanel}>
+                <div className={styles.draftAutosaveStatus} role="status" aria-live="polite">
+                  <strong>Draft autosaves privately</strong>
+                  <span>{isDraftSaving ? 'Autosaving to your profile...' : savedHeroId ? `Saved. Future changes save every ${draftAutosaveIntervalLabel}.` : `Changes save every ${draftAutosaveIntervalLabel}.`}</span>
+                </div>
+                <div className={styles.draftAutosaveControls} aria-label="Draft autosave interval">
+                  <label htmlFor="draft-autosave-amount">
+                    Every
+                    <input
+                      id="draft-autosave-amount"
+                      type="number"
+                      min={DRAFT_AUTOSAVE_AMOUNT_MIN}
+                      max={DRAFT_AUTOSAVE_AMOUNT_MAX}
+                      step={1}
+                      value={draftAutosavePreference.amount}
+                      onChange={event => handleDraftAutosaveAmountChange(event.target.value)}
+                      aria-label="Draft autosave interval value"
+                    />
+                  </label>
+                  <select
+                    value={draftAutosavePreference.unit}
+                    onChange={event => handleDraftAutosaveUnitChange(event.target.value)}
+                    aria-label="Draft autosave interval unit"
+                  >
+                    <option value="minutes">minutes</option>
+                  </select>
+                </div>
+              </div>
               <button
                 type="button"
                 className={styles.publishActionButton}
-                disabled={isSaving}
-                onClick={() => handleGlobalSave('published')}
+                disabled={isSaving || isDraftSaving}
+                onClick={() => void handleGlobalSave('published')}
               >
                 Publish
               </button>
@@ -1929,6 +2181,7 @@ export default function HeroInfoEditor({
           <CharacterExportButton payload={exportPayload} className={styles.exportActionButton} />
           {saveError ? <p className={styles.saveError} role="alert">{saveError}</p> : null}
           {saveFailure && onRetrySave ? <SaveFailureBanner reason={saveFailure} onRetry={onRetrySave} /> : null}
+          {blockedActionToast ? <SystemToast key={blockedActionToast.id} message={blockedActionToast.message} variant="error" position="top" /> : null}
           {saveStatusMessage ? <SystemToast message={saveStatusMessage} /> : null}
           {recoveryStatus && !saveStatusMessage ? <SystemToast message={recoveryStatus} /> : null}
           </div>
@@ -1972,7 +2225,7 @@ export default function HeroInfoEditor({
                 disabled={isSaving}
                 onClick={() => {
                   setIsUnpublishConfirmOpen(false)
-                  handleGlobalSave('private')
+                  void handleGlobalSave('private')
                 }}
               >
                 Confirm Unpublish
@@ -1988,17 +2241,14 @@ export default function HeroInfoEditor({
             <p className={styles.exitConfirmEyebrow}>Leave hero editor?</p>
             <h2 id="hero-editor-exit-title">Go back to the main pages?</h2>
             <p>
-              Your current draft is kept in local recovery, but it will not be saved to your profile until you save or publish it.
+              Your draft will be saved privately to your profile before leaving. Resolve any listed restrictions first.
             </p>
             <div className={styles.exitConfirmActions}>
               <button type="button" className={styles.exitStayButton} onClick={() => setIsExitConfirmOpen(false)}>
                 Stay here
               </button>
-              <button type="button" className={styles.exitConfirmButton} onClick={() => {
-                setIsExitConfirmOpen(false)
-                onExitEditor?.()
-              }}>
-                Yes, Go Back
+              <button type="button" className={styles.exitConfirmButton} disabled={isDraftSaving} onClick={() => void handleExitConfirm()}>
+                {isDraftSaving ? 'Saving...' : 'Yes, Go Back'}
               </button>
             </div>
           </section>
@@ -2156,6 +2406,7 @@ export default function HeroInfoEditor({
           }}
           onSave={handleAbilitySave}
           onCancel={() => setActiveAbilityTarget(null)}
+          onBlockedAction={showBlockedAction}
         />
       ) : null}
     </section>

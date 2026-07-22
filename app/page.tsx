@@ -6,6 +6,7 @@ import HeroGrid from '@/components/HeroGrid/HeroGrid'
 interface HomeProps {
   searchParams?: Promise<{
     tab?: string | string[]
+    heroId?: string | string[]
   }>
 }
 
@@ -40,6 +41,7 @@ export default async function Home({ searchParams }: HomeProps = {}) {
 
   const resolvedSearchParams = await searchParams
   const initialTab = getInitialTab(resolvedSearchParams?.tab)
+  const initialHeroId = Array.isArray(resolvedSearchParams?.heroId) ? resolvedSearchParams?.heroId[0] : resolvedSearchParams?.heroId
 
-  return <HeroGrid key={initialTab} initialTab={initialTab} />
+  return <HeroGrid key={`${initialTab}:${initialHeroId ?? ''}`} initialTab={initialTab} initialHeroId={initialHeroId} />
 }

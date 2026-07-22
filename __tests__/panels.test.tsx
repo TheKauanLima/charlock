@@ -2,6 +2,7 @@
 
 import { readFileSync } from 'node:fs'
 
+import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -377,7 +378,8 @@ describe('migrated stat panels', () => {
     expect(within(maxHealthCell).getByLabelText('Max Health value')).toHaveAttribute('placeholder', '0')
 
     await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
-    expect(screen.queryByRole('button', { name: 'Set Max Health scaling to boon' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set Max Health scaling to boon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set Max Health scaling to other' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to spirit' }))
     expect(maxHealthCell).toHaveAttribute('data-scaling', 'spirit')
     await user.clear(screen.getByLabelText('Max Health scaling value'))
@@ -414,19 +416,51 @@ describe('migrated stat panels', () => {
     expect(screen.getByRole('button', { name: 'Edit Bullet Damage scaling' })).toBeInTheDocument()
   })
 
-  it('does not expose or display legacy boon scaling in ordinary stat panels', async () => {
+  it('edits custom scaling metadata from the shared scaling dropdown', async () => {
     const user = userEvent.setup()
-    const legacyStats = [
-      { label: 'Bullet Damage', value: '13.5', unit: '', icon: 'bulletDamage', scaling: 'boon' as const, scalingValue: '0.12' },
+    let latestStats = [
+      { label: 'Bullet Damage', value: '13.5', unit: '', icon: 'bulletDamage', scaling: 'none' as const, scalingValue: '0' },
     ]
 
-    render(<WeaponPanel weaponStats={legacyStats} isEditable showDetails />)
+    function WeaponPanelHarness() {
+      const [stats, setStats] = useState(latestStats)
+
+      latestStats = stats
+
+      return <WeaponPanel weaponStats={stats} isEditable showDetails onStatsChange={setStats} />
+    }
+
+    render(<WeaponPanelHarness />)
 
     const bulletDamageCell = screen.getByRole('group', { name: /Bullet Damage/ })
-    expect(bulletDamageCell).toHaveAttribute('data-scaling', 'none')
-    expect(screen.queryByLabelText('boon scaling value x0.12')).not.toBeInTheDocument()
 
     await user.click(within(bulletDamageCell).getByRole('button', { name: 'Edit Bullet Damage scaling' }))
-    expect(screen.queryByRole('button', { name: 'Set Bullet Damage scaling to boon' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Set Bullet Damage scaling to other' }))
+    expect(bulletDamageCell).toHaveAttribute('data-scaling', 'custom')
+    expect(latestStats[0]).toMatchObject({
+      scaling: 'custom',
+      customScaling: {
+        name: 'Other',
+        icon: '/panorama/images/icons/properties/spirit.svg',
+        color: '#f5eadb',
+      },
+    })
+
+    const nameInput = screen.getByLabelText('Bullet Damage custom scaling name')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Curse')
+    expect(latestStats[0].customScaling?.name).toBe('Curse')
+
+    fireEvent.change(screen.getByLabelText('Bullet Damage custom scaling color'), { target: { value: '#84c955' } })
+    expect(latestStats[0].customScaling?.color).toBe('#84c955')
+
+    await user.click(screen.getByRole('button', { name: 'Bullet Damage custom scaling icon' }))
+    const iconDialog = screen.getByRole('dialog', { name: 'Bullet Damage custom scaling icon selector' })
+    expect(iconDialog).toBeInTheDocument()
+    expect(iconDialog.parentElement).toBe(document.body)
+    expect(screen.getByRole('tablist', { name: 'Ability icon categories' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Stat icons' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Use Abrams 1' }))
+    expect(latestStats[0].customScaling?.icon).toBe('/panorama/images/hud/abilities/abrams/1.png')
   })
 })

@@ -16,6 +16,7 @@ import {
   isSquareIcon,
   type SquareIconSize,
 } from '@/lib/square-icon'
+import { getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 
 import styles from './HeroStatsBoonPanel.module.css'
 
@@ -25,6 +26,7 @@ interface HeroStatsBoonPanelProps {
   stats?: PanelStat[]
   isEditable?: boolean
   onStatsChange?: (stats: PanelStat[]) => void
+  onBlockedAction?: (message: string) => void
 }
 
 const ICON_PATHS: Record<string, string> = {
@@ -43,6 +45,8 @@ const BOON_ICON_COLOR_SWATCHES = [
   { id: 'spirit', label: 'Spirit', value: '#7e61a1' },
   { id: 'cream', label: 'Cream', value: '#f5eadb' },
 ] as const
+const BOON_STAT_LABEL_MAX_LENGTH = 120
+const BOON_STAT_MAX_COUNT = 24
 
 function getNextCustomBoonStatLabel(stats: PanelStat[]) {
   const baseLabel = 'Extra Stat'
@@ -109,7 +113,7 @@ function getIconVisualStyle(icon: string | undefined, iconColor = ''): CSSProper
   }
 }
 
-export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards', stats, isEditable = false, onStatsChange }: HeroStatsBoonPanelProps) {
+export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards', stats, isEditable = false, onStatsChange, onBlockedAction }: HeroStatsBoonPanelProps) {
   const normalizedStats = buildBoonStatsArray(stats)
   const [iconTargetIndex, setIconTargetIndex] = useState<number | null>(null)
   const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
@@ -129,6 +133,11 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
   }
 
   function handleAddStat() {
+    if (normalizedStats.length >= BOON_STAT_MAX_COUNT) {
+      onBlockedAction?.(getItemLimitMessage('Boon stats', BOON_STAT_MAX_COUNT))
+      return
+    }
+
     onStatsChange?.([...normalizedStats, createBoonStat(getNextCustomBoonStatLabel(normalizedStats))])
   }
 
@@ -299,7 +308,14 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
               {isEditable ? (
                 <label className={styles.customLabel}>
                   <span className={styles.srOnly}>Boon stat {index + 1} label</span>
-                  <input aria-label={`Boon stat ${index + 1} label`} value={stat.label} onChange={event => handleLabelChange(index, event)} />
+                  <input
+                    aria-label={`Boon stat ${index + 1} label`}
+                    value={stat.label}
+                    maxLength={BOON_STAT_LABEL_MAX_LENGTH}
+                    onKeyDown={event => notifyIfLimitedTextKeyDown(event, stat.label, BOON_STAT_LABEL_MAX_LENGTH, 'Boon stat label', onBlockedAction)}
+                    onPaste={event => notifyIfLimitedTextPaste(event, stat.label, BOON_STAT_LABEL_MAX_LENGTH, 'Boon stat label', onBlockedAction)}
+                    onChange={event => handleLabelChange(index, event)}
+                  />
                 </label>
               ) : (
                 <span className={styles.statLabel}>{stat.label}</span>
@@ -314,7 +330,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
           })}
         </div>
         {isEditable ? (
-          <button type="button" className={styles.addStatButton} onClick={handleAddStat}>
+          <button type="button" className={styles.addStatButton} aria-disabled={normalizedStats.length >= BOON_STAT_MAX_COUNT} title={normalizedStats.length >= BOON_STAT_MAX_COUNT ? getItemLimitMessage('Boon stats', BOON_STAT_MAX_COUNT) : undefined} onClick={handleAddStat}>
             Add Boon Stat
           </button>
         ) : null}

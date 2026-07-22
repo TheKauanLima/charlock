@@ -83,6 +83,11 @@ async function confirmFocusedGoBack(user: ReturnType<typeof userEvent.setup>) {
   await user.click(within(screen.getByTestId('ability-editor')).getByRole('button', { name: 'Go Back' }))
 }
 
+async function confirmEditorExitSave(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Go Back' }))
+  await user.click(await screen.findByRole('button', { name: 'Yes, Go Back' }))
+}
+
 describe('HeroGrid', () => {
   it('opens on an unselected Cursed Concepts landing state with the primary top bar', () => {
     render(<HeroGrid />)
@@ -134,6 +139,30 @@ describe('HeroGrid', () => {
 
   it('keeps guarded draft navigation on the hero editor rail and opens abilities from the left editor rail', async () => {
     const user = userEvent.setup()
+    const abrams = HEROES[0]
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
+      hero: {
+        id: 'rail-saved-hero',
+        slug: 'rail-saved-hero',
+        assetSlug: 'rail-saved-hero',
+        displayName: 'NAME',
+        portrait: abrams.portrait,
+        render: abrams.render,
+        background: abrams.render,
+        heroInfo: abrams.heroInfo,
+        status: 'private',
+        likesCount: 0,
+        likedByCurrentUser: false,
+        allowCopies: false,
+        viewerCanEdit: true,
+        publishedAt: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        stats: buildHeroStatsSeed(abrams),
+        abilityStats: buildDefaultAbilityStats(abrams),
+      },
+    }))
 
     render(<HeroGrid />)
 
@@ -204,6 +233,11 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
     await user.clear(screen.getByLabelText('Ability Name'))
     await user.type(screen.getByLabelText('Ability Name'), 'Stat Panel Saved Ability')
+    await user.click(screen.getByRole('button', { name: 'Text' }))
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+    richTextEditor.textContent = 'Stat panel saved text'
+    fireEvent.input(richTextEditor)
 
     await user.click(screen.getByRole('tab', { name: 'Weapon stats' }))
 
@@ -214,6 +248,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
 
     expect(screen.getByLabelText('Ability Name')).toHaveValue('Stat Panel Saved Ability')
+    expect(screen.getByRole('textbox', { name: 'Description rich text' })).toHaveTextContent('Stat panel saved text')
   })
 
   it('opens the create template picker with only Empty available', async () => {
@@ -241,7 +276,8 @@ describe('HeroGrid', () => {
     const maxHealthCell = within(vitalityPanel).getByRole('group', { name: /Max Health/ })
 
     await user.click(within(maxHealthCell).getByRole('button', { name: 'Edit Max Health scaling' }))
-    expect(screen.queryByRole('button', { name: 'Set Max Health scaling to boon' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set Max Health scaling to boon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set Max Health scaling to other' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Set Max Health scaling to spirit' }))
     await user.click(within(screen.getByTestId('editor-control-rail')).getByRole('button', { name: 'Preview Mode' }))
     await user.click(screen.getByRole('tab', { name: 'Vitality stats' }))
@@ -319,6 +355,48 @@ describe('HeroGrid', () => {
     expect(screen.queryByTestId('hero-info-cluster')).not.toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'Abrams render' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create' })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('opens an existing profile hero for editing without showing the template picker', async () => {
+    const abrams = HEROES[0]
+    const savedHero = {
+      id: 'profile_edit_hero',
+      slug: 'profile-edit-hero',
+      assetSlug: 'profile-edit-hero',
+      displayName: 'Profile Edit Hero',
+      portrait: abrams.portrait,
+      render: abrams.render,
+      background: abrams.render,
+      heroInfo: {
+        ...abrams.heroInfo,
+        nameType: 'text' as const,
+        nameValue: 'Profile Edit Hero',
+        ability1Icon: '',
+        ability2Icon: '',
+        ability3Icon: '',
+        ability4Icon: '',
+      },
+      status: 'private' as const,
+      likesCount: 0,
+      likedByCurrentUser: false,
+      allowCopies: false,
+      viewerCanEdit: true,
+      publishedAt: null,
+      createdAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      updatedAt: new Date('2026-06-05T12:00:00.000Z').toISOString(),
+      stats: buildHeroStatsSeed(abrams),
+      abilityStats: buildDefaultAbilityStats(abrams),
+    }
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ hero: savedHero }))
+
+    render(<HeroGrid initialTab="Create" initialHeroId="profile_edit_hero" />)
+
+    expect(screen.queryByRole('dialog', { name: 'Choose Template' })).not.toBeInTheDocument()
+    expect(await screen.findByTestId('hero-info-editor')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Choose Template' })).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Name this draft')).toHaveValue('Profile Edit Hero')
+    expect(screen.getByTestId('editor-ability-1').querySelector('[aria-hidden="true"]')?.getAttribute('style') ?? '').not.toContain('/panorama/images/hud/abilities/abrams/1.png')
   })
 
   it('loads the notifications tab from the profile menu route', async () => {
@@ -761,7 +839,7 @@ describe('HeroGrid', () => {
     render(<HeroGrid />)
 
     await openEmptyCreateEditor(user)
-    await user.type(screen.getByPlaceholderText('Name this save'), 'Published Secondary')
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Published Secondary')
     await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
     await user.click(screen.getByRole('button', { name: 'Secondary Abilities' }))
     await user.click(screen.getByRole('button', { name: 'Apply Selection' }))
@@ -828,7 +906,7 @@ describe('HeroGrid', () => {
     render(<HeroGrid />)
 
     await openEmptyCreateEditor(user)
-    await user.type(screen.getByPlaceholderText('Name this save'), 'Published Default Secondary')
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Published Default Secondary')
     await user.click(screen.getByLabelText('Second Ability Set'))
     expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close second ability set modal' }))
@@ -918,12 +996,9 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 42px) calc(0% + 28px)')))
     expect(screen.getByTestId('hero-render-layer')).not.toHaveAttribute('style', expect.stringContaining('background-position'))
 
-    await user.clear(screen.getByPlaceholderText('Name this save'))
-    await user.type(screen.getByPlaceholderText('Name this save'), 'Positioned Render')
-    const saveButton = screen.getByRole('button', { name: 'Save Private' })
-
-    expect(saveButton).not.toBeDisabled()
-    fireEvent.click(saveButton)
+    await user.clear(screen.getByPlaceholderText('Name this draft'))
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Positioned Render')
+    await confirmEditorExitSave(user)
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
     const saveCall = fetchMock.mock.calls.find(([input]) => String(input) === '/api/heroes')
@@ -931,8 +1006,95 @@ describe('HeroGrid', () => {
 
     expect(requestBody.hero.render).toBe('https://utfs.io/f/heroRender.png')
     expect(requestBody.hero.renderPosition).toEqual({ x: 42, y: 28 })
-    await screen.findByText('Private hero saved to your profile.')
-    await waitFor(() => expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('background-position: calc(100% + 42px) calc(0% + 28px)')))
+  })
+
+  it('shows draft save restrictions before leaving the editor', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.clear(screen.getByLabelText('Hero name text'))
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(await screen.findByRole('button', { name: 'Yes, Go Back' }))
+
+    expect(await screen.findAllByRole('alert')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ textContent: expect.stringContaining('Hero name is required') }),
+      ]),
+    )
+    expect(screen.getByTestId('hero-info-editor')).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('explains missing ability icons when a draft cannot save', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
+      error: 'Ability 1 icon is required. Open Ability 1 and choose an ability icon.',
+      code: 'INVALID_REQUEST',
+      retryable: false,
+    }, { status: 400 }))
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Iconless Draft')
+    await user.click(screen.getByRole('button', { name: 'Go Back' }))
+    await user.click(await screen.findByRole('button', { name: 'Yes, Go Back' }))
+
+    expect(await screen.findAllByRole('alert')).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ textContent: expect.stringContaining('Ability 1 icon is required. Open Ability 1 and choose an ability icon.') }),
+      ]),
+    )
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('lets users customize and persist the draft autosave interval with a one-minute minimum', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+
+    const intervalInput = screen.getByLabelText('Draft autosave interval value')
+    const unitSelect = screen.getByLabelText('Draft autosave interval unit')
+
+    expect(intervalInput).toHaveValue(1)
+    expect(unitSelect).toHaveValue('minutes')
+    expect(screen.queryByRole('option', { name: 'seconds' })).not.toBeInTheDocument()
+
+    fireEvent.change(intervalInput, { target: { value: '0' } })
+    expect(intervalInput).toHaveValue(1)
+    expect(screen.getByText(/every 1 minute/i)).toBeInTheDocument()
+    fireEvent.change(intervalInput, { target: { value: '61' } })
+
+    expect(intervalInput).toHaveValue(60)
+    expect(unitSelect).toHaveValue('minutes')
+    expect(screen.getByText(/every 60 minutes/i)).toBeInTheDocument()
+    await waitFor(() => expect(JSON.parse(window.localStorage.getItem('charlock_draft_autosave_interval') ?? '{}')).toEqual({
+      amount: 60,
+      unit: 'minutes',
+    }))
+
+    cleanup()
+    render(<HeroGrid />)
+    await openEmptyCreateEditor(user)
+
+    expect(screen.getByLabelText('Draft autosave interval value')).toHaveValue(60)
+    expect(screen.getByLabelText('Draft autosave interval unit')).toHaveValue('minutes')
+
+    cleanup()
+    window.localStorage.setItem('charlock_draft_autosave_interval', JSON.stringify({
+      amount: 15,
+      unit: 'seconds',
+    }))
+    render(<HeroGrid />)
+    await openEmptyCreateEditor(user)
+
+    expect(screen.getByLabelText('Draft autosave interval value')).toHaveValue(1)
+    expect(screen.getByLabelText('Draft autosave interval unit')).toHaveValue('minutes')
   })
 
   it('disables uploaded render dragging while ability editor text is editable', async () => {
@@ -1191,8 +1353,8 @@ describe('HeroGrid', () => {
     await user.clear(screen.getByLabelText('Pellet Count value'))
     await user.type(screen.getByLabelText('Pellet Count value'), '7')
     await user.click(screen.getByTestId('uploadthing-heroPortrait'))
-    await user.clear(screen.getByPlaceholderText('Name this save'))
-    await user.type(screen.getByPlaceholderText('Name this save'), 'Arc Light')
+    await user.clear(screen.getByPlaceholderText('Name this draft'))
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Arc Light')
     await user.click(screen.getByLabelText('Second Ability Set'))
     expect(screen.getByRole('dialog', { name: 'SELECT SECONDARY ABILITIES' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Toggle secondary Ability 1' }))
@@ -1208,7 +1370,7 @@ describe('HeroGrid', () => {
     await user.type(screen.getByLabelText('Ability Name'), 'Arc Echo')
     await confirmFocusedGoBack(user)
     await user.click(screen.getByLabelText('Allow Copies'))
-    await user.click(screen.getByRole('button', { name: 'Save Private' }))
+    await confirmEditorExitSave(user)
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
 
@@ -1239,15 +1401,13 @@ describe('HeroGrid', () => {
       requestBody.heroInfo.ability2Icon,
       requestBody.heroInfo.ability3Icon,
       requestBody.heroInfo.ability4Icon,
-    ]).not.toContain('')
+    ]).toEqual(['', '', '', ''])
     expect(requestBody.abilityStats.abilities).toHaveLength(4)
     expect(requestBody.abilityStats.abilities[0].name).toBe('Arc Pulse')
     expect(requestBody.abilityStats.secondaryAbilities).toHaveLength(1)
     expect(requestBody.abilityStats.secondaryAbilitySlots).toEqual([0])
     expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBeUndefined()
     expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
-    expect(await screen.findByRole('status')).toHaveTextContent('Private hero saved')
-    expect(screen.getByTestId('editor-secondary-ability-1')).toBeInTheDocument()
   })
 
   it('lets an owner confirm unpublishing a hero and returns it to private saves', async () => {
@@ -1322,8 +1482,8 @@ describe('HeroGrid', () => {
       id: 'owner_published_hero',
       status: 'private',
     })
-    expect(await screen.findByRole('status')).toHaveTextContent('Hero unpublished and moved to your private saves.')
-    expect(screen.getByRole('button', { name: 'Save Private' })).toBeInTheDocument()
+    expect(await screen.findByText('Hero unpublished and moved to your private saves.')).toBeInTheDocument()
+    expect(screen.getByText('Draft autosaves privately')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Unpublish Hero' })).not.toBeInTheDocument()
   })
 
@@ -1437,7 +1597,7 @@ describe('HeroGrid', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=new&limit=24&offset=0&search=Arc', expect.objectContaining({ signal: expect.any(AbortSignal) })))
     await user.click(screen.getByRole('button', { name: 'Use as Template' }))
     expect(await screen.findByTestId('hero-info-editor')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('Name this save')).toHaveValue('')
+    expect(screen.getByPlaceholderText('Name this draft')).toHaveValue('')
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=new&limit=24&offset=0', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes/published_hero_1/like', expect.objectContaining({ method: 'POST' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes/published_hero_1/copy', expect.objectContaining({ method: 'POST' })))

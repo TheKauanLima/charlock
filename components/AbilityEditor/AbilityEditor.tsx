@@ -1,11 +1,12 @@
 'use client'
 
-import { Bold, GripVertical, Italic, Moon, Plus, Search, X } from 'lucide-react'
+import { Bold, GripVertical, Italic, Moon, Plus, X } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
+import type { ClipboardEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
+import IconSearchModal, { getAbilityIconGroupsAsAssets } from '@/components/IconSearchModal/IconSearchModal'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type {
@@ -28,13 +29,11 @@ import {
   type HeroInfoDefinition,
 } from '@/lib/hero-data'
 import {
-  SQUARE_ICON_SIZE_OPTIONS,
   getSquareIconOption,
   getSquareIconStyle,
-  getSquareIconToken,
   isSquareIcon,
-  type SquareIconSize,
 } from '@/lib/square-icon'
+import { getCharacterLimitMessage, getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 import cn from '@/lib/utilsd'
 
 import styles from './AbilityEditor.module.css'
@@ -105,6 +104,7 @@ interface AbilityEditorProps {
   onDraftChange?: (ability: AbilityDefinition) => void
   onSave?: (ability: AbilityDefinition) => void
   onCancel?: () => void
+  onBlockedAction?: (message: string) => void
 }
 
 type IconTarget =
@@ -133,22 +133,21 @@ const RICH_TEXT_COLORS: Array<{ id: string; label: string; token: string }> = [
   { id: 'green', label: 'Green', token: 'green' },
   { id: 'orange', label: 'Orange', token: 'orange' },
 ]
+const ABILITY_NAME_MAX_LENGTH = 120
+const ABILITY_STAT_LABEL_MAX_LENGTH = 120
+const ABILITY_STAT_UNIT_MAX_LENGTH = 40
+const ABILITY_STAT_APPEND_MAX_LENGTH = 40
+const ABILITY_RICH_TEXT_MAX_LENGTH = 5000
+const ABILITY_TIER_TEXT_MAX_LENGTH = 2000
+const ABILITY_SUB_STAT_MAX_COUNT = 24
+const ABILITY_SECTION_MAX_COUNT = 12
+const ABILITY_MAIN_GRID_CELL_MAX_COUNT = 3
 
 const RICH_TEXT_COLOR_TOKENS = RICH_TEXT_COLORS.map(color => color.token).join('|')
 const CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY = 'charlock_recent_rich_text_colors'
 const MAX_RECENT_CUSTOM_TEXT_COLORS = 8
 
-const COOLDOWN_ICON_COLOR = '#7e61a1'
-const ICON_COLOR_SWATCHES = [
-  { id: 'default', label: 'Default', value: '' },
-  { id: 'green', label: 'Green', value: '#2e9860' },
-  { id: 'freshGreen', label: 'Fresh Green', value: '#84c955' },
-  { id: 'olive', label: 'Olive', value: '#919814' },
-  { id: 'amber', label: 'Amber', value: '#e5a535' },
-  { id: 'spirit', label: 'Spirit', value: COOLDOWN_ICON_COLOR },
-  { id: 'cream', label: 'Cream', value: '#f5eadb' },
-] as const
-
+const PROPERTY_ICON_PATH_PREFIX = '/panorama/images/icons/properties/'
 const INLINE_ICON_CARET_STOP = '\u200B'
 const TIER_BOXES: Array<{ tier: AbilityTierLevel; cost: string }> = [
   { tier: 1, cost: '1' },
@@ -174,7 +173,6 @@ function getIconName(path: string) {
 
   return (path.split('/').at(-1) ?? path).replace('.svg', '')
 }
-
 function isIntrinsicColorPropertyIcon(pathOrName: string) {
   if (isSquareIcon(pathOrName)) {
     return false
@@ -203,21 +201,49 @@ function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties
   }
 }
 
-function getWhiteAbilityIconVisualStyle(path: string): CSSProperties {
+function getWhiteAbilityIconVisualStyle(path: string, iconColor = '#ffffff'): CSSProperties {
   if (isSquareIcon(path)) {
-    return getSquareIconStyle(path, '#ffffff')
+    return getSquareIconStyle(path, iconColor)
   }
 
   return {
-    backgroundColor: '#ffffff',
+    backgroundColor: iconColor,
     WebkitMaskImage: `url('${path}')`,
     maskImage: `url('${path}')`,
   }
 }
 
+function getInlineIconToken(path: string) {
+  if (isSquareIcon(path)) {
+    return path
+  }
+
+  if (path.startsWith(PROPERTY_ICON_PATH_PREFIX) && path.endsWith('.svg')) {
+    return getIconName(path)
+  }
+
+  return path
+}
+
+function getInlineIconPath(iconToken: string) {
+  if (iconToken.startsWith('/')) {
+    return iconToken
+  }
+
+  return `${PROPERTY_ICON_PATH_PREFIX}${iconToken}.svg`
+}
+
+function isIntrinsicColorInlineIcon(iconToken: string) {
+  if (isSquareIcon(iconToken) || iconToken.startsWith('/')) {
+    return false
+  }
+
+  return isIntrinsicColorPropertyIcon(iconToken)
+}
+
 function getInlineIconHtml(iconName: string, iconColor = '') {
-  const iconPath = `/panorama/images/icons/properties/${iconName}.svg`
-  const hasIntrinsicColor = isIntrinsicColorPropertyIcon(iconName)
+  const iconPath = getInlineIconPath(iconName)
+  const hasIntrinsicColor = isIntrinsicColorInlineIcon(iconName)
   const className = hasIntrinsicColor ? `${styles.inlineIcon} ${styles.inlineIconOriginalColor}` : styles.inlineIcon
   const squareOption = isSquareIcon(iconName) ? getSquareIconOption(iconName) : null
   const style = squareOption
@@ -481,6 +507,52 @@ function serializeRichNode(node: Node): string {
 
 function editableHtmlToTokenText(element: HTMLElement) {
   return Array.from(element.childNodes).map(serializeRichNode).join('').replace(/\n+$/g, '')
+}
+
+function getEditableSelectionTextLength(root: HTMLElement) {
+  const selection = window.getSelection()
+
+  if (!selection || selection.rangeCount === 0 || !root.contains(selection.anchorNode) || !root.contains(selection.focusNode)) {
+    return 0
+  }
+
+  return selection.toString().length
+}
+
+function notifyIfContentEditableTextKeyDown(
+  event: KeyboardEvent<HTMLElement>,
+  currentText: string,
+  maxLength: number,
+  label: string,
+  onBlockedAction?: (message: string) => void,
+) {
+  if (!onBlockedAction || event.key.length !== 1 || event.metaKey || event.ctrlKey || event.altKey) {
+    return
+  }
+
+  if (currentText.length - getEditableSelectionTextLength(event.currentTarget) >= maxLength) {
+    event.preventDefault()
+    onBlockedAction(getCharacterLimitMessage(label, maxLength))
+  }
+}
+
+function notifyIfContentEditableTextPaste(
+  event: ClipboardEvent<HTMLElement>,
+  currentText: string,
+  maxLength: number,
+  label: string,
+  onBlockedAction?: (message: string) => void,
+) {
+  if (!onBlockedAction) {
+    return
+  }
+
+  const pastedText = event.clipboardData.getData('text')
+
+  if (currentText.length - getEditableSelectionTextLength(event.currentTarget) + pastedText.length > maxLength) {
+    event.preventDefault()
+    onBlockedAction(getCharacterLimitMessage(label, maxLength))
+  }
 }
 
 function estimateTierTextLineCount(text: string) {
@@ -853,30 +925,6 @@ function cloneAbility(ability: AbilityDefinition): AbilityDefinition {
   return syncAbilityNames(structuredClone(ability))
 }
 
-function formatAbilityIconAssetLabel(path: string) {
-  const fileName = path.split('/').at(-1) ?? path
-  const rawName = fileName
-    .replace(/\.(png|svg)$/i, '')
-    .replace(/_(psd|png)$/i, '')
-
-  return rawName
-    .split('_')
-    .filter(Boolean)
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
-function getAbilityIconGroupsAsAssets(groups: AbilityIconGroup[]): EditorAssetGroup[] {
-  return groups.map(group => ({
-    id: `ability-icons-${group.heroSlug}`,
-    label: group.heroName,
-    assets: group.icons.map((icon, index) => ({
-      label: group.useFileLabels ? formatAbilityIconAssetLabel(icon) : `${group.heroName} ${index + 1}`,
-      path: icon,
-    })),
-  }))
-}
-
 function getActiveVariant(ability: AbilityDefinition, activeTier: ActiveTier): AbilityVariant {
   if (activeTier === 0) {
     return ability
@@ -957,11 +1005,12 @@ function reorderSections(sections: AbilitySection[], sourceIndex: number, target
   return nextSections
 }
 
-export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onAbilitySwap, onSecondAbilitySetToggle, onModeToggle, onDraftChange, onSave, onCancel }: AbilityEditorProps) {
+export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edit', previewLayout = 'browse', className, hero, heroInfo, activeAbilityTarget, secondaryAbilities = [], secondaryAbilitySlots, secondaryAbilityAnchorIndex, isSecondAbilitySetEnabled = secondaryAbilities.length > 0, abilityIconGroups = [], showDetails = false, onHeroInfoChange, onAbilityIconChange, onAbilitySelect, onAbilitySwap, onSecondAbilitySetToggle, onModeToggle, onDraftChange, onSave, onCancel, onBlockedAction }: AbilityEditorProps) {
   const capabilities = ABILITY_EDITOR_CAPABILITIES[mode]
   const isPreviewMode = mode === 'preview'
   const isEditorPreview = isPreviewMode && previewLayout === 'editor'
   const [draftAbility, setDraftAbility] = useState(() => cloneAbility(ability))
+  const draftAbilityRef = useRef(draftAbility)
   const [activeTier, setActiveTier] = useState<ActiveTier>(0)
   const [flashingTier, setFlashingTier] = useState<AbilityTierLevel | null>(null)
   const flashTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1011,8 +1060,13 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     }
   }, [])
 
-  useEffect(() => {
-    onDraftChange?.(syncAbilityNames(draftAbility))
+  const getCurrentDraftAbility = useCallback(() => syncAbilityNames(draftAbilityRef.current), [])
+
+  useLayoutEffect(() => {
+    const syncedAbility = syncAbilityNames(draftAbility)
+
+    draftAbilityRef.current = syncedAbility
+    onDraftChange?.(syncedAbility)
   }, [draftAbility, onDraftChange])
 
   useLayoutEffect(() => {
@@ -1118,6 +1172,15 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     }), { cascadeToHigher: true })
   }
 
+  function addSubStat() {
+    if (activeAbility.subStats.length >= ABILITY_SUB_STAT_MAX_COUNT) {
+      onBlockedAction?.(getItemLimitMessage('Sub-header stats', ABILITY_SUB_STAT_MAX_COUNT))
+      return
+    }
+
+    setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat('Stat')] }), { cascadeToHigher: true })
+  }
+
   function updateSection(sectionId: string, updater: (section: AbilitySection) => AbilitySection, options: { cascadeToHigher?: boolean } = {}) {
     const activeSectionIndex = activeAbility.sections.findIndex(section => section.id === sectionId)
 
@@ -1158,6 +1221,11 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   }
 
   function addSection(type: 'richText' | 'grid') {
+    if (activeAbility.sections.length >= ABILITY_SECTION_MAX_COUNT) {
+      onBlockedAction?.(getItemLimitMessage('Ability sections', ABILITY_SECTION_MAX_COUNT))
+      return
+    }
+
     const id = `ability-${draftAbility.slot}-${type}-${Date.now()}`
     const section: AbilitySection = type === 'richText'
       ? {
@@ -1322,11 +1390,11 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       return
     }
 
-    const iconColor = isIntrinsicColorPropertyIcon(path) ? '' : selectedIconColor
-
     if (iconTarget.type === 'abilityIcon') {
       setActiveAbility(current => ({ ...current, icon: path }))
     } else if (iconTarget.type !== 'inlineIcon') {
+      const iconColor = isIntrinsicColorPropertyIcon(path) ? '' : selectedIconColor
+
       updateIconTarget(iconTarget, { icon: path, iconColor })
     } else {
       updateSection(iconTarget.sectionId, section => {
@@ -1335,7 +1403,8 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
         }
 
         const markerToken = `[[inline-icon-marker:${iconTarget.marker}]]`
-        const iconName = getIconName(path)
+        const iconName = getInlineIconToken(path)
+        const iconColor = isIntrinsicColorInlineIcon(iconName) ? '' : selectedIconColor
         const iconToken = iconColor ? `[i:${iconName}|${iconColor}]` : `[i:${iconName}]`
 
         return {
@@ -1479,6 +1548,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                     style={appendInputStyle}
                     value={stat.append ?? ''}
                     placeholder="+"
+                    maxLength={ABILITY_STAT_APPEND_MAX_LENGTH}
+                    onKeyDown={event => notifyIfLimitedTextKeyDown(event, stat.append ?? '', ABILITY_STAT_APPEND_MAX_LENGTH, 'Ability stat suffix', onBlockedAction)}
+                    onPaste={event => notifyIfLimitedTextPaste(event, stat.append ?? '', ABILITY_STAT_APPEND_MAX_LENGTH, 'Ability stat suffix', onBlockedAction)}
                     onChange={event => onChange(updateStat(stat, { append: event.target.value }))}
                   />
                 ) : renderStatText(styles.appendInput, stat.append, '', false)}
@@ -1509,6 +1581,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                     style={appendInputStyle}
                     value={stat.append ?? ''}
                     placeholder="+"
+                    maxLength={ABILITY_STAT_APPEND_MAX_LENGTH}
+                    onKeyDown={event => notifyIfLimitedTextKeyDown(event, stat.append ?? '', ABILITY_STAT_APPEND_MAX_LENGTH, 'Ability stat suffix', onBlockedAction)}
+                    onPaste={event => notifyIfLimitedTextPaste(event, stat.append ?? '', ABILITY_STAT_APPEND_MAX_LENGTH, 'Ability stat suffix', onBlockedAction)}
                     onChange={event => onChange(updateStat(stat, { append: event.target.value }))}
                   />
                 ) : renderStatText(styles.appendInput, stat.append, '', false)}
@@ -1525,6 +1600,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               style={unitInputStyle}
               placeholder={variant === 'main' ? 'Detail' : 'Unit'}
               value={stat.unit ?? ''}
+              maxLength={ABILITY_STAT_UNIT_MAX_LENGTH}
+              onKeyDown={event => notifyIfLimitedTextKeyDown(event, stat.unit ?? '', ABILITY_STAT_UNIT_MAX_LENGTH, variant === 'main' ? 'Ability stat detail' : 'Ability stat unit', onBlockedAction)}
+              onPaste={event => notifyIfLimitedTextPaste(event, stat.unit ?? '', ABILITY_STAT_UNIT_MAX_LENGTH, variant === 'main' ? 'Ability stat detail' : 'Ability stat unit', onBlockedAction)}
               onChange={event => onChange(updateStat(stat, { unit: event.target.value }))}
             />
           ) : renderStatText(styles.unitInput, stat.unit, '', variant === 'main')}
@@ -1539,6 +1617,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 value={stat.label}
                 aria-label="Detail"
                 placeholder="Detail"
+                maxLength={ABILITY_STAT_LABEL_MAX_LENGTH}
+                onKeyDown={event => notifyIfLimitedTextKeyDown(event, stat.label, ABILITY_STAT_LABEL_MAX_LENGTH, 'Ability stat label', onBlockedAction)}
+                onPaste={event => notifyIfLimitedTextPaste(event, stat.label, ABILITY_STAT_LABEL_MAX_LENGTH, 'Ability stat label', onBlockedAction)}
                 onChange={event => onChange(updateStat(stat, { label: event.target.value }))}
               />
             ) : renderStatText(styles.statLabelInput, stat.label)}
@@ -1550,13 +1631,14 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               label={label}
               scaling={stat.scaling}
               scalingValue={stat.scalingValue}
+              customScaling={stat.customScaling}
               boundaryRef={mainEditorColumnRef}
               openPickerId={openScalingPickerId}
               onChange={updates => onChange(updateStat(stat, updates))}
               onOpenPickerChange={setOpenScalingPickerId}
             />
           ) : (
-            <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} showValue={showDetails} valuePosition={variant === 'main' ? 'lower' : 'center'} />
+            <ScalingValueEditor scaling={stat.scaling} scalingValue={stat.scalingValue} customScaling={stat.customScaling} showValue={showDetails} valuePosition={variant === 'main' ? 'lower' : 'center'} />
           )}
         </span>
       </div>
@@ -1574,7 +1656,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             className={cn(styles.secondAbilityToggle, isSecondAbilitySetEnabled && styles.secondAbilityToggleActive)}
             aria-label="Secondary Abilities"
             aria-pressed={isSecondAbilitySetEnabled}
-            onClick={() => onSecondAbilitySetToggle?.(true, syncAbilityNames(draftAbility))}
+            onClick={() => onSecondAbilitySetToggle?.(true, getCurrentDraftAbility())}
             >
               <span>2nd</span>
               <strong>Slots</strong>
@@ -1593,7 +1675,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
               if (!capabilities.canChangeIcons) {
                 if (target.set !== currentTarget.set || target.index !== currentTarget.index) {
-                  onAbilitySelect?.(target, syncAbilityNames(draftAbility))
+                  onAbilitySelect?.(target, getCurrentDraftAbility())
                 }
 
                 return
@@ -1604,16 +1686,16 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 return
               }
 
-              onAbilitySelect?.(target, syncAbilityNames(draftAbility))
+              onAbilitySelect?.(target, getCurrentDraftAbility())
             }}
-            onAbilitySwap={onAbilitySwap ? primaryIndex => onAbilitySwap(primaryIndex, syncAbilityNames(draftAbility)) : undefined}
+            onAbilitySwap={onAbilitySwap ? primaryIndex => onAbilitySwap(primaryIndex, getCurrentDraftAbility()) : undefined}
           />
         </>
       ) : null}
       <div className={cn(styles.editorLayout, isPreviewMode && previewLayout === 'browse' && styles.editorLayoutPreview)} data-ability-preview-panel={isPreviewMode ? 'true' : undefined}>
         {capabilities.canAddSections ? (
           <aside className={styles.sideTabs} aria-label="Append ability sections">
-          <button type="button" aria-label="Add sub-header stat" onClick={() => setActiveAbility(current => ({ ...current, subStats: [...current.subStats, createStat('Stat')] }), { cascadeToHigher: true })}>
+          <button type="button" aria-label="Add sub-header stat" aria-disabled={activeAbility.subStats.length >= ABILITY_SUB_STAT_MAX_COUNT} title={activeAbility.subStats.length >= ABILITY_SUB_STAT_MAX_COUNT ? getItemLimitMessage('Sub-header stats', ABILITY_SUB_STAT_MAX_COUNT) : undefined} onClick={addSubStat}>
             <Plus aria-hidden="true" />
           </button>
           <button type="button" onClick={() => addSection('richText')}>Text</button>
@@ -1634,7 +1716,17 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                 ) : null}
                 <label className={styles.nameInputWrap}>
                   <span className={styles.srOnly}>Ability Name</span>
-                  <input className={cn(isAbilityNameLong && styles.nameInputLong, isAbilityNameExtraLong && styles.nameInputExtraLong)} value={abilityName} placeholder="Ability name" readOnly={!capabilities.canEditText} tabIndex={capabilities.canEditText ? undefined : -1} onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)} />
+                  <input
+                    className={cn(isAbilityNameLong && styles.nameInputLong, isAbilityNameExtraLong && styles.nameInputExtraLong)}
+                    value={abilityName}
+                    placeholder="Ability name"
+                    maxLength={ABILITY_NAME_MAX_LENGTH}
+                    readOnly={!capabilities.canEditText}
+                    tabIndex={capabilities.canEditText ? undefined : -1}
+                    onKeyDown={!capabilities.canEditText ? undefined : event => notifyIfLimitedTextKeyDown(event, abilityName, ABILITY_NAME_MAX_LENGTH, 'Ability name', onBlockedAction)}
+                    onPaste={!capabilities.canEditText ? undefined : event => notifyIfLimitedTextPaste(event, abilityName, ABILITY_NAME_MAX_LENGTH, 'Ability name', onBlockedAction)}
+                    onChange={!capabilities.canEditText ? undefined : event => updateAbilityName(event.target.value)}
+                  />
                 </label>
               </div>
 
@@ -1706,7 +1798,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
                   {section.type === 'richText' ? (
                     <>
-                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }), { cascadeToHigher: true })} onInlineIcon={marker => openIconModal({ type: 'inlineIcon', sectionId: section.id, marker })} />
+                      <RichTextSection section={section} readOnly={!capabilities.canEditText} onTextChange={text => updateSection(section.id, current => ({ ...current, text }), { cascadeToHigher: true })} onInlineIcon={marker => openIconModal({ type: 'inlineIcon', sectionId: section.id, marker })} onBlockedAction={onBlockedAction} />
                     </>
                   ) : (
                     <GridSection
@@ -1721,6 +1813,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                       onLowerCellRemove={index => updateSection(section.id, current => current.type === 'grid' ? { ...current, lowerCells: current.lowerCells.filter((_, cellIndex) => cellIndex !== index) } : current, { cascadeToHigher: true })}
                       onMainIconClick={index => openIconModal({ type: 'mainCell', sectionId: section.id, index })}
                       onLowerIconClick={index => openIconModal({ type: 'lowerCell', sectionId: section.id, index })}
+                      onBlockedAction={onBlockedAction}
                     />
                   )}
                 </article>
@@ -1737,6 +1830,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             tierSystemRef={tierSystemRef}
             onTierSelect={selectTier}
             onTierTextChange={updateTierText}
+            onBlockedAction={onBlockedAction}
           />
         </div>
 
@@ -1747,7 +1841,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
             data-testid="ability-mode-toggle"
             data-placement="right"
             aria-pressed={isPreviewMode}
-            onClick={() => onModeToggle(syncAbilityNames(draftAbility))}
+            onClick={() => onModeToggle(getCurrentDraftAbility())}
           >
             {isPreviewMode ? 'Edit Mode' : 'Preview Mode'}
           </button>
@@ -1756,7 +1850,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
         <aside className={styles.returnPanel}>
           <p>{isPreviewMode ? 'Ability Preview' : 'Focused Ability Editor'}</p>
           <h2>{abilityName}</h2>
-          <button type="button" className={styles.saveReturnButton} onClick={() => isPreviewMode ? onCancel?.() : onSave?.(syncAbilityNames(draftAbility))}>
+          <button type="button" className={styles.saveReturnButton} onClick={() => isPreviewMode ? onCancel?.() : onSave?.(getCurrentDraftAbility())}>
             Go Back
           </button>
         </aside>
@@ -1775,9 +1869,14 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
       {iconTarget ? (
         <IconSearchModal
-          groups={filteredIconGroups}
+          groups={iconTarget.type === 'inlineIcon' ? abilityIconPickerGroups : filteredIconGroups}
+          statGroups={iconTarget.type === 'inlineIcon' ? filteredIconGroups : []}
           search={iconSearch}
           selectedIconColor={selectedIconColor}
+          title={iconTarget.type === 'inlineIcon' ? 'Inline icon selector' : 'Property icon selector'}
+          searchPlaceholder="Search property icons"
+          previewMode={iconTarget.type === 'inlineIcon' ? 'ability' : 'property'}
+          initialAbilityIconTab={iconTarget.type === 'inlineIcon' && abilityIconAssetGroups.length ? 'heroes' : 'stats'}
           onIconColorChange={applyIconColor}
           onSearch={setIconSearch}
           onSelect={applyIcon}
@@ -1807,12 +1906,12 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     </section>
   )
 }
-
 interface RichTextSectionProps {
   section: AbilityRichTextSection
   readOnly?: boolean
   onTextChange: (text: string) => void
   onInlineIcon: (marker: string) => void
+  onBlockedAction?: (message: string) => void
 }
 
 interface TierSelectorProps {
@@ -1824,9 +1923,10 @@ interface TierSelectorProps {
   tierSystemRef: RefObject<HTMLElement | null>
   onTierSelect: (tier: ActiveTier) => void
   onTierTextChange: (tier: AbilityTierLevel, text: string) => void
+  onBlockedAction?: (message: string) => void
 }
 
-function TierSelector({ activeTier, flashingTier, tiers, readOnly = false, canSwitchTiers = true, tierSystemRef, onTierSelect, onTierTextChange }: TierSelectorProps) {
+function TierSelector({ activeTier, flashingTier, tiers, readOnly = false, canSwitchTiers = true, tierSystemRef, onTierSelect, onTierTextChange, onBlockedAction }: TierSelectorProps) {
   return (
     <section className={styles.tierSystem} aria-label="Ability tiers" ref={tierSystemRef}>
       <div className={styles.tierBoxes}>
@@ -1885,6 +1985,7 @@ function TierSelector({ activeTier, flashingTier, tiers, readOnly = false, canSw
                 readOnly={readOnly}
                 onFocus={() => onTierSelect(tier)}
                 onTextChange={text => onTierTextChange(tier, text)}
+                onBlockedAction={onBlockedAction}
               />
             </article>
           )
@@ -1900,9 +2001,10 @@ interface TierTextEditorProps {
   readOnly?: boolean
   onFocus: () => void
   onTextChange: (text: string) => void
+  onBlockedAction?: (message: string) => void
 }
 
-function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }: TierTextEditorProps) {
+function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange, onBlockedAction }: TierTextEditorProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const lastTextRef = useRef('')
   const lastSelectionRef = useRef<Range | null>(null)
@@ -2070,7 +2172,11 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange }:
         data-empty={isEmpty ? 'true' : undefined}
         spellCheck
         onFocus={onFocus}
-        onKeyDown={readOnly ? undefined : event => event.stopPropagation()}
+        onKeyDown={readOnly ? undefined : event => {
+          event.stopPropagation()
+          notifyIfContentEditableTextKeyDown(event, text, ABILITY_TIER_TEXT_MAX_LENGTH, `Tier ${tier} upgrade text`, onBlockedAction)
+        }}
+        onPaste={readOnly ? undefined : event => notifyIfContentEditableTextPaste(event, text, ABILITY_TIER_TEXT_MAX_LENGTH, `Tier ${tier} upgrade text`, onBlockedAction)}
         onPointerUp={readOnly ? undefined : () => rememberSelection()}
         onMouseUp={readOnly ? undefined : () => rememberSelection()}
         onKeyUp={readOnly ? undefined : () => rememberSelection()}
@@ -2167,7 +2273,7 @@ function AbilityHeroInfoCluster({ hero, heroInfo, activeTarget, secondaryAbiliti
   )
 }
 
-function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon }: RichTextSectionProps) {
+function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon, onBlockedAction }: RichTextSectionProps) {
   const editorRef = useRef<HTMLDivElement | null>(null)
   const swatchMenuRef = useRef<HTMLDivElement | null>(null)
   const swatchButtonRef = useRef<HTMLButtonElement | null>(null)
@@ -2476,6 +2582,12 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
   }
 
   function handleEditorKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    notifyIfContentEditableTextKeyDown(event, section.text, ABILITY_RICH_TEXT_MAX_LENGTH, getRichTextAriaLabel(section), onBlockedAction)
+
+    if (event.defaultPrevented) {
+      return
+    }
+
     if (event.key !== 'Backspace' && event.key !== 'Delete') {
       return
     }
@@ -2650,6 +2762,13 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     }
 
     const marker = `${section.id}-${Date.now()}`
+    const markerToken = `[[inline-icon-marker:${marker}]]`
+
+    if (section.text.length - getEditableSelectionTextLength(editorRef.current) + markerToken.length > ABILITY_RICH_TEXT_MAX_LENGTH) {
+      onBlockedAction?.(getCharacterLimitMessage(getRichTextAriaLabel(section), ABILITY_RICH_TEXT_MAX_LENGTH))
+      return
+    }
+
     const markerElement = document.createElement('span')
 
     markerElement.className = styles.inlineIconPending
@@ -2776,6 +2895,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
         data-placeholder="Write ability text..."
         spellCheck
         onKeyDown={readOnly ? undefined : handleEditorKeyDown}
+        onPaste={readOnly ? undefined : event => notifyIfContentEditableTextPaste(event, section.text, ABILITY_RICH_TEXT_MAX_LENGTH, getRichTextAriaLabel(section), onBlockedAction)}
         onMouseDown={readOnly ? undefined : handleEditorMouseDown}
         onMouseUp={readOnly ? undefined : () => rememberSelection()}
         onKeyUp={readOnly ? undefined : () => rememberSelection()}
@@ -2801,15 +2921,34 @@ interface GridSectionProps {
   onLowerCellRemove: (index: number) => void
   onMainIconClick: (index: number) => void
   onLowerIconClick: (index: number) => void
+  onBlockedAction?: (message: string) => void
 }
 
-function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCell, onAddLowerCell, onMainCellChange, onLowerCellChange, onMainCellRemove, onLowerCellRemove, onMainIconClick, onLowerIconClick }: GridSectionProps) {
+function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCell, onAddLowerCell, onMainCellChange, onLowerCellChange, onMainCellRemove, onLowerCellRemove, onMainIconClick, onLowerIconClick, onBlockedAction }: GridSectionProps) {
+  function handleAddMainCell() {
+    if (section.mainCells.length >= ABILITY_MAIN_GRID_CELL_MAX_COUNT) {
+      onBlockedAction?.(getItemLimitMessage('Main grid cells', ABILITY_MAIN_GRID_CELL_MAX_COUNT))
+      return
+    }
+
+    onAddMainCell()
+  }
+
+  function handleAddLowerCell() {
+    if (section.lowerCells.length >= MAX_LOWER_GRID_CELLS) {
+      onBlockedAction?.(getItemLimitMessage('Lower grid cells', MAX_LOWER_GRID_CELLS))
+      return
+    }
+
+    onAddLowerCell()
+  }
+
   return (
     <div className={styles.gridEditor}>
       {!readOnly ? (
         <div className={styles.gridActions}>
-        <button type="button" onClick={onAddMainCell} disabled={section.mainCells.length >= 3}>Add Main Cell</button>
-        <button type="button" onClick={onAddLowerCell} disabled={section.lowerCells.length >= MAX_LOWER_GRID_CELLS}>Add Lower Cell</button>
+        <button type="button" onClick={handleAddMainCell} aria-disabled={section.mainCells.length >= ABILITY_MAIN_GRID_CELL_MAX_COUNT} title={section.mainCells.length >= ABILITY_MAIN_GRID_CELL_MAX_COUNT ? getItemLimitMessage('Main grid cells', ABILITY_MAIN_GRID_CELL_MAX_COUNT) : undefined}>Add Main Cell</button>
+        <button type="button" onClick={handleAddLowerCell} aria-disabled={section.lowerCells.length >= MAX_LOWER_GRID_CELLS} title={section.lowerCells.length >= MAX_LOWER_GRID_CELLS ? getItemLimitMessage('Lower grid cells', MAX_LOWER_GRID_CELLS) : undefined}>Add Lower Cell</button>
         </div>
       ) : null}
       <div
@@ -2829,6 +2968,9 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
                   placeholder="Detail"
                   readOnly={readOnly}
                   tabIndex={readOnly ? -1 : undefined}
+                  maxLength={ABILITY_STAT_LABEL_MAX_LENGTH}
+                  onKeyDown={readOnly ? undefined : event => notifyIfLimitedTextKeyDown(event, getMainCellTitleInputValue(cell), ABILITY_STAT_LABEL_MAX_LENGTH, 'Main cell title', onBlockedAction)}
+                  onPaste={readOnly ? undefined : event => notifyIfLimitedTextPaste(event, getMainCellTitleInputValue(cell), ABILITY_STAT_LABEL_MAX_LENGTH, 'Main cell title', onBlockedAction)}
                   onChange={readOnly ? undefined : event => onMainCellChange(index, { ...cell, label: event.target.value })}
                 />
               </label>
@@ -2856,190 +2998,6 @@ function GridSection({ section, readOnly = false, renderInlineStat, onAddMainCel
           ))}
         </div>
       ) : null}
-    </div>
-  )
-}
-
-interface IconSearchModalProps {
-  groups: EditorAssetGroup[]
-  statGroups?: EditorAssetGroup[]
-  search: string
-  selectedIconColor: string
-  title?: string
-  testId?: string
-  searchPlaceholder?: string
-  previewMode?: 'property' | 'image' | 'ability'
-  showColorPicker?: boolean
-  closeLabel?: string
-  onIconColorChange: (color: string) => void
-  onSearch: (search: string) => void
-  onSelect: (path: string) => void
-  onClose: () => void
-}
-
-function IconSearchModal({ groups, statGroups = [], search, selectedIconColor, title = 'Property icon selector', testId = 'property-icon-modal', searchPlaceholder = 'Search property icons', previewMode = 'property', showColorPicker = true, closeLabel = 'Close property icon selector', onIconColorChange, onSearch, onSelect, onClose }: IconSearchModalProps) {
-  const isAbilityPicker = previewMode === 'ability'
-  const [abilityIconTab, setAbilityIconTab] = useState('heroes')
-  const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
-  const squareIconOption = getSquareIconOption(squareIconSize)
-  const upgradeAbilityGroups = isAbilityPicker ? groups.filter(group => group.id.startsWith('ability-icons-upgrade')) : []
-  const heroAbilityGroups = isAbilityPicker ? groups.filter(group => !group.id.startsWith('ability-icons-upgrade')) : groups
-  const activeAbilityGroups = abilityIconTab === 'heroes'
-    ? heroAbilityGroups
-    : upgradeAbilityGroups.filter(group => group.id === abilityIconTab)
-  const showsAbilityIcons = isAbilityPicker && abilityIconTab !== 'stats'
-  const activeIconGroups = isAbilityPicker
-    ? abilityIconTab === 'stats' ? statGroups : activeAbilityGroups
-    : groups
-  const tabPanelLabelId = abilityIconTab === 'stats'
-    ? 'ability-icon-tab-stats'
-    : abilityIconTab === 'heroes'
-      ? 'ability-icon-tab-heroes'
-      : `ability-icon-tab-${abilityIconTab}`
-
-  function handleBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      onClose()
-    }
-  }
-
-  const renderIconButton = (asset: EditorAssetGroup['assets'][number], assetPreviewMode: 'property' | 'image' | 'ability' = previewMode) => (
-    <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => onSelect(asset.path)}>
-      <span
-        className={cn(
-          styles.iconPreview,
-          assetPreviewMode === 'ability' && styles.iconPreviewAbility,
-          assetPreviewMode === 'image' && styles.iconPreviewImage,
-          assetPreviewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor,
-        )}
-        aria-hidden="true"
-        style={
-          assetPreviewMode === 'image'
-            ? { backgroundImage: `url('${asset.path}')` }
-            : assetPreviewMode === 'ability'
-              ? getWhiteAbilityIconVisualStyle(asset.path)
-              : getPropertyIconVisualStyle(asset.path, selectedIconColor || '#ffffff')
-        }
-      />
-      {assetPreviewMode === 'ability' ? null : asset.label}
-    </button>
-  )
-
-  return (
-    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId} onPointerDown={handleBackdropPointerDown}>
-      <div className={cn(styles.iconModal, isAbilityPicker && styles.iconModalAbility)}>
-        <div className={styles.iconHeader}>
-          <label>
-            <Search aria-hidden="true" />
-            <input value={search} onChange={event => onSearch(event.target.value)} placeholder={searchPlaceholder} />
-          </label>
-          <button type="button" aria-label={closeLabel} onClick={onClose}><X aria-hidden="true" /></button>
-        </div>
-        {showColorPicker ? (
-          <section className={styles.iconColorPicker} aria-label="Icon color">
-            {ICON_COLOR_SWATCHES.map(swatch => (
-              <button
-                key={swatch.id}
-                type="button"
-                className={cn(styles.iconColorSwatch, selectedIconColor === swatch.value && styles.iconColorSwatchActive)}
-                style={swatch.value ? { backgroundColor: swatch.value } : undefined}
-                aria-label={`${swatch.label} icon color`}
-                aria-pressed={selectedIconColor === swatch.value}
-                onClick={() => onIconColorChange(swatch.value)}
-              >
-                {swatch.value ? null : 'Default'}
-              </button>
-            ))}
-          </section>
-        ) : null}
-        <section className={styles.squareIconPicker} aria-label="Square icon">
-          <button type="button" className={styles.squareIconSelect} aria-label="Use Square Icon" onClick={() => onSelect(getSquareIconToken(squareIconSize))}>
-            <span
-              className={styles.squareIconPreview}
-              aria-hidden="true"
-              style={{
-                width: squareIconOption.previewSize,
-                height: squareIconOption.previewSize,
-                backgroundColor: selectedIconColor || '#ffffff',
-              }}
-            />
-            <span>
-              <strong>Square Icon</strong>
-              <em>{squareIconOption.label}</em>
-            </span>
-          </button>
-          <div className={styles.iconSizePicker} aria-label="Square icon size">
-            {SQUARE_ICON_SIZE_OPTIONS.map(sizeOption => (
-              <button
-                key={sizeOption.id}
-                type="button"
-                className={cn(styles.iconSizeSwatch, squareIconSize === sizeOption.id && styles.iconSizeSwatchActive)}
-                aria-label={`${sizeOption.label} square icon size`}
-                aria-pressed={squareIconSize === sizeOption.id}
-                onClick={() => setSquareIconSize(sizeOption.id)}
-              >
-                <span aria-hidden="true" style={{ width: sizeOption.swatchSize, height: sizeOption.swatchSize }} />
-                <em>{sizeOption.label}</em>
-              </button>
-            ))}
-          </div>
-        </section>
-        {isAbilityPicker ? (
-          <div className={styles.iconTabs} role="tablist" aria-label="Ability icon categories">
-            <button
-              type="button"
-              id="ability-icon-tab-heroes"
-              role="tab"
-              aria-controls="ability-icon-tabpanel"
-              aria-selected={abilityIconTab === 'heroes'}
-              className={cn(abilityIconTab === 'heroes' && styles.iconTabActive)}
-              onClick={() => setAbilityIconTab('heroes')}
-            >
-              Hero abilities
-            </button>
-            {upgradeAbilityGroups.map(group => (
-              <button
-                key={group.id}
-                type="button"
-                id={`ability-icon-tab-${group.id}`}
-                role="tab"
-                aria-controls="ability-icon-tabpanel"
-                aria-selected={abilityIconTab === group.id}
-                className={cn(abilityIconTab === group.id && styles.iconTabActive)}
-                onClick={() => setAbilityIconTab(group.id)}
-              >
-                {group.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              id="ability-icon-tab-stats"
-              role="tab"
-              aria-controls="ability-icon-tabpanel"
-              aria-selected={abilityIconTab === 'stats'}
-              className={cn(abilityIconTab === 'stats' && styles.iconTabActive)}
-              onClick={() => setAbilityIconTab('stats')}
-            >
-              Stat icons
-            </button>
-          </div>
-        ) : null}
-        <div
-          className={cn(styles.iconGrid, showsAbilityIcons && styles.iconGridAbility)}
-          id={isAbilityPicker ? 'ability-icon-tabpanel' : undefined}
-          role={isAbilityPicker ? 'tabpanel' : undefined}
-          aria-labelledby={isAbilityPicker ? tabPanelLabelId : undefined}
-        >
-          {showsAbilityIcons
-            ? activeIconGroups.map(group => (
-                <div key={group.id} className={styles.iconAbilityGroup} role="group" aria-label={group.label}>
-                  <p className={styles.iconAbilityGroupTitle}>{group.label}</p>
-                  {group.assets.map(asset => renderIconButton(asset, 'ability'))}
-                </div>
-              ))
-            : activeIconGroups.flatMap(group => group.assets).map(asset => renderIconButton(asset, previewMode === 'ability' ? 'property' : previewMode))}
-        </div>
-      </div>
     </div>
   )
 }

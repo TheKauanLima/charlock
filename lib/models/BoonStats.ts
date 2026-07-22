@@ -1,6 +1,6 @@
 import { Schema, model, models, type Model, type Types } from 'mongoose'
 
-import type { IPanelStat } from './WeaponStats'
+import { customScalingSchema, type IPanelStat } from './WeaponStats'
 
 export interface IBoonStats {
   heroId: Types.ObjectId
@@ -23,8 +23,9 @@ const boonStatSchema = new Schema<IPanelStat>({
   unit: { type: String, default: '' },
   icon: { type: String, default: 'dot' },
   iconColor: { type: String, default: '' },
-  scaling: { type: String, enum: ['boon'], default: 'boon' },
+  scaling: { type: String, enum: ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'], default: 'boon' },
   scalingValue: { type: String, required: true },
+  customScaling: { type: customScalingSchema, default: undefined },
 }, { _id: false })
 
 const boonPanelVariantSchema = new Schema<IBoonPanelVariant>({

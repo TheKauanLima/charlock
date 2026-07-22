@@ -18,9 +18,12 @@ describe('Mongoose model schemas', () => {
   it('allows melee scaling on panel stats', () => {
     const scalingPath = statSchema.path('scaling')
 
-    expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee'])
+    expect(scalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'])
     expect(statSchema.path('iconColor')).toBeDefined()
     expect(statSchema.path('append')).toBeDefined()
+    expect(statSchema.path('customScaling.name')).toBeDefined()
+    expect(statSchema.path('customScaling.icon')).toBeDefined()
+    expect(statSchema.path('customScaling.color')).toBeDefined()
     expect(statSchema.options._id).toBe(false)
   })
 
@@ -33,6 +36,10 @@ describe('Mongoose model schemas', () => {
     expect(HeroInfo.schema.path('nameFontFamily')).toBeDefined()
     expect(HeroInfo.schema.path('nameFontWeight')).toBeDefined()
     expect(HeroInfo.schema.path('backstory')).toBeDefined()
+    expect(HeroInfo.schema.path('ability1Icon')).toHaveProperty('options.required', undefined)
+    expect(HeroInfo.schema.path('ability2Icon')).toHaveProperty('options.required', undefined)
+    expect(HeroInfo.schema.path('ability3Icon')).toHaveProperty('options.required', undefined)
+    expect(HeroInfo.schema.path('ability4Icon')).toHaveProperty('options.required', undefined)
   })
 
   it('stores ability editor sections with four required abilities', () => {
@@ -53,7 +60,8 @@ describe('Mongoose model schemas', () => {
     expect(AbilityStats.schema.path('heroId')).toBeDefined()
     expect(abilitiesPath).toBeDefined()
     expect(sectionTypePath).toHaveProperty('enumValues', ['richText', 'grid'])
-    expect(mainCellScalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon'])
+    expect(mainCellScalingPath).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'])
+    expect(AbilityStats.schema.path('abilities.sections.mainCells.customScaling.name')).toBeDefined()
     expect(mainCellIconColorPath).toBeDefined()
     expect(mainCellAppendPath).toBeDefined()
     expect(tierPath).toHaveProperty('enumValues', [1, 2, 3])
@@ -85,9 +93,10 @@ describe('Mongoose model schemas', () => {
     expect(BoonStats.schema.path('panels')).toBeDefined()
     expect(BoonStats.schema.path('panels.name')).toBeDefined()
     expect(BoonStats.schema.path('panels.stats')).toBeDefined()
-    expect(BoonStats.schema.path('stats.scaling')).toHaveProperty('enumValues', ['boon'])
-    expect(BoonStats.schema.path('panels.stats.scaling')).toHaveProperty('enumValues', ['boon'])
+    expect(BoonStats.schema.path('stats.scaling')).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'])
+    expect(BoonStats.schema.path('panels.stats.scaling')).toHaveProperty('enumValues', ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'])
     expect(BoonStats.schema.path('stats.scalingValue')).toBeDefined()
+    expect(BoonStats.schema.path('stats.customScaling.name')).toBeDefined()
     expect(BoonStats.schema.path('stats.iconColor')).toBeDefined()
     expect(BoonStats.schema.path('panels.stats.iconColor')).toBeDefined()
   })

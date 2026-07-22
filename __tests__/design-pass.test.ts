@@ -80,7 +80,7 @@ describe('design pass styles', () => {
     expect(focusShellRule).toMatch(/z-index:\s*360/)
     expect(abilityEditor).not.toMatch(/\.focusShell:not\(\.focusShellPreview\) \.focusBackdrop/)
     expect(abilityEditor).not.toMatch(/backdrop-filter:\s*blur\(1px\)/)
-    expect(iconBackdropRule).toMatch(/z-index:\s*2000/)
+    expect(iconBackdropRule).toMatch(/z-index:\s*30000/)
   })
 
   it('uses a full-height tabbed left pane for create editor settings', () => {

@@ -22,7 +22,7 @@ export function SaveFailureBanner({ reason, onRetry }: { reason: string; onRetry
   return (
     <div className={styles.failureBanner} role="alert">
       <AlertTriangle aria-hidden="true" />
-      <p>Save rejected by server node. Reason: {reason}</p>
+      <p>We could not save this draft. {reason}</p>
       <button type="button" onClick={onRetry}><RefreshCw aria-hidden="true" />Retry Save</button>
     </div>
   )
@@ -68,11 +68,18 @@ export function ConnectionStatus() {
   ) : null
 }
 
-export function SystemToast({ message, durationMs = 3200 }: { message: string; durationMs?: number }) {
-  return <TimedSystemToast key={message} message={message} durationMs={durationMs} />
+interface SystemToastProps {
+  message: string
+  durationMs?: number
+  variant?: 'info' | 'error'
+  position?: 'bottom' | 'top'
 }
 
-function TimedSystemToast({ message, durationMs }: { message: string; durationMs: number }) {
+export function SystemToast({ message, durationMs = 3200, variant = 'info', position = 'bottom' }: SystemToastProps) {
+  return <TimedSystemToast key={message} message={message} durationMs={durationMs} variant={variant} position={position} />
+}
+
+function TimedSystemToast({ message, durationMs, variant, position }: Required<SystemToastProps>) {
   const [visible, setVisible] = useState(true)
 
   useEffect(() => {
@@ -85,7 +92,13 @@ function TimedSystemToast({ message, durationMs }: { message: string; durationMs
     return null
   }
 
-  return createPortal(<p className={styles.toast} role="status">{message}</p>, document.body)
+  const toastClassName = [
+    styles.toast,
+    variant === 'error' ? styles.toastError : '',
+    position === 'top' ? styles.toastTop : '',
+  ].filter(Boolean).join(' ')
+
+  return createPortal(<p className={toastClassName} role={variant === 'error' ? 'alert' : 'status'}>{message}</p>, document.body)
 }
 
 export function ProfileLoadingSkeleton() {

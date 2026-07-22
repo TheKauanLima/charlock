@@ -7,8 +7,13 @@ export interface IPanelStat {
   append?: string
   icon: string
   iconColor?: string
-  scaling: 'none' | 'spirit' | 'courage' | 'melee' | 'boon'
+  scaling: 'none' | 'spirit' | 'courage' | 'melee' | 'boon' | 'custom'
   scalingValue: string
+  customScaling?: {
+    name: string
+    icon: string
+    color: string
+  }
   description?: string
 }
 
@@ -39,6 +44,12 @@ export interface IWeaponPanelVariant {
   stats: IPanelStat[]
 }
 
+export const customScalingSchema = new Schema<NonNullable<IPanelStat['customScaling']>>({
+  name: { type: String, required: true },
+  icon: { type: String, required: true },
+  color: { type: String, required: true },
+}, { _id: false })
+
 export const statSchema = new Schema<IPanelStat>({
   label: { type: String, required: true },
   value: { type: String, required: true },
@@ -48,10 +59,11 @@ export const statSchema = new Schema<IPanelStat>({
   iconColor: { type: String, default: '' },
   scaling: {
     type: String,
-    enum: ['none', 'spirit', 'courage', 'melee'],
+    enum: ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'],
     default: 'none',
   },
   scalingValue: { type: String, default: '0' },
+  customScaling: { type: customScalingSchema, default: undefined },
   description: { type: String },
 }, { _id: false })
 

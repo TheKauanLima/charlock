@@ -5,6 +5,7 @@ import type { CSSProperties, MouseEvent } from 'react'
 import { Plus } from 'lucide-react'
 
 import type { HeroDefinition } from '@/lib/hero-data'
+import { notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 
 import styles from './BackstoryModule.module.css'
 
@@ -14,6 +15,7 @@ interface BackstoryModuleProps {
   isEditable?: boolean
   onCreateFromHero?: () => void
   onBackstoryChange?: (value: string) => void
+  onBlockedAction?: (message: string) => void
 }
 
 type BackstoryStyle = CSSProperties & {
@@ -24,6 +26,7 @@ type BackstoryStyle = CSSProperties & {
 const BOOK_ICON_PATH = '/panorama/images/icons/icon_book.svg'
 const FALLBACK_BACKSTORY = 'No character backstory has been added yet.'
 const BACKSTORY_VISIBLE_ROWS = 15
+const BACKSTORY_MAX_LENGTH = 10000
 
 interface RgbColor {
   r: number
@@ -118,7 +121,7 @@ function getBackstoryAccentImage(hero: HeroDefinition) {
   return heroWithBackground.background || hero.render
 }
 
-export default function BackstoryModule({ hero, accentImageSrc, isEditable = false, onCreateFromHero, onBackstoryChange }: BackstoryModuleProps) {
+export default function BackstoryModule({ hero, accentImageSrc, isEditable = false, onCreateFromHero, onBackstoryChange, onBlockedAction }: BackstoryModuleProps) {
   const [isOpen, setIsOpen] = useState(false)
   const themeAccentColor = hero.heroInfo.abilityCircleColor || hero.heroInfo.tagColor
   const [sampledAccentColor, setSampledAccentColor] = useState<{ source: string; color: string } | null>(null)
@@ -320,6 +323,9 @@ export default function BackstoryModule({ hero, accentImageSrc, isEditable = fal
                 aria-label="Backstory"
                 className={`${styles.body} ${styles.bodyInput}`}
                 value={editableBackstory}
+                maxLength={BACKSTORY_MAX_LENGTH}
+                onKeyDown={event => notifyIfLimitedTextKeyDown(event, editableBackstory, BACKSTORY_MAX_LENGTH, 'Backstory', onBlockedAction)}
+                onPaste={event => notifyIfLimitedTextPaste(event, editableBackstory, BACKSTORY_MAX_LENGTH, 'Backstory', onBlockedAction)}
                 onChange={event => onBackstoryChange?.(event.target.value)}
                 rows={BACKSTORY_VISIBLE_ROWS}
                 wrap="soft"

@@ -28,8 +28,10 @@ import type { ICustomHero } from '@/lib/models/CustomHero'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
 import { normalizeVitalityStatsArray } from '@/components/panels/vitality-stats-mapper'
 import { buildBoonStatsArray } from '@/components/panels/boon-stats-mapper'
+import { normalizeCustomScaling } from '@/components/panels/scaling-utils'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
 import { enforceRateLimit } from '@/lib/rate-limit'
+import { getMissingAbilityIconSaveIssueMessages } from '@/lib/custom-hero-validation'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
 
 interface Actor {
@@ -153,8 +155,29 @@ function normalizeStatus(value: unknown): CustomHeroStatus {
   return value === 'published' ? 'published' : 'private'
 }
 
+function getPanelScaling(value: unknown): IPanelStat['scaling'] {
+  const scaling = getString(value)
+
+  return scaling === 'spirit' || scaling === 'courage' || scaling === 'melee' || scaling === 'boon' || scaling === 'custom'
+    ? scaling
+    : 'none'
+}
+
+function normalizeCustomPanelScaling(value: unknown): IPanelStat['customScaling'] | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  return normalizeCustomScaling({
+    name: getString(value.name),
+    icon: getString(value.icon),
+    color: getString(value.color),
+  })
+}
+
 function normalizePanelStat(value: unknown): IPanelStat {
   const record = isRecord(value) ? value : {}
+  const scaling = getPanelScaling(record.scaling)
 
   return {
     label: getString(record.label),
@@ -162,8 +185,10 @@ function normalizePanelStat(value: unknown): IPanelStat {
     unit: getString(record.unit),
     append: getString(record.append),
     icon: getString(record.icon, 'dot'),
-    scaling: ['spirit', 'courage', 'melee'].includes(getString(record.scaling)) ? getString(record.scaling) as IPanelStat['scaling'] : 'none',
-    scalingValue: ['spirit', 'courage', 'melee'].includes(getString(record.scaling)) ? getString(record.scalingValue, '0') : '0',
+    iconColor: getString(record.iconColor),
+    scaling,
+    scalingValue: scaling === 'none' ? '0' : getString(record.scalingValue, '0'),
+    ...(scaling === 'custom' ? { customScaling: normalizeCustomPanelScaling(record.customScaling) ?? normalizeCustomScaling() } : {}),
     ...(getString(record.description) ? { description: getString(record.description) } : {}),
   }
 }
@@ -180,13 +205,17 @@ function normalizeBoonStats(value: unknown) {
   const stats = Array.isArray(value) ? value.map(stat => {
     const record = isRecord(stat) ? stat : {}
 
+    const scaling = getPanelScaling(record.scaling)
+
     return {
       label: getString(record.label),
       value: getString(record.value, '0'),
       unit: '',
       icon: getString(record.icon, 'dot'),
-      scaling: getString(record.scaling) === 'boon' ? 'boon' as const : 'none' as const,
-      scalingValue: getString(record.scalingValue, '0'),
+      iconColor: getString(record.iconColor),
+      scaling,
+      scalingValue: scaling === 'none' ? '0' : getString(record.scalingValue, '0'),
+      ...(scaling === 'custom' ? { customScaling: normalizeCustomPanelScaling(record.customScaling) ?? normalizeCustomScaling() } : {}),
     }
   }).filter(stat => stat.label) : []
 
@@ -266,7 +295,6 @@ function normalizeSpiritPanels(value: unknown) {
 
 function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
   const record = isRecord(value) ? value : {}
-  const requiredIcon = (iconValue: unknown, fallback: string) => getString(iconValue) || fallback
 
   return {
     nameType: record.nameType === 'text' ? 'text' : 'image',
@@ -286,10 +314,10 @@ function normalizeHeroInfo(value: unknown): HeroInfoDefinition {
     tag1OffsetY: getNumber(record.tag1OffsetY, DEFAULT_HERO_INFO.tag1OffsetY),
     tag2OffsetY: getNumber(record.tag2OffsetY, DEFAULT_HERO_INFO.tag2OffsetY),
     tag3OffsetY: getNumber(record.tag3OffsetY, DEFAULT_HERO_INFO.tag3OffsetY),
-    ability1Icon: requiredIcon(record.ability1Icon, DEFAULT_HERO_INFO.ability1Icon),
-    ability2Icon: requiredIcon(record.ability2Icon, DEFAULT_HERO_INFO.ability2Icon),
-    ability3Icon: requiredIcon(record.ability3Icon, DEFAULT_HERO_INFO.ability3Icon),
-    ability4Icon: requiredIcon(record.ability4Icon, DEFAULT_HERO_INFO.ability4Icon),
+    ability1Icon: getString(record.ability1Icon),
+    ability2Icon: getString(record.ability2Icon),
+    ability3Icon: getString(record.ability3Icon),
+    ability4Icon: getString(record.ability4Icon),
     abilityCircleColor: getString(record.abilityCircleColor, DEFAULT_HERO_INFO.abilityCircleColor),
     abilityIconColor: getString(record.abilityIconColor, DEFAULT_HERO_INFO.abilityIconColor),
     backstory: getString(record.backstory),
@@ -312,6 +340,10 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
   const background = getString(heroRecord.background, render || DEFAULT_BACKGROUND)
   const renderPosition = normalizeRenderPosition(heroRecord.renderPosition)
   const heroInfo = normalizeHeroInfo(value.heroInfo)
+  const abilityStats = normalizeAbilityStats(abilityStatsRecord, {
+    displayName: name,
+    heroInfo,
+  })
 
   if (!name) {
     throw new CustomHeroError('Hero name is required', 400)
@@ -323,6 +355,12 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
 
   if (!render) {
     throw new CustomHeroError('Hero render is required', 400)
+  }
+
+  const missingAbilityIconMessages = getMissingAbilityIconSaveIssueMessages({ abilityStats })
+
+  if (missingAbilityIconMessages.length) {
+    throw new CustomHeroError(missingAbilityIconMessages.join(' '), 400)
   }
 
   return {
@@ -368,10 +406,7 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
       spiritPowerStat: normalizePanelStat(spiritRecord.spiritPowerStat),
       panels: normalizeSpiritPanels(spiritRecord.panels),
     },
-    abilityStats: normalizeAbilityStats(abilityStatsRecord, {
-      displayName: name,
-      heroInfo,
-    }),
+    abilityStats,
   }
 }
 

@@ -8,6 +8,7 @@ import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
 import type { PanelStat, StatsRow } from '@/components/panels/scaling-utils'
 import { buildPelletCountStat, buildWeaponStatsArray, PELLET_COUNT_LABEL } from '@/components/panels/weapon-stats-mapper'
+import { getCharacterLimitMessage, getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 import cn from '@/lib/utilsd'
 
 import styles from './WeaponPanel.module.css'
@@ -39,6 +40,7 @@ interface WeaponPanelProps {
   onWeaponMinRangeChange?: (value: string) => void
   onWeaponMaxRangeChange?: (value: string) => void
   onOpenWeaponAssetPicker?: () => void
+  onBlockedAction?: (message: string) => void
 }
 
 interface CompactStatElementProps extends PanelStat {
@@ -106,6 +108,10 @@ const BULLET_DAMAGE_TYPES = [
   { icon: 'damage_magic_color', label: 'Magic' },
   { icon: 'damage_melee_color', label: 'Melee' },
 ] as const
+const WEAPON_NAME_MAX_LENGTH = 120
+const WEAPON_DESCRIPTION_MAX_LENGTH = 3000
+const WEAPON_TAG_MAX_LENGTH = 80
+const WEAPON_TAG_MAX_COUNT = 20
 
 function getBulletDamageType(icon: string | undefined) {
   return BULLET_DAMAGE_TYPES.find(type => type.icon === icon) ?? BULLET_DAMAGE_TYPES[0]
@@ -136,7 +142,7 @@ const DEFAULT_WEAPON_STATS: PanelStat[] = [
 ]
 
 function normalizeStat(stat: PanelStat): PanelStat {
-  const scaling = normalizePanelScaling(stat.scaling ?? 'none', stat.scalingValue ?? '0')
+  const scaling = normalizePanelScaling(stat.scaling ?? 'none', stat.scalingValue ?? '0', stat.customScaling)
 
   return {
     ...stat,
@@ -216,10 +222,10 @@ function getIconStyle(icon: string | undefined, iconColor: string): CSSPropertie
   }
 }
 
-function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, openScalingAbove = false, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
+function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', customScaling, isEditable = false, showDetails = false, panelType, boundaryRef, openScalingPickerId = null, openScalingAbove = false, onChange, onOpenScalingPickerChange }: CompactStatElementProps) {
   const theme = PANEL_THEMES[panelType]
   const bulletDamageType = getBulletDamageType(icon)
-  const panelScaling = normalizePanelScaling(scaling, scalingValue)
+  const panelScaling = normalizePanelScaling(scaling, scalingValue, customScaling)
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
@@ -261,6 +267,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
           label={label}
           scaling={panelScaling.scaling}
           scalingValue={panelScaling.scalingValue}
+          customScaling={panelScaling.customScaling}
           boundaryRef={boundaryRef}
           menuPosition={openScalingAbove ? 'above' : 'below'}
           openPickerId={openScalingPickerId}
@@ -269,7 +276,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
           onOpenPickerChange={onOpenScalingPickerChange}
         />
       ) : (
-        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
+        <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} customScaling={panelScaling.customScaling} showValue={showDetails} position="raised" />
       )}
     </>
   )
@@ -325,6 +332,7 @@ export default function WeaponPanel({
   onWeaponMinRangeChange,
   onWeaponMaxRangeChange,
   onOpenWeaponAssetPicker,
+  onBlockedAction,
 }: WeaponPanelProps) {
   const panelRef = useRef<HTMLElement | null>(null)
   const theme = PANEL_THEMES[panelType]
@@ -348,22 +356,50 @@ export default function WeaponPanel({
       return
     }
 
+    if (editableTagDraft.completed.length >= WEAPON_TAG_MAX_COUNT && value.trim()) {
+      onBlockedAction?.(getItemLimitMessage('Weapon tags', WEAPON_TAG_MAX_COUNT))
+      return
+    }
+
+    if (value.length > WEAPON_TAG_MAX_LENGTH) {
+      onBlockedAction?.(getCharacterLimitMessage('Weapon tag', WEAPON_TAG_MAX_LENGTH))
+    }
+
     if (value.includes(',')) {
       const parts = value.split(',')
+      const incomingCompleted = parts.slice(0, -1).map(attribute => attribute.trim()).filter(Boolean)
+      const remainingSlots = WEAPON_TAG_MAX_COUNT - editableTagDraft.completed.length
+
+      if (incomingCompleted.length > remainingSlots) {
+        onBlockedAction?.(getItemLimitMessage('Weapon tags', WEAPON_TAG_MAX_COUNT))
+      }
+
+      if (incomingCompleted.some(attribute => attribute.length > WEAPON_TAG_MAX_LENGTH) || (parts.at(-1) ?? '').trimStart().length > WEAPON_TAG_MAX_LENGTH) {
+        onBlockedAction?.(getCharacterLimitMessage('Weapon tag', WEAPON_TAG_MAX_LENGTH))
+      }
+
       const nextCompleted = [
         ...editableTagDraft.completed,
-        ...parts.slice(0, -1).map(attribute => attribute.trim()).filter(Boolean),
-      ]
-      const nextActive = (parts.at(-1) ?? '').trimStart()
+        ...incomingCompleted.map(attribute => attribute.slice(0, WEAPON_TAG_MAX_LENGTH)),
+      ].slice(0, WEAPON_TAG_MAX_COUNT)
+      const nextActive = nextCompleted.length >= WEAPON_TAG_MAX_COUNT ? '' : (parts.at(-1) ?? '').trimStart().slice(0, WEAPON_TAG_MAX_LENGTH)
 
       onWeaponAttributesTextChange(serializeTagDraft(nextCompleted, nextActive, /,\s*$/.test(value)))
       return
     }
 
-    onWeaponAttributesTextChange(serializeTagDraft(editableTagDraft.completed, value, value === '' && editableTagDraft.completed.length > 0))
+    onWeaponAttributesTextChange(serializeTagDraft(editableTagDraft.completed, value.slice(0, WEAPON_TAG_MAX_LENGTH), value === '' && editableTagDraft.completed.length > 0))
   }
 
   function handleAttributeInputKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    notifyIfLimitedTextKeyDown(event, editableTagDraft.active, WEAPON_TAG_MAX_LENGTH, 'Weapon tag', onBlockedAction)
+
+    if (event.key.length === 1 && editableTagDraft.completed.length >= WEAPON_TAG_MAX_COUNT && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault()
+      onBlockedAction?.(getItemLimitMessage('Weapon tags', WEAPON_TAG_MAX_COUNT))
+      return
+    }
+
     if (event.key !== 'Backspace' || editableTagDraft.active || editableTagDraft.completed.length === 0 || !onWeaponAttributesTextChange) {
       return
     }
@@ -432,6 +468,9 @@ export default function WeaponPanel({
               type="text"
               className={styles.weaponNameInput}
               value={weaponName}
+              maxLength={WEAPON_NAME_MAX_LENGTH}
+              onKeyDown={event => notifyIfLimitedTextKeyDown(event, weaponName, WEAPON_NAME_MAX_LENGTH, 'Weapon name', onBlockedAction)}
+              onPaste={event => notifyIfLimitedTextPaste(event, weaponName, WEAPON_NAME_MAX_LENGTH, 'Weapon name', onBlockedAction)}
               onChange={event => onWeaponNameChange(event.target.value)}
               placeholder="Weapon name"
               aria-label="Weapon name"
@@ -451,6 +490,8 @@ export default function WeaponPanel({
                   type="text"
                   className={cn(styles.attribute, styles.attributeInput)}
                   value={editableTagDraft.active}
+                  maxLength={WEAPON_TAG_MAX_LENGTH}
+                  onPaste={event => notifyIfLimitedTextPaste(event, editableTagDraft.active, WEAPON_TAG_MAX_LENGTH, 'Weapon tag', onBlockedAction)}
                   onChange={event => handleAttributeInputChange(event.target.value)}
                   onKeyDown={handleAttributeInputKeyDown}
                   placeholder="TANK, BRAWLER, DEFENDER"
@@ -531,6 +572,9 @@ export default function WeaponPanel({
           <textarea
             className={styles.descriptionInput}
             value={weaponDesc}
+            maxLength={WEAPON_DESCRIPTION_MAX_LENGTH}
+            onKeyDown={event => notifyIfLimitedTextKeyDown(event, weaponDesc, WEAPON_DESCRIPTION_MAX_LENGTH, 'Weapon description', onBlockedAction)}
+            onPaste={event => notifyIfLimitedTextPaste(event, weaponDesc, WEAPON_DESCRIPTION_MAX_LENGTH, 'Weapon description', onBlockedAction)}
             onChange={event => onWeaponDescChange(event.target.value)}
             rows={getDescriptionRows(weaponDesc)}
             aria-label="Weapon description"

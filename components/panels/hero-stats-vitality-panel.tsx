@@ -85,8 +85,8 @@ function getIconStyle(icon = 'dot'): CSSProperties {
   }
 }
 
-function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', isBottom = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: VitalityStatCellProps) {
-  const panelScaling = normalizePanelScaling(scaling, scalingValue)
+function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none', scalingValue = '0', customScaling, isBottom = false, isEditable = false, showDetails = false, boundaryRef, openScalingPickerId = null, onChange, onOpenScalingPickerChange }: VitalityStatCellProps) {
+  const panelScaling = normalizePanelScaling(scaling, scalingValue, customScaling)
 
   function handleValueChange(event: ChangeEvent<HTMLInputElement>) {
     onChange?.({ value: event.target.value })
@@ -121,6 +121,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
             label={label}
             scaling={panelScaling.scaling}
             scalingValue={panelScaling.scalingValue}
+            customScaling={panelScaling.customScaling}
             boundaryRef={boundaryRef}
             openPickerId={openScalingPickerId}
             allowedScalingTypes={PANEL_SCALING_TYPES}
@@ -128,7 +129,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
             onOpenPickerChange={onOpenScalingPickerChange}
           />
         ) : (
-          <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} showValue={showDetails} position="raised" />
+          <ScalingValueEditor scaling={panelScaling.scaling} scalingValue={panelScaling.scalingValue} customScaling={panelScaling.customScaling} showValue={showDetails} position="raised" />
         )}
       </span>
     </>

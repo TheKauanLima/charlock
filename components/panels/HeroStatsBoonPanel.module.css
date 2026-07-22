@@ -274,6 +274,11 @@
   outline: none;
 }
 
+.addStatButton[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .iconPickerBackdrop {
   position: fixed;
   inset: 0;

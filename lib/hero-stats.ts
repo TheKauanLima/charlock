@@ -12,7 +12,7 @@ import SpiritStats from '@/lib/models/SpiritStats'
 import VitalityStats from '@/lib/models/VitalityStats'
 import WeaponStats from '@/lib/models/WeaponStats'
 import type { IPanelStat } from '@/lib/models/WeaponStats'
-import type { PanelStat } from '@/components/panels/scaling-utils'
+import { normalizeCustomScaling, type PanelStat } from '@/components/panels/scaling-utils'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildFallbackHeroStatsBySlug } from '@/lib/hero-stats-shared'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroInfoDefinition } from '@/lib/hero-data'
@@ -190,7 +190,7 @@ function buildStandardStat(definition: StandardStatDefinition, stat?: IPanelStat
   const icon = definition.label === 'Bullet Damage' && stat?.icon && bulletDamageIcons.includes(stat.icon)
     ? stat.icon
     : definition.icon
-  const scaling = stat?.scaling === 'boon' ? 'none' : stat?.scaling ?? 'none'
+  const scaling = stat?.scaling ?? 'none'
 
   return {
     label: definition.label,
@@ -199,6 +199,7 @@ function buildStandardStat(definition: StandardStatDefinition, stat?: IPanelStat
     icon,
     scaling,
     scalingValue: scaling === 'none' ? '0' : stat?.scalingValue ?? '0',
+    ...(scaling === 'custom' ? { customScaling: normalizeCustomScaling(stat?.customScaling) } : {}),
     ...(stat?.description || definition.description ? { description: stat?.description ?? definition.description } : {}),
   }
 }

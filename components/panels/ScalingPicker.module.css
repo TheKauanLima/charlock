@@ -67,12 +67,21 @@
   box-shadow: 0 0 12px rgb(153 255 214 / 28%);
 }
 
+.root[data-scaling="custom"] .button {
+  border-color: rgb(245 234 219 / 74%);
+  background: rgb(47 38 50 / 92%);
+  box-shadow: 0 0 12px rgb(245 234 219 / 22%);
+}
+
 .buttonIcon {
   width: 22px;
   height: 16px;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
 }
 
 .buttonNone {
@@ -110,7 +119,7 @@
 
 .typeRow {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
 }
 
@@ -181,12 +190,25 @@
   background: rgb(20 76 58 / 64%);
 }
 
+.typeCell[data-scaling="custom"] {
+  border-color: rgb(245 234 219 / 24%);
+}
+
+.typeCell[data-scaling="custom"]:hover,
+.typeCell[data-scaling="custom"].typeCellActive {
+  border-color: rgb(245 234 219 / 72%);
+  background: rgb(62 50 68 / 70%);
+}
+
 .typeIcon {
   width: 25px;
   height: 17px;
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
 }
 
 .valueRow {
@@ -211,6 +233,108 @@
 .valueRow input:focus {
   border-color: rgb(206 146 255 / 72%);
   outline: none;
+}
+
+.customFields {
+  display: grid;
+  gap: 7px;
+}
+
+.customNameRow {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  color: rgb(245 234 219 / 76%);
+  font-size: 0.62rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customNameRow input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgb(245 234 219 / 22%);
+  border-radius: 2px;
+  color: #fff7e7;
+  background: rgb(255 255 255 / 8%);
+  font-family: "Retail Demo", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.customNameRow input:focus {
+  border-color: rgb(206 146 255 / 72%);
+  outline: none;
+}
+
+.customControlRow {
+  display: grid;
+  grid-template-columns: 34px 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.customIconButton {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgb(245 234 219 / 28%);
+  border-radius: 2px;
+  background: rgb(255 255 255 / 7%);
+  cursor: pointer;
+}
+
+.customIconButton:hover,
+.customIconButton:focus-visible {
+  border-color: rgb(206 146 255 / 70%);
+  outline: none;
+}
+
+.customIconButton span {
+  width: 24px;
+  height: 24px;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+}
+
+.customColorInput input {
+  display: block;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgb(245 234 219 / 28%);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.customColorInput input:focus {
+  border-color: rgb(206 146 255 / 70%);
+  outline: none;
+}
+
+.customSwatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+
+.customSwatches button {
+  height: 22px;
+  border: 1px solid rgb(245 234 219 / 22%);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.customSwatches button[aria-pressed="true"] {
+  border-color: #fff7e7;
+  box-shadow: 0 0 0 1px rgb(206 146 255 / 58%);
 }
 
 .srOnly {

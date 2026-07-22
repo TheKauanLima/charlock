@@ -79,11 +79,25 @@ export function getNetworkRequestError(error: unknown, fallback: string): Client
 
 export function getUserFacingSaveError(message: string, code: ApiErrorCode = 'UNKNOWN_ERROR') {
   if (code === 'AUTH_REQUIRED' || code === 'FORBIDDEN') {
-    return 'Your session has expired. Sign in again, then retry; your draft is still saved locally.'
+    return 'Your sign-in session expired. Sign in again, then retry saving; your draft is still stored locally.'
+  }
+
+  if (code === 'RATE_LIMITED') {
+    return 'Too many save attempts were made in a short time. Wait about a minute, then retry saving.'
   }
 
   if (code === 'SERVER_ERROR') {
     return 'The server could not save your character. Your draft is safe; please retry.'
+  }
+
+  if (code === 'NETWORK_ERROR') {
+    return message === 'Network connection is offline.'
+      ? 'You are offline. Reconnect, then retry saving; your draft is still stored locally.'
+      : 'The network request failed. Check your connection, then retry saving.'
+  }
+
+  if (code === 'INVALID_REQUEST') {
+    return message || 'Some character fields need changes before this hero can be saved.'
   }
 
   if (/ability[1-4]Icon/i.test(message)) {

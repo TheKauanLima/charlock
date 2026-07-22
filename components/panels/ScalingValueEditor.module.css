@@ -36,6 +36,9 @@
   height: 24px;
   background-size: contain;
   background-repeat: no-repeat;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
 }
 
 .valueWrap {

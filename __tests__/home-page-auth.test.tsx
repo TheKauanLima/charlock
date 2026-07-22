@@ -58,6 +58,17 @@ describe('Home auth gate', () => {
     )
   })
 
+  it('passes a profile edit hero id into the hero grid', async () => {
+    authMock.mockResolvedValueOnce({ userId: 'user_123' })
+
+    render(await Home({ searchParams: Promise.resolve({ tab: 'create', heroId: 'hero_123' }) }))
+
+    expect(heroGridMock).toHaveBeenCalledWith(
+      expect.objectContaining({ initialTab: 'Create', initialHeroId: 'hero_123' }),
+      undefined,
+    )
+  })
+
   it('passes profile-menu tab routes into the hero grid', async () => {
     authMock.mockResolvedValue({ userId: 'user_123' })
 

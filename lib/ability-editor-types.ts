@@ -1,4 +1,5 @@
-import type { PanelStat, ScalingType } from '@/components/panels/scaling-utils'
+import { normalizeCustomScaling } from '@/components/panels/scaling-utils'
+import type { CustomScalingDefinition, PanelStat, ScalingType } from '@/components/panels/scaling-utils'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 
 export type AbilitySectionType = 'richText' | 'grid'
@@ -136,10 +137,24 @@ function getSecondaryAbilitySlotsFromConfig(config: SecondaryAbilitySlotConfig =
 }
 
 function getScaling(value: unknown): ScalingType {
-  return value === 'spirit' || value === 'courage' || value === 'melee' || value === 'boon' ? value : 'none'
+  return value === 'spirit' || value === 'courage' || value === 'melee' || value === 'boon' || value === 'custom' ? value : 'none'
+}
+
+function getCustomScaling(value: unknown): CustomScalingDefinition | undefined {
+  if (!isRecord(value)) {
+    return undefined
+  }
+
+  return normalizeCustomScaling({
+    name: getString(value.name),
+    icon: getString(value.icon),
+    color: getString(value.color),
+  })
 }
 
 function buildAbilityStat(value: Partial<AbilityStat> = {}): AbilityStat {
+  const scaling = getScaling(value.scaling)
+
   return {
     label: getString(value.label, 'Value'),
     value: getString(value.value, '0'),
@@ -147,8 +162,9 @@ function buildAbilityStat(value: Partial<AbilityStat> = {}): AbilityStat {
     append: getString(value.append),
     icon: getString(value.icon, DEFAULT_PROPERTY_ICON),
     iconColor: getString(value.iconColor),
-    scaling: getScaling(value.scaling),
+    scaling,
     scalingValue: getString(value.scalingValue, '0'),
+    ...(scaling === 'custom' ? { customScaling: normalizeCustomScaling(value.customScaling) } : {}),
     ...(value.description ? { description: value.description } : {}),
   }
 }
@@ -165,6 +181,7 @@ function normalizeAbilityStat(value: unknown, fallback: AbilityStat): AbilitySta
     iconColor: getString(record.iconColor, fallback.iconColor ?? ''),
     scaling: getScaling(record.scaling),
     scalingValue: getString(record.scalingValue, fallback.scalingValue),
+    customScaling: getCustomScaling(record.customScaling) ?? fallback.customScaling,
     description: getString(record.description),
   })
 }

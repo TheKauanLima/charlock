@@ -1,8 +1,8 @@
-export const SCALING_TYPES = ['none', 'spirit', 'courage', 'melee', 'boon'] as const
+export const SCALING_TYPES = ['none', 'spirit', 'courage', 'melee', 'boon', 'custom'] as const
 
 export type ScalingType = (typeof SCALING_TYPES)[number]
 
-export const PANEL_SCALING_TYPES = ['none', 'spirit', 'courage', 'melee'] as const satisfies readonly ScalingType[]
+export const PANEL_SCALING_TYPES = SCALING_TYPES
 
 export const SCALING_LABELS: Record<ScalingType, string> = {
   none: 'None',
@@ -10,11 +10,19 @@ export const SCALING_LABELS: Record<ScalingType, string> = {
   courage: 'Gun',
   melee: 'Melee',
   boon: 'Boon',
+  custom: 'Other',
+}
+
+export interface CustomScalingDefinition {
+  name: string
+  icon: string
+  color: string
 }
 
 export interface ScalingState {
   scaling: ScalingType
   scalingValue: string
+  customScaling?: CustomScalingDefinition
 }
 
 export interface PanelStat extends ScalingState {
@@ -37,13 +45,21 @@ export const SCALING_ICONS: Record<ScalingType, string | null> = {
   courage: '/icon/weapon_scaling.png',
   melee: '/icon/melee_scaling.png',
   boon: '/icon/boon_scaling.png',
+  custom: null,
 }
 
 export const SCALING_VALUE_COLORS: Record<Exclude<ScalingType, 'none'>, { fill: string; border: string }> = {
   boon: { fill: '#99ffd6', border: '#0f5b3d' },
+  custom: { fill: '#f5eadb', border: '#2b2230' },
   courage: { fill: '#de972d', border: '#322309' },
   melee: { fill: '#de972d', border: '#322309' },
   spirit: { fill: '#e1a0ff', border: '#2c1139' },
+}
+
+export const DEFAULT_CUSTOM_SCALING: CustomScalingDefinition = {
+  name: 'Other',
+  icon: '/panorama/images/icons/properties/spirit.svg',
+  color: '#f5eadb',
 }
 
 export const SCALING_VALUE_CONFIG = {
@@ -65,10 +81,33 @@ export function getNextScaling(currentScaling?: ScalingType | string | null): Sc
   return SCALING_TYPES[nextIndex]
 }
 
-export function normalizePanelScaling(scaling: ScalingType, scalingValue: string): ScalingState {
-  return scaling === 'boon'
-    ? { scaling: 'none', scalingValue: '0' }
-    : { scaling, scalingValue }
+export function normalizeCustomScaling(value?: Partial<CustomScalingDefinition> | null): CustomScalingDefinition {
+  const name = typeof value?.name === 'string' && value.name.trim()
+    ? value.name.trim()
+    : DEFAULT_CUSTOM_SCALING.name
+  const icon = typeof value?.icon === 'string' && value.icon.trim()
+    ? value.icon.trim()
+    : DEFAULT_CUSTOM_SCALING.icon
+  const color = typeof value?.color === 'string' && value.color.trim()
+    ? value.color.trim()
+    : DEFAULT_CUSTOM_SCALING.color
+
+  return { name, icon, color }
+}
+
+function normalizeCustomScalingDraft(value?: Partial<CustomScalingDefinition> | null): CustomScalingDefinition {
+  return {
+    ...normalizeCustomScaling(value),
+    ...(typeof value?.name === 'string' ? { name: value.name } : {}),
+  }
+}
+
+export function normalizePanelScaling(scaling: ScalingType, scalingValue: string, customScaling?: Partial<CustomScalingDefinition> | null): ScalingState {
+  return {
+    scaling,
+    scalingValue: scaling === 'none' ? '0' : scalingValue,
+    ...(scaling === 'custom' ? { customScaling: normalizeCustomScalingDraft(customScaling) } : {}),
+  }
 }
 
 export function formatPanelValue(value: string | number | null | undefined) {

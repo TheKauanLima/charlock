@@ -1,7 +1,12 @@
 import { z } from 'zod'
 
-const scalingSchema = z.enum(['none', 'spirit', 'courage', 'melee', 'boon'])
+const scalingSchema = z.enum(['none', 'spirit', 'courage', 'melee', 'boon', 'custom'])
 const stringOrNumberSchema = z.union([z.string(), z.number()])
+const customScalingSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  icon: z.string().trim().min(1).max(500),
+  color: z.string().trim().min(1).max(80),
+}).strict()
 const renderPositionSchema = z.object({
   x: z.number().min(-2000).max(2000),
   y: z.number().min(-2000).max(2000),
@@ -32,6 +37,7 @@ export const panelStatSchema = z.object({
   iconColor: z.string().max(80).optional(),
   scaling: scalingSchema.optional(),
   scalingValue: stringOrNumberSchema.optional(),
+  customScaling: customScalingSchema.optional(),
   description: z.string().max(1000).optional(),
 }).strict()
 

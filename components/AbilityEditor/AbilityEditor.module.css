@@ -1604,7 +1604,9 @@
   gap: 6px;
 }
 
-.gridActions button:disabled {
+.gridActions button:disabled,
+.gridActions button[aria-disabled='true'],
+.sideTabs button[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.42;
 }
@@ -2053,7 +2055,7 @@
 .iconBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: 30000;
   display: grid;
   place-items: center;
   padding: 22px;
@@ -2076,6 +2078,7 @@
 }
 
 .iconModalAbility {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   width: min(820px, calc(100vw - 44px));
 }
 
@@ -2281,26 +2284,32 @@
 }
 
 .iconGridAbility {
-  grid-template-columns: repeat(2, max-content);
+  grid-template-columns: repeat(2, minmax(0, max-content));
   align-items: start;
   justify-content: center;
   justify-items: center;
   column-gap: 34px;
-  row-gap: 14px;
+  row-gap: 20px;
   max-height: min(520px, calc(100dvh - 150px));
-  padding: 2px 6px 2px 2px;
+  padding: 8px 6px 2px 2px;
 }
 
 .iconTabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 38px;
+  padding-top: 2px;
   border-bottom: 1px solid rgb(205 142 255 / 22%);
 }
 
 .iconTabs button {
-  min-height: 34px;
-  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 11px;
   border: 1px solid transparent;
   border-bottom: 0;
   color: rgb(245 234 219 / 68%);
@@ -2324,16 +2333,20 @@
 
 .iconAbilityGroup {
   display: grid;
+  grid-template-rows: minmax(14px, auto) repeat(1, 72px);
   grid-template-columns: repeat(4, 72px);
-  gap: 10px;
+  gap: 8px 10px;
 }
 
 .iconAbilityGroupTitle {
   grid-column: 1 / -1;
-  margin: 0 0 -2px;
+  align-self: end;
+  min-height: 14px;
+  margin: 0;
   color: rgb(245 234 219 / 82%);
   font-size: 0.68rem;
   font-weight: 950;
+  line-height: 1.1;
   letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
