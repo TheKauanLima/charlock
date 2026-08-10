@@ -155,6 +155,16 @@
   line-height: 1.45;
 }
 
+.sessionStatus {
+  margin: 0;
+  padding: 24px 30px 30px;
+  color: rgba(255, 239, 215, 0.72);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .error {
   border: 1px solid rgba(254, 52, 53, 0.58);
   background: rgba(254, 52, 53, 0.1);

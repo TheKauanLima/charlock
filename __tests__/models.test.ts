@@ -48,6 +48,8 @@ describe('Mongoose model schemas', () => {
     const mainCellScalingPath = AbilityStats.schema.path('abilities.sections.mainCells.scaling')
     const mainCellIconColorPath = AbilityStats.schema.path('abilities.sections.mainCells.iconColor')
     const mainCellAppendPath = AbilityStats.schema.path('abilities.sections.mainCells.append')
+    const abilityIconColorPath = AbilityStats.schema.path('abilities.iconColor')
+    const tierAbilityIconColorPath = AbilityStats.schema.path('abilities.tiers.variant.iconColor')
     const tierPath = AbilityStats.schema.path('abilities.tiers.tier')
     const tierUpgradeTextPath = AbilityStats.schema.path('abilities.tiers.upgradeText')
     const tierVariantSectionsPath = AbilityStats.schema.path('abilities.tiers.variant.sections')
@@ -64,6 +66,8 @@ describe('Mongoose model schemas', () => {
     expect(AbilityStats.schema.path('abilities.sections.mainCells.customScaling.name')).toBeDefined()
     expect(mainCellIconColorPath).toBeDefined()
     expect(mainCellAppendPath).toBeDefined()
+    expect(abilityIconColorPath).toBeDefined()
+    expect(tierAbilityIconColorPath).toBeDefined()
     expect(tierPath).toHaveProperty('enumValues', [1, 2, 3])
     expect(tierUpgradeTextPath).toBeDefined()
     expect(tierVariantSectionsPath).toBeDefined()
@@ -138,6 +142,9 @@ describe('Mongoose model schemas', () => {
     expect(CustomHero.schema.path('reports')).toBeDefined()
     expect(CustomHero.schema.path('reports.reporterId')).toBeDefined()
     expect(CustomHero.schema.path('moderationStatus')).toHaveProperty('enumValues', ['clean', 'flagged', 'hidden'])
+    expect(CustomHero.schema.path('interactions')).toBeDefined()
+    expect(CustomHero.schema.path('interactions.0.lines.0.speakerSide')).toHaveProperty('enumValues', ['left', 'right'])
+    expect(CustomHero.schema.path('interactions.0.lines.0.text')).toHaveProperty('options.maxlength', 500)
   })
 
   it('stores social comments and follow relationships', () => {

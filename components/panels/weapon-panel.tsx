@@ -349,6 +349,7 @@ export default function WeaponPanel({
   const hasFalloffRange = weaponMinRange !== null || weaponMaxRange !== null || isEditable
   const editableAttributesText = weaponAttributesText ?? weaponAttributes.join(', ')
   const editableTagDraft = getEditableTagDraft(editableAttributesText)
+  const editableTagPlaceholder = editableTagDraft.completed.length ? '' : 'TANK, BRAWLER, DEFENDER'
   const [openScalingPickerId, setOpenScalingPickerId] = useState<string | null>(null)
 
   function handleAttributeInputChange(value: string) {
@@ -486,18 +487,22 @@ export default function WeaponPanel({
                     {attribute}
                   </span>
                 ))}
-                <input
-                  type="text"
-                  className={cn(styles.attribute, styles.attributeInput)}
-                  value={editableTagDraft.active}
-                  maxLength={WEAPON_TAG_MAX_LENGTH}
-                  onPaste={event => notifyIfLimitedTextPaste(event, editableTagDraft.active, WEAPON_TAG_MAX_LENGTH, 'Weapon tag', onBlockedAction)}
-                  onChange={event => handleAttributeInputChange(event.target.value)}
-                  onKeyDown={handleAttributeInputKeyDown}
-                  placeholder="TANK, BRAWLER, DEFENDER"
-                  aria-label="Weapon tags"
-                  style={{ width: `${Math.max(editableTagDraft.active.length + 3, editableTagDraft.completed.length ? 9 : 26)}ch` }}
-                />
+                <span
+                  className={cn(styles.attribute, styles.attributeInputSizer)}
+                  data-tag-input-value={editableTagDraft.active || editableTagPlaceholder}
+                >
+                  <input
+                    type="text"
+                    className={styles.attributeInput}
+                    value={editableTagDraft.active}
+                    maxLength={WEAPON_TAG_MAX_LENGTH}
+                    onPaste={event => notifyIfLimitedTextPaste(event, editableTagDraft.active, WEAPON_TAG_MAX_LENGTH, 'Weapon tag', onBlockedAction)}
+                    onChange={event => handleAttributeInputChange(event.target.value)}
+                    onKeyDown={handleAttributeInputKeyDown}
+                    placeholder={editableTagPlaceholder}
+                    aria-label="Weapon tags"
+                  />
+                </span>
               </div>
             ) : (
               weaponAttributes.map(attribute => (

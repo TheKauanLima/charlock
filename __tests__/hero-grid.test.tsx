@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from 'node:fs'
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -7,8 +8,19 @@ import userEvent from '@testing-library/user-event'
 
 import HeroGrid from '@/components/HeroGrid/HeroGrid'
 import { buildDefaultAbilityStats } from '@/lib/ability-editor-types'
+import type { CustomHeroSummary } from '@/lib/custom-hero-types'
 import { HEROES } from '@/lib/hero-data'
 import { buildHeroStatsSeed } from '@/lib/hero-stats-shared'
+
+const clerkState = vi.hoisted(() => ({
+  isLoaded: true,
+  isSignedIn: false,
+  user: null as { id: string } | null,
+}))
+
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => clerkState,
+}))
 
 vi.mock('next/image', () => ({
   default: (props: React.ImgHTMLAttributes<HTMLImageElement> & { fill?: boolean; priority?: boolean }) => {
@@ -72,7 +84,40 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.restoreAllMocks()
+  clerkState.isLoaded = true
+  clerkState.isSignedIn = false
+  clerkState.user = null
 })
+
+function buildCustomHero(id: string, displayName: string, overrides: Partial<CustomHeroSummary> = {}): CustomHeroSummary {
+  const createdAt = overrides.createdAt ?? '2026-01-01T00:00:00.000Z'
+
+  return {
+    ...HEROES[0],
+    id,
+    slug: id,
+    assetSlug: id,
+    displayName,
+    portrait: `https://example.com/${id}-portrait.png`,
+    render: `https://example.com/${id}-render.png`,
+    background: `https://example.com/${id}-background.png`,
+    heroInfo: {
+      ...HEROES[0].heroInfo,
+      nameValue: displayName,
+    },
+    creatorId: 'user_1',
+    status: 'private',
+    likesCount: 0,
+    likedByCurrentUser: false,
+    bookmarkedByCurrentUser: false,
+    allowCopies: true,
+    viewerCanEdit: true,
+    publishedAt: null,
+    createdAt,
+    updatedAt: createdAt,
+    ...overrides,
+  }
+}
 
 async function openEmptyCreateEditor(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Create' }))
@@ -89,7 +134,22 @@ async function confirmEditorExitSave(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('HeroGrid', () => {
-  it('opens on an unselected Cursed Concepts landing state with the primary top bar', () => {
+  it('keeps the desktop grid at eight columns and custom hero actions out of layout flow', () => {
+    const stylesheet = readFileSync('components/HeroGrid/HeroGrid.module.css', 'utf8')
+    const gridRule = stylesheet.match(/\.grid\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\)/)?.[0]
+    const selectActionsRule = stylesheet.match(/\.selectHeroActions\s*\{[^}]*position:\s*absolute/)?.[0]
+    const interactionModalRule = stylesheet.match(/\.interactionModalBackdrop\s*\{([^}]*)\}/)?.[1] ?? ''
+
+    expect(gridRule).toBeTruthy()
+    expect(selectActionsRule).toBeTruthy()
+    expect(interactionModalRule).toMatch(/position:\s*fixed/)
+    expect(interactionModalRule).toMatch(/place-items:\s*center/)
+    expect(interactionModalRule).toMatch(/background:\s*rgba\(0,\s*0,\s*0,\s*0\.82\)/)
+  })
+
+  it('shows logged-out users only the 38 official heroes on Select', () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+
     render(<HeroGrid />)
 
     expect(screen.getAllByTestId('hero-card')).toHaveLength(38)
@@ -111,6 +171,89 @@ describe('HeroGrid', () => {
     expect(within(topBar).getByRole('button', { name: 'Create' })).toBeInTheDocument()
     expect(within(topBar).getAllByRole('button')).toHaveLength(3)
     expect(within(topBar).queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('merges owned custom heroes into Select in exact case-insensitive alphabetical order with deterministic ties', async () => {
+    clerkState.isSignedIn = true
+    clerkState.user = { id: 'user_1' }
+    const newerAbrams = buildCustomHero('custom-abrams-new', 'abrams', {
+      createdAt: '2026-03-01T00:00:00.000Z',
+      portrait: 'https://example.com/newer-abrams.png',
+    })
+    const olderAbrams = buildCustomHero('custom-abrams-old', 'ABRAMS', {
+      createdAt: '2025-03-01T00:00:00.000Z',
+      portrait: 'https://example.com/older-abrams.png',
+    })
+    const customHeroes = [
+      buildCustomHero('zeta', 'zeta'),
+      newerAbrams,
+      buildCustomHero('aardvark', 'aardvark'),
+      olderAbrams,
+    ]
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({ heroes: customHeroes }))
+
+    render(<HeroGrid />)
+
+    await waitFor(() => expect(screen.getAllByTestId('hero-card')).toHaveLength(42))
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes?mine=true', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(screen.queryAllByTestId('hero-empty-slot')).toHaveLength(0)
+
+    const displayedNames = screen.getAllByTestId('hero-name-badge').map(badge => badge.textContent)
+    const expectedNames = [...HEROES.map(hero => hero.displayName), 'zeta', 'ABRAMS', 'aardvark', 'abrams']
+      .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }))
+    const doormanIndex = expectedNames.indexOf('The Doorman')
+
+    expectedNames.splice(doormanIndex, 1)
+    expectedNames.splice(expectedNames.indexOf('Drifter') + 1, 0, 'The Doorman')
+
+    expect(displayedNames).toEqual(expectedNames)
+    expect(displayedNames.indexOf('The Doorman')).toBe(displayedNames.indexOf('Drifter') + 1)
+    expect(HEROES.findIndex(hero => hero.slug === 'doorman')).toBe(HEROES.findIndex(hero => hero.slug === 'drifter') + 1)
+
+    const abramsCards = screen.getAllByRole('button', { name: /Select character Abrams/i })
+
+    expect(abramsCards).toHaveLength(3)
+    expect(within(abramsCards[0]).getByRole('img')).toHaveAttribute('src', HEROES[0].portrait)
+    expect(within(abramsCards[1]).getByRole('img')).toHaveAttribute('src', expect.stringContaining('older-abrams.png'))
+    expect(within(abramsCards[2]).getByRole('img')).toHaveAttribute('src', expect.stringContaining('newer-abrams.png'))
+  })
+
+  it('selects an owned custom hero and updates its stage render and info cluster', async () => {
+    const user = userEvent.setup()
+    const customHero = buildCustomHero('stage-custom', 'Stage Custom')
+    clerkState.isSignedIn = true
+    clerkState.user = { id: 'user_1' }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input)
+
+      if (url === '/api/heroes?mine=true') {
+        return Response.json({ heroes: [customHero] })
+      }
+
+      if (url === '/api/heroes/stage-custom/stats') {
+        return Response.json({
+          ...buildHeroStatsSeed(customHero),
+          abilityStats: buildDefaultAbilityStats(customHero),
+        })
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    render(<HeroGrid />)
+
+    await user.click(await screen.findByRole('button', { name: 'Select character Stage Custom' }))
+
+    expect(screen.getByTestId('hero-render-layer')).toHaveAccessibleName('Stage Custom background')
+    expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('stage-custom-background.png'))
+    expect(screen.getByTestId('editor-custom-render-layer')).toHaveAccessibleName('Stage Custom render')
+    expect(screen.getByTestId('editor-custom-render-layer')).toHaveAttribute('style', expect.stringContaining('stage-custom-render.png'))
+    expect(screen.getByTestId('hero-info-cluster')).toHaveTextContent('Stage Custom')
+    expect(screen.getByRole('button', { name: 'Edit Hero' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'View Stats' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create Copy' })).toBeInTheDocument()
+    expect(screen.getByTestId('select-hero-actions').className).toContain('selectHeroActions')
   })
 
   it('retracts the create settings rail and shifts the hero info preview left', async () => {
@@ -175,6 +318,7 @@ describe('HeroGrid', () => {
       within(editorNav).getByRole('tab', { name: 'Color settings' }),
       within(editorNav).getByRole('tab', { name: 'Image settings' }),
       within(editorNav).getByRole('button', { name: 'Open ability editor' }),
+      within(editorNav).getByRole('tab', { name: 'Interactions' }),
       within(editorNav).getByRole('tab', { name: 'Editor options' }),
       within(editorNav).getByRole('link', { name: 'Open profile' }),
     ]
@@ -222,6 +366,59 @@ describe('HeroGrid', () => {
 
     expect(screen.queryByTestId('hero-info-editor')).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'CURSED CONCEPTS' })).toBeInTheDocument()
+  })
+
+  it('opens interactions from the left editor rail while keeping the editor pane and selected background', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+
+    const editorNav = screen.getByRole('navigation', { name: 'Hero editor navigation' })
+    const backgroundLayer = screen.getByRole('img', { name: 'Selected editor background' })
+    const backgroundStyle = backgroundLayer.getAttribute('style')
+
+    expect(within(screen.getByTestId('hero-sidebar-tabs')).queryByRole('tab', { name: 'Interactions' })).not.toBeInTheDocument()
+
+    await user.click(within(editorNav).getByRole('tab', { name: 'Interactions' }))
+
+    expect(screen.getByTestId('interaction-creator')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-control-rail')).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel', { name: 'Interactions' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit NAME character backstory' })).toBeInTheDocument()
+    expect(backgroundLayer).toHaveAttribute('style', backgroundStyle)
+
+    await user.click(screen.getByRole('button', { name: 'Retract editor settings panel' }))
+
+    expect(screen.getByTestId('editor-control-rail')).toHaveAttribute('data-collapsed', 'true')
+    expect(screen.getByTestId('interaction-creator').className).toContain('creatorPaneCollapsed')
+  })
+
+  it('removes the interaction creator before opening the incompatible ability editor', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+
+    const editorNav = screen.getByRole('navigation', { name: 'Hero editor navigation' })
+    const interactionsTab = within(editorNav).getByRole('tab', { name: 'Interactions' })
+
+    await user.click(interactionsTab)
+
+    expect(screen.getByTestId('interaction-creator')).toBeInTheDocument()
+    expect(interactionsTab).toHaveAttribute('aria-selected', 'true')
+
+    await user.click(within(editorNav).getByRole('button', { name: 'Open ability editor' }))
+
+    expect(screen.queryByTestId('interaction-creator')).not.toBeInTheDocument()
+    expect(screen.getByTestId('ability-editor')).toBeInTheDocument()
+    expect(interactionsTab).toHaveAttribute('aria-selected', 'false')
+    expect(within(editorNav).getByRole('tab', { name: 'Text and font settings' })).toHaveAttribute('aria-selected', 'true')
+    expect(document.getElementById('editor-interactions-panel')).toHaveAttribute('hidden')
+    expect(document.getElementById('editor-interactions-panel')).not.toBeVisible()
   })
 
   it('closes and saves the focused ability editor when opening editor stat panels', async () => {
@@ -577,6 +774,36 @@ describe('HeroGrid', () => {
     await user.click(within(backgroundModal).getByRole('button', { name: 'Use Yamato' }))
 
     expect(screen.getByTestId('hero-render-layer')).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/backgrounds/yamato_bg_psd.png'))
+  })
+
+  it('saves and closes the focused ability editor before opening the background picker', async () => {
+    const user = userEvent.setup()
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.click(screen.getByRole('tab', { name: 'Image settings' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Background Saved Ability')
+    await user.click(screen.getByRole('button', { name: 'Text' }))
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+    richTextEditor.textContent = 'Saved before choosing a background'
+    fireEvent.input(richTextEditor)
+
+    await user.click(screen.getByTestId('editor-background-picker'))
+
+    expect(screen.queryByTestId('ability-editor')).not.toBeInTheDocument()
+    expect(screen.getByTestId('background-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('editor-preview-stage')).not.toHaveAttribute('aria-hidden')
+
+    await user.click(within(screen.getByTestId('background-modal')).getByRole('button', { name: 'Use Yamato' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Background Saved Ability')
+    expect(screen.getByRole('textbox', { name: 'Description rich text' })).toHaveTextContent('Saved before choosing a background')
   })
 
   it('uses the top create sidebar tab to replace the background with an existing hero render', async () => {
@@ -1410,6 +1637,78 @@ describe('HeroGrid', () => {
     expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
   })
 
+  it('manually saves the complete private draft immediately without waiting for autosave', async () => {
+    const user = userEvent.setup()
+    const abrams = HEROES[0]
+    const savedStats = buildHeroStatsSeed(abrams)
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== '/api/heroes' || init?.method !== 'POST') {
+        return Promise.resolve(Response.json(savedStats))
+      }
+
+      const payload = JSON.parse(String(init.body))
+
+      return Promise.resolve(Response.json({
+        hero: {
+          id: 'manually-saved-draft',
+          slug: 'manually-saved-draft',
+          assetSlug: 'manually-saved-draft',
+          displayName: payload.name,
+          portrait: payload.hero.portrait,
+          render: payload.hero.render,
+          background: payload.hero.background,
+          heroInfo: payload.heroInfo,
+          status: payload.status,
+          likesCount: 0,
+          likedByCurrentUser: false,
+          allowCopies: payload.allowCopies,
+          viewerCanEdit: true,
+          publishedAt: null,
+          createdAt: new Date('2026-08-06T12:00:00.000Z').toISOString(),
+          updatedAt: new Date('2026-08-06T12:00:00.000Z').toISOString(),
+          stats: {
+            heroInfo: payload.heroInfo,
+            boon: payload.boon,
+            weapon: payload.weapon,
+            vitality: payload.vitality,
+            spirit: payload.spirit,
+          },
+          abilityStats: payload.abilityStats,
+          interactions: payload.interactions,
+        },
+      }, { status: 201 }))
+    })
+
+    render(<HeroGrid />)
+
+    await openEmptyCreateEditor(user)
+    await user.clear(screen.getByLabelText('Boon stat 1 label'))
+    await user.type(screen.getByLabelText('Boon stat 1 label'), 'Manual Bonus')
+    await user.type(screen.getByPlaceholderText('Name this draft'), 'Manual Arc')
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Unsynced Manual Ability')
+    await user.click(screen.getByRole('button', { name: 'Save Draft Now' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', expect.objectContaining({ method: 'POST' })))
+
+    const saveCall = fetchMock.mock.calls.find(([input, init]) => String(input) === '/api/heroes' && init?.method === 'POST')
+    const requestBody = JSON.parse(String(saveCall?.[1]?.body)) as {
+      name: string
+      status: string
+      boon: { stats: Array<{ label: string }> }
+      abilityStats: { abilities: Array<{ name: string }> }
+    }
+
+    expect(requestBody).toMatchObject({
+      name: 'Manual Arc',
+      status: 'private',
+    })
+    expect(requestBody.boon.stats[0].label).toBe('Manual Bonus')
+    expect(requestBody.abilityStats.abilities[0].name).toBe('Unsynced Manual Ability')
+    expect(await screen.findByText('Draft saved to your profile.')).toBeInTheDocument()
+  })
+
   it('lets an owner confirm unpublishing a hero and returns it to private saves', async () => {
     const user = userEvent.setup()
     const abrams = HEROES[0]
@@ -1601,6 +1900,111 @@ describe('HeroGrid', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=new&limit=24&offset=0', expect.objectContaining({ signal: expect.any(AbortSignal) }))
     expect(fetchMock).toHaveBeenCalledWith('/api/heroes/published_hero_1/like', expect.objectContaining({ method: 'POST' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes/published_hero_1/copy', expect.objectContaining({ method: 'POST' })))
+  })
+
+  it('loads and displays every published interaction from the Browse tab', async () => {
+    const user = userEvent.setup()
+    const publishedHero = buildCustomHero('interaction_hero_1', 'Dialogue Keeper', {
+      status: 'published',
+      viewerCanEdit: false,
+      publishedAt: '2026-08-01T12:00:00.000Z',
+    })
+    const stats = buildHeroStatsSeed(publishedHero)
+    const detailedHero = {
+      ...publishedHero,
+      stats,
+      abilityStats: buildDefaultAbilityStats(publishedHero),
+      interactions: [
+        {
+          id: 'interaction-haze',
+          targetHeroId: 'haze',
+          targetHeroName: 'Haze',
+          title: 'A Quiet Warning',
+          lines: [
+            { id: 'line-3', speakerSide: 'right' as const, speakerHeroId: 'haze', text: 'You never saw me.', order: 0 },
+          ],
+          createdAt: '2026-08-02T12:00:00.000Z',
+          updatedAt: '2026-08-02T12:05:00.000Z',
+        },
+        {
+          id: 'interaction-apollo',
+          targetHeroId: 'apollo',
+          targetHeroName: 'Apollo',
+          title: 'Respect at the Bridge',
+          lines: [
+            { id: 'line-2', speakerSide: 'right' as const, speakerHeroId: 'apollo', text: 'Then prove it.', order: 1 },
+            { id: 'line-1', speakerSide: 'left' as const, speakerHeroId: publishedHero.id, text: 'Give me a fair fight.', order: 0 },
+          ],
+          createdAt: '2026-08-01T12:00:00.000Z',
+          updatedAt: '2026-08-01T12:05:00.000Z',
+        },
+      ],
+    }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input)
+
+      if (url === '/api/heroes?id=interaction_hero_1') {
+        return Promise.resolve(Response.json({ hero: detailedHero }))
+      }
+
+      if (url.includes('/stats')) {
+        return Promise.resolve(Response.json(stats))
+      }
+
+      return Promise.resolve(Response.json({
+        heroes: [publishedHero],
+        pagination: { limit: 24, offset: 0, total: 1, hasMore: false },
+      }))
+    })
+
+    render(<HeroGrid />)
+
+    await user.click(screen.getByRole('button', { name: 'Browse' }))
+    await user.click(await screen.findByRole('button', { name: 'View Dialogue Keeper interactions' }))
+
+    const viewer = await screen.findByRole('dialog', { name: 'Dialogue Keeper Interactions' })
+    const modal = screen.getByTestId('interaction-viewer-modal')
+    const conversationRail = within(viewer).getByRole('complementary', { name: 'Interactions ordered by character' })
+    const conversationButtons = within(conversationRail).getAllByRole('button')
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/heroes?id=interaction_hero_1')
+    expect(modal).toContainElement(viewer)
+    expect(screen.getByTestId('interaction-creator')).toHaveAttribute('data-read-only', 'true')
+    expect(conversationButtons.map(button => button.getAttribute('aria-label'))).toEqual([
+      'View Apollo interaction: Respect at the Bridge',
+      'View Haze interaction: A Quiet Warning',
+    ])
+    expect(within(viewer).getByRole('heading', { name: 'Respect at the Bridge' })).toBeInTheDocument()
+    const customHeroLine = within(viewer).getByRole('textbox', { name: 'Dialogue Keeper voiceline 1' })
+    const apolloLine = within(viewer).getByRole('textbox', { name: 'Apollo voiceline 2' })
+
+    expect(customHeroLine).toHaveValue('Give me a fair fight.')
+    expect(customHeroLine).toHaveAttribute('readonly')
+    expect(customHeroLine.className).toContain('voicelineInput')
+    expect(apolloLine).toHaveValue('Then prove it.')
+    expect(apolloLine.closest('li')?.querySelector('img')).toHaveAttribute('src', '/panorama/images/heroes/fencer_sm_psd.png')
+    expect(within(viewer).queryByRole('button', { name: /move line/i })).not.toBeInTheDocument()
+    expect(within(viewer).queryByRole('button', { name: /add .* line/i })).not.toBeInTheDocument()
+
+    await user.click(conversationButtons[1])
+
+    expect(within(viewer).getByRole('heading', { name: 'A Quiet Warning' })).toBeInTheDocument()
+    expect(within(viewer).getByRole('textbox', { name: 'Haze voiceline 1' })).toHaveValue('You never saw me.')
+
+    fireEvent.mouseDown(viewer)
+
+    expect(screen.getByRole('dialog', { name: 'Dialogue Keeper Interactions' })).toBeInTheDocument()
+
+    fireEvent.mouseDown(modal)
+
+    expect(screen.queryByRole('dialog', { name: 'Dialogue Keeper Interactions' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'View Dialogue Keeper interactions' }))
+    await screen.findByRole('dialog', { name: 'Dialogue Keeper Interactions' })
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog', { name: 'Dialogue Keeper Interactions' })).not.toBeInTheDocument()
   })
 
   it('uses broad browse sorting and loads the next result page', async () => {

@@ -189,6 +189,12 @@
   background: rgba(0, 0, 0, 0.4);
 }
 
+.topStats:has([data-scaling-value-overlay]),
+.powerSection:has([data-scaling-value-overlay]),
+.cell:has([data-scaling-value-overlay]) {
+  z-index: auto;
+}
+
 .topStats:has([data-scaling-picker-menu]),
 .powerSection:has([data-scaling-picker-menu]) {
   z-index: 10000;

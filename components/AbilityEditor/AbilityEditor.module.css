@@ -316,6 +316,18 @@
   z-index: 1;
 }
 
+/* An open main-cell picker must lift the entire upper grid above lower-cell
+   scaling controls. The main-cell override also beats the numbered preview
+   stacking rules above, keeping the menu as the top hit-testing layer. */
+.gridEditor:has(.mainCellGrid [data-scaling-picker-menu]) .mainCellGrid {
+  position: relative;
+  z-index: 12000;
+}
+
+.mainEditorColumnPreview .mainCellGrid > .mainCell:has([data-scaling-picker-menu]) {
+  z-index: 12001;
+}
+
 .mainEditorColumnPreview .mainCell {
   padding-top: 22px;
 }
@@ -2080,6 +2092,7 @@
 .iconModalAbility {
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
   width: min(820px, calc(100vw - 44px));
+  height: min(700px, calc(100dvh - 44px));
 }
 
 .iconHeader {
@@ -2144,6 +2157,73 @@
 .iconColorSwatchActive {
   border-color: rgb(255 255 255 / 86%);
   box-shadow: 0 0 0 1px rgb(198 127 255 / 42%);
+}
+
+.customIconColor {
+  display: inline-grid;
+  height: 28px;
+  grid-template-columns: 28px max-content max-content;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgb(205 142 255 / 34%);
+  background: rgb(255 255 255 / 9%);
+  padding: 0 8px 0 0;
+  color: #efe2ff;
+  cursor: pointer;
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customIconColor:focus-within {
+  border-color: rgb(255 255 255 / 86%);
+  box-shadow: 0 0 0 1px rgb(198 127 255 / 42%);
+}
+
+.customIconColor input {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.customIconColor input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.customIconColor input::-webkit-color-swatch {
+  border: 0;
+}
+
+.customIconColor code {
+  color: rgb(245 234 219 / 62%);
+  font-family: Consolas, monospace;
+  font-size: 0.62rem;
+  text-transform: lowercase;
+}
+
+.recentIconColors {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 1px solid rgb(205 142 255 / 22%);
+  padding-left: 8px;
+}
+
+.recentIconColors > span {
+  color: rgb(245 234 219 / 58%);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recentIconColors .iconColorSwatch {
+  width: 26px;
+  min-width: 26px;
+  padding: 0;
 }
 
 .squareIconPicker {
@@ -2290,8 +2370,9 @@
   justify-items: center;
   column-gap: 34px;
   row-gap: 20px;
-  max-height: min(520px, calc(100dvh - 150px));
-  padding: 8px 6px 2px 2px;
+  max-height: none;
+  padding: 8px 6px 28px 2px;
+  scroll-padding-bottom: 28px;
 }
 
 .iconTabs {

@@ -6,6 +6,25 @@ import type { ModerationStatus } from '@/lib/moderation-types'
 
 export type CustomHeroStatus = 'private' | 'published'
 export type CustomHeroSort = 'new' | 'liked' | 'trending'
+export type DialogueSpeakerSide = 'left' | 'right'
+
+export interface DialogueLine {
+  id: string
+  speakerSide: DialogueSpeakerSide
+  speakerHeroId: string
+  text: string
+  order: number
+}
+
+export interface HeroInteraction {
+  id: string
+  targetHeroId: string
+  targetHeroName: string
+  title: string
+  lines: DialogueLine[]
+  createdAt: string
+  updatedAt: string
+}
 
 export interface CustomHeroListFilters {
   status: CustomHeroStatus
@@ -44,6 +63,7 @@ export interface CustomHeroSavePayload {
   vitality: VitalityStatsPayload
   spirit: SpiritStatsPayload
   abilityStats: AbilityStatsPayload
+  interactions?: HeroInteraction[]
 }
 
 export interface CustomHeroSummary extends HeroDefinition {
@@ -59,6 +79,7 @@ export interface CustomHeroSummary extends HeroDefinition {
   viewerCanEdit: boolean
   moderationStatus?: ModerationStatus
   abilityStats?: AbilityStatsPayload
+  interactions?: HeroInteraction[]
   publishedAt: string | null
   createdAt: string
   updatedAt: string
@@ -67,4 +88,5 @@ export interface CustomHeroSummary extends HeroDefinition {
 export interface CustomHeroDetail extends CustomHeroSummary {
   stats: HeroStatsPayload
   abilityStats: AbilityStatsPayload
+  interactions: HeroInteraction[]
 }

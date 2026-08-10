@@ -229,12 +229,18 @@ function ProfileHeroGrid({
   emptyMessage,
   onUnbookmark,
   onDelete,
+  isSelectionMode = false,
+  selectedHeroIds = new Set<string>(),
+  onToggleSelection,
   pendingRemovalIds = new Set<string>(),
 }: {
   heroes: ProfileGridHero[]
   emptyMessage: string
   onUnbookmark?: (heroId: string) => void
   onDelete?: (hero: ProfileGridHero) => void
+  isSelectionMode?: boolean
+  selectedHeroIds?: Set<string>
+  onToggleSelection?: (heroId: string, shiftKey: boolean) => void
   pendingRemovalIds?: Set<string>
 }) {
   if (!heroes.length) {
@@ -251,16 +257,11 @@ function ProfileHeroGrid({
 
   return (
     <div className={`${heroGridStyles.grid} ${styles.cardGrid}`}>
-      {heroes.map(hero => (
-        <article
-          key={hero.id}
-          className={`${heroGridStyles.browseCard} ${styles.profileHeroCard} ${pendingRemovalIds.has(hero.id) ? styles.removingCard : ''}`}
-        >
-          <Link
-            href={hero.href}
-            className={heroGridStyles.heroCard}
-            aria-label={`Open character ${hero.name}`}
-          >
+      {heroes.map(hero => {
+        const isSelected = selectedHeroIds.has(hero.id)
+        const isPending = pendingRemovalIds.has(hero.id)
+        const cardContent = (
+          <>
             <span className={heroGridStyles.heroBacker} />
             <span className={heroGridStyles.browseBackground} style={{ backgroundImage: `url('${hero.background}')` }} aria-hidden="true" />
             <span className={heroGridStyles.heroPortraitWrap}>
@@ -279,41 +280,74 @@ function ProfileHeroGrid({
             <span className={heroGridStyles.heroNameBadge} aria-hidden="true">
               {hero.name}
             </span>
+            {isSelectionMode ? (
+              <span className={`${styles.heroSelectionIndicator} ${isSelected ? styles.heroSelectionIndicatorActive : ''}`} aria-hidden="true">
+                {isSelected ? <Check size={18} /> : null}
+              </span>
+            ) : null}
             {hero.restricted ? (
               <span className={styles.restrictedCardMessage} role="status">
                 ALERT: This character has been temporarily restricted due to safety reports and is undergoing review.
               </span>
             ) : null}
-          </Link>
-          {onUnbookmark ? (
-            <button
-              type="button"
-              className={styles.cardIconButton}
-              onClick={() => onUnbookmark(hero.id)}
-              aria-label={`Remove bookmark for ${hero.name}`}
-              disabled={pendingRemovalIds.has(hero.id)}
-            >
-              <BookmarkX aria-hidden="true" size={16} />
-            </button>
-          ) : null}
-          {onDelete ? (
-            <button
-              type="button"
-              className={`${styles.cardIconButton} ${styles.cardDeleteButton}`}
-              onClick={event => {
-                event.preventDefault()
-                event.stopPropagation()
-                onDelete(hero)
-              }}
-              aria-label={`Delete character ${hero.name}`}
-              title={`Delete ${hero.name}`}
-              disabled={pendingRemovalIds.has(hero.id)}
-            >
-              <X aria-hidden="true" size={18} />
-            </button>
-          ) : null}
-        </article>
-      ))}
+          </>
+        )
+
+        return (
+          <article
+            key={hero.id}
+            className={`${heroGridStyles.browseCard} ${styles.profileHeroCard} ${isSelected ? styles.profileHeroCardSelected : ''} ${isPending ? styles.removingCard : ''}`}
+          >
+            {isSelectionMode && onToggleSelection ? (
+              <button
+                type="button"
+                className={`${heroGridStyles.heroCard} ${styles.heroSelectionCard}`}
+                aria-label={`${isSelected ? 'Deselect' : 'Select'} character ${hero.name}`}
+                aria-pressed={isSelected}
+                onClick={event => onToggleSelection(hero.id, event.shiftKey)}
+                disabled={isPending}
+              >
+                {cardContent}
+              </button>
+            ) : (
+              <Link
+                href={hero.href}
+                className={heroGridStyles.heroCard}
+                aria-label={`Open character ${hero.name}`}
+              >
+                {cardContent}
+              </Link>
+            )}
+            {onUnbookmark ? (
+              <button
+                type="button"
+                className={styles.cardIconButton}
+                onClick={() => onUnbookmark(hero.id)}
+                aria-label={`Remove bookmark for ${hero.name}`}
+                disabled={isPending}
+              >
+                <BookmarkX aria-hidden="true" size={16} />
+              </button>
+            ) : null}
+            {onDelete && !isSelectionMode ? (
+              <button
+                type="button"
+                className={`${styles.cardIconButton} ${styles.cardDeleteButton}`}
+                onClick={event => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onDelete(hero)
+                }}
+                aria-label={`Delete character ${hero.name}`}
+                title={`Delete ${hero.name}`}
+                disabled={isPending}
+              >
+                <X aria-hidden="true" size={18} />
+              </button>
+            ) : null}
+          </article>
+        )
+      })}
     </div>
   )
 }
@@ -352,6 +386,47 @@ function DeleteHeroConfirmation({ hero, isPending, error, onCancel, onConfirm }:
           <button type="button" className={styles.deleteHeroConfirmButton} onClick={onConfirm} disabled={isPending}>
             <Trash2 aria-hidden="true" size={15} />
             {isPending ? 'Deleting Character...' : 'Permanently Delete'}
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function BulkDeleteHeroConfirmation({ count, isPending, error, onCancel, onConfirm }: {
+  count: number
+  isPending: boolean
+  error: string | null
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className={styles.modalBackdrop} role="presentation" onClick={() => { if (!isPending) onCancel() }}>
+      <section
+        className={styles.deleteHeroModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-delete-heroes-title"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className={styles.backgroundModalHeader}>
+          <div>
+            <p id="bulk-delete-heroes-title">Delete {count} characters?</p>
+            <span>Permanent bulk database deletion</span>
+          </div>
+          <button type="button" className={styles.modalCloseButton} onClick={onCancel} aria-label="Close bulk hero deletion confirmation" disabled={isPending}>
+            <X aria-hidden="true" size={16} />
+          </button>
+        </div>
+        <p className={styles.deleteHeroWarning}>
+          This permanently removes every selected character and all associated stats, abilities, comments, likes, and bookmarks. This action cannot be undone.
+        </p>
+        {error ? <p className={styles.deleteHeroError} role="alert">{error}</p> : null}
+        <div className={styles.backgroundModalActions}>
+          <button type="button" className={styles.backgroundCancelButton} onClick={onCancel} disabled={isPending}>Cancel</button>
+          <button type="button" className={styles.deleteHeroConfirmButton} onClick={onConfirm} disabled={isPending}>
+            <Trash2 aria-hidden="true" size={15} />
+            {isPending ? `Deleting ${count} Characters...` : `Permanently Delete ${count} Characters`}
           </button>
         </div>
       </section>
@@ -785,6 +860,12 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   const [heroPendingDeletion, setHeroPendingDeletion] = useState<ProfileGridHero | null>(null)
   const [pendingDeleteHeroId, setPendingDeleteHeroId] = useState<string | null>(null)
   const [heroDeleteError, setHeroDeleteError] = useState<string | null>(null)
+  const [isHeroSelectionMode, setIsHeroSelectionMode] = useState(false)
+  const [selectedHeroIds, setSelectedHeroIds] = useState<Set<string>>(new Set())
+  const [selectionAnchorHeroId, setSelectionAnchorHeroId] = useState<string | null>(null)
+  const [isBulkDeleteConfirmationOpen, setIsBulkDeleteConfirmationOpen] = useState(false)
+  const [isBulkDeletePending, setIsBulkDeletePending] = useState(false)
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [bookmarkSort, setBookmarkSort] = useState<BookmarkSort>('newest')
   const [bookmarkRoleFilter, setBookmarkRoleFilter] = useState<BookmarkRoleFilter>('all')
   const [bookmarkCreatorFilter, setBookmarkCreatorFilter] = useState<BookmarkCreatorFilter>('all')
@@ -811,6 +892,13 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     () => getSortedBookmarkCards(bookmarkCards, bookmarkSort, bookmarkRoleFilter, bookmarkCreatorFilter),
     [bookmarkCards, bookmarkCreatorFilter, bookmarkRoleFilter, bookmarkSort],
   )
+  const pendingHeroRemovalIds = useMemo(() => {
+    if (isBulkDeletePending) {
+      return selectedHeroIds
+    }
+
+    return pendingDeleteHeroId ? new Set([pendingDeleteHeroId]) : new Set<string>()
+  }, [isBulkDeletePending, pendingDeleteHeroId, selectedHeroIds])
   const themeStyle: ProfileStyle = {
     '--profile-accent': profileBackground.accent,
     '--profile-name': profileBackground.nameColor,
@@ -989,6 +1077,14 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
   }, [activePanel, fetchNotifications, notificationsStatus])
 
   function handlePanelSelect(panel: ProfilePanel) {
+    if (panel !== 'saved') {
+      setIsHeroSelectionMode(false)
+      setSelectedHeroIds(new Set())
+      setSelectionAnchorHeroId(null)
+      setIsBulkDeleteConfirmationOpen(false)
+      setBulkDeleteError(null)
+    }
+
     startPanelTransition(() => setActivePanel(panel))
 
     const hash = panel === 'saved' ? 'characters-created' : panel
@@ -1218,6 +1314,137 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
     setHeroPendingDeletion(hero)
   }
 
+  function applyDeletedHeroes(heroIds: Set<string>) {
+    setCreatedHeroCards(previous => previous.filter(card => !heroIds.has(card.id)))
+    setBookmarkCards(previous => previous.filter(card => !heroIds.has(card.id)))
+    setDeletedHeroIds(previous => new Set([...previous, ...heroIds]))
+
+    const selectedBackgroundHeroId = savedProfileBackground.id.startsWith('custom:')
+      ? savedProfileBackground.id.slice('custom:'.length)
+      : null
+
+    if (selectedBackgroundHeroId && heroIds.has(selectedBackgroundHeroId)) {
+      const fallbackBackground: ProfileBackgroundVisual = {
+        id: `official:${data.preferredHero.slug}`,
+        label: data.preferredHero.displayName,
+        render: data.preferredHero.render,
+        accent: data.preferredHero.heroInfo.tagColor,
+        nameColor: data.preferredHero.heroInfo.nameColor,
+      }
+
+      setSavedProfileBackground(fallbackBackground)
+      setProfileBackground(fallbackBackground)
+    }
+  }
+
+  function openHeroSelectionMode() {
+    setHeroDeleteError(null)
+    setSelectedHeroIds(new Set())
+    setSelectionAnchorHeroId(null)
+    setIsHeroSelectionMode(true)
+  }
+
+  function closeHeroSelectionMode() {
+    if (isBulkDeletePending) return
+
+    setIsHeroSelectionMode(false)
+    setSelectedHeroIds(new Set())
+    setSelectionAnchorHeroId(null)
+    setIsBulkDeleteConfirmationOpen(false)
+    setBulkDeleteError(null)
+  }
+
+  function toggleHeroSelection(heroId: string, shiftKey: boolean) {
+    if (isBulkDeletePending) return
+
+    const heroIndex = createdHeroCards.findIndex(hero => hero.id === heroId)
+    const anchorIndex = selectionAnchorHeroId
+      ? createdHeroCards.findIndex(hero => hero.id === selectionAnchorHeroId)
+      : -1
+
+    setSelectedHeroIds(previous => {
+      const next = new Set(previous)
+
+      if (shiftKey && anchorIndex >= 0 && heroIndex >= 0) {
+        const rangeStart = Math.min(anchorIndex, heroIndex)
+        const rangeEnd = Math.max(anchorIndex, heroIndex)
+
+        createdHeroCards.slice(rangeStart, rangeEnd + 1).forEach(hero => next.add(hero.id))
+        return next
+      }
+
+      if (next.has(heroId)) {
+        next.delete(heroId)
+      } else {
+        next.add(heroId)
+      }
+
+      return next
+    })
+
+    if (!shiftKey || anchorIndex < 0 || heroIndex < 0) {
+      setSelectionAnchorHeroId(heroId)
+    }
+  }
+
+  function selectAllCreatedHeroes() {
+    setSelectedHeroIds(new Set(createdHeroCards.map(hero => hero.id)))
+    setSelectionAnchorHeroId(null)
+  }
+
+  function clearHeroSelection() {
+    setSelectedHeroIds(new Set())
+    setSelectionAnchorHeroId(null)
+  }
+
+  function openBulkDeleteConfirmation() {
+    if (!selectedHeroIds.size) return
+
+    setBulkDeleteError(null)
+    setIsBulkDeleteConfirmationOpen(true)
+  }
+
+  function closeBulkDeleteConfirmation() {
+    if (isBulkDeletePending) return
+
+    setBulkDeleteError(null)
+    setIsBulkDeleteConfirmationOpen(false)
+  }
+
+  async function handleBulkDeleteHeroes() {
+    const heroIds = [...selectedHeroIds]
+
+    if (!heroIds.length) return
+
+    setIsBulkDeletePending(true)
+    setBulkDeleteError(null)
+
+    try {
+      const response = await fetch('/api/heroes', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: heroIds }),
+      })
+      const body = await response.json() as { ids?: string[]; deletedCount?: number; error?: string }
+
+      if (!response.ok || !body.ids || body.deletedCount !== body.ids.length) {
+        throw new Error(body.error || `Bulk hero deletion failed with ${response.status}`)
+      }
+
+      applyDeletedHeroes(new Set(body.ids))
+      setSelectedHeroIds(new Set())
+      setSelectionAnchorHeroId(null)
+      setIsBulkDeleteConfirmationOpen(false)
+      setIsHeroSelectionMode(false)
+    } catch (error) {
+      setBulkDeleteError(error instanceof Error ? error.message : 'Unable to delete the selected characters.')
+    } finally {
+      setIsBulkDeletePending(false)
+    }
+  }
+
   function closeDeleteHeroConfirmation() {
     if (pendingDeleteHeroId) return
 
@@ -1246,22 +1473,7 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
         throw new Error(body.error || `Hero deletion failed with ${response.status}`)
       }
 
-      setCreatedHeroCards(previous => previous.filter(card => card.id !== hero.id))
-      setBookmarkCards(previous => previous.filter(card => card.id !== hero.id))
-      setDeletedHeroIds(previous => new Set(previous).add(hero.id))
-
-      if (savedProfileBackground.id === `custom:${hero.id}`) {
-        const fallbackBackground: ProfileBackgroundVisual = {
-          id: `official:${data.preferredHero.slug}`,
-          label: data.preferredHero.displayName,
-          render: data.preferredHero.render,
-          accent: data.preferredHero.heroInfo.tagColor,
-          nameColor: data.preferredHero.heroInfo.nameColor,
-        }
-
-        setSavedProfileBackground(fallbackBackground)
-        setProfileBackground(fallbackBackground)
-      }
+      applyDeletedHeroes(new Set([hero.id]))
 
       setHeroPendingDeletion(null)
     } catch (error) {
@@ -1357,6 +1569,24 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                     <p>Characters Created</p>
                     <span>{createdHeroCards.length} total</span>
                   </div>
+                  {data.viewerIsOwner && createdHeroCards.length ? (
+                    <div className={styles.bulkHeroToolbar} aria-label="Created character selection controls">
+                      {isHeroSelectionMode ? (
+                        <>
+                          <span>{selectedHeroIds.size} selected</span>
+                          <button type="button" onClick={selectAllCreatedHeroes} disabled={selectedHeroIds.size === createdHeroCards.length || isBulkDeletePending}>Select All</button>
+                          <button type="button" onClick={clearHeroSelection} disabled={!selectedHeroIds.size || isBulkDeletePending}>Clear</button>
+                          <button type="button" className={styles.bulkDeleteButton} onClick={openBulkDeleteConfirmation} disabled={!selectedHeroIds.size || isBulkDeletePending}>
+                            <Trash2 aria-hidden="true" size={15} />
+                            Delete Selected ({selectedHeroIds.size})
+                          </button>
+                          <button type="button" onClick={closeHeroSelectionMode} disabled={isBulkDeletePending}>Cancel</button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={openHeroSelectionMode}>Select Characters</button>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
                 {data.viewerIsOwner ? (
                   <section className={styles.backgroundSummary} aria-label="Profile background">
@@ -1376,7 +1606,15 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
                     </button>
                   </section>
                 ) : null}
-                <ProfileHeroGrid heroes={createdHeroCards} emptyMessage="No characters have been created yet." onDelete={data.viewerIsOwner ? openDeleteHeroConfirmation : undefined} pendingRemovalIds={pendingDeleteHeroId ? new Set([pendingDeleteHeroId]) : undefined} />
+                <ProfileHeroGrid
+                  heroes={createdHeroCards}
+                  emptyMessage="No characters have been created yet."
+                  onDelete={data.viewerIsOwner ? openDeleteHeroConfirmation : undefined}
+                  isSelectionMode={data.viewerIsOwner && isHeroSelectionMode}
+                  selectedHeroIds={selectedHeroIds}
+                  onToggleSelection={toggleHeroSelection}
+                  pendingRemovalIds={pendingHeroRemovalIds}
+                />
               </section>
             ) : null}
 
@@ -1523,6 +1761,15 @@ export default function UserProfile({ data, heroes }: UserProfileProps) {
           error={heroDeleteError}
           onCancel={closeDeleteHeroConfirmation}
           onConfirm={handleDeleteHero}
+        />
+      ) : null}
+      {isBulkDeleteConfirmationOpen ? (
+        <BulkDeleteHeroConfirmation
+          count={selectedHeroIds.size}
+          isPending={isBulkDeletePending}
+          error={bulkDeleteError}
+          onCancel={closeBulkDeleteConfirmation}
+          onConfirm={handleBulkDeleteHeroes}
         />
       ) : null}
       {backgroundToast ? <div className={styles.profileToast} role="status">{backgroundToast}</div> : null}

@@ -100,6 +100,7 @@ const abilitySectionSchema = z.discriminatedUnion('type', [
 const abilityVariantSchema = z.object({
   name: z.string().max(120).optional(),
   icon: z.string().max(500).optional(),
+  iconColor: z.string().max(80).optional(),
   cooldown: panelStatSchema.optional(),
   hasCooldown: z.boolean().optional(),
   hasCharges: z.boolean().optional(),
@@ -118,6 +119,24 @@ const abilityTierSchema = z.object({
 const abilityDefinitionSchema = abilityVariantSchema.extend({
   slot: z.number().int().min(1).max(4).optional(),
   tiers: z.array(abilityTierSchema).max(3).optional(),
+}).strict()
+
+const dialogueLineSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  speakerSide: z.enum(['left', 'right']),
+  speakerHeroId: z.string().trim().min(1).max(160),
+  text: z.string().max(500).default(''),
+  order: z.number().int().min(0).max(99),
+}).strict()
+
+const heroInteractionSchema = z.object({
+  id: z.string().trim().min(1).max(160),
+  targetHeroId: z.string().trim().min(1).max(160),
+  targetHeroName: z.string().trim().min(1).max(120),
+  title: z.string().trim().min(1).max(100),
+  lines: z.array(dialogueLineSchema).max(100),
+  createdAt: z.string().max(64),
+  updatedAt: z.string().max(64),
 }).strict()
 
 export const heroInfoSchema = z.object({
@@ -192,6 +211,7 @@ export const customHeroSaveSchema = z.object({
     secondaryAbilitySlots: z.array(z.number().int().min(0).max(3)).max(4).optional(),
     secondaryAbilityAnchorIndex: z.number().int().min(0).max(3).optional(),
   }).strict().default({}),
+  interactions: z.array(heroInteractionSchema).max(50).default([]),
 }).strict()
 
 export const authEmailRequestSchema = z.object({

@@ -124,6 +124,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
             customScaling={panelScaling.customScaling}
             boundaryRef={boundaryRef}
             openPickerId={openScalingPickerId}
+            menuPosition={isBottom ? 'above' : 'below'}
             allowedScalingTypes={PANEL_SCALING_TYPES}
             onChange={updates => onChange?.(updates)}
             onOpenPickerChange={onOpenScalingPickerChange}

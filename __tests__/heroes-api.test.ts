@@ -2,16 +2,19 @@ import type { NextRequest } from 'next/server'
 import { describe, expect, it, vi } from 'vitest'
 
 const serviceMocks = vi.hoisted(() => ({
+  deleteCustomHeroes: vi.fn(),
   deleteCustomHero: vi.fn(),
   getEditableCustomHero: vi.fn(),
   likeCustomHero: vi.fn(),
   listBookmarkedCustomHeroPage: vi.fn(),
+  listCurrentUserCustomHeroes: vi.fn(),
   listCustomHeroPage: vi.fn(),
   recordCustomHeroCopy: vi.fn(),
   saveCustomHero: vi.fn(),
 }))
 
 vi.mock('@/lib/custom-heroes', () => ({
+  deleteCustomHeroes: serviceMocks.deleteCustomHeroes,
   deleteCustomHero: serviceMocks.deleteCustomHero,
   CustomHeroError: class CustomHeroError extends Error {
     status: number
@@ -24,12 +27,13 @@ vi.mock('@/lib/custom-heroes', () => ({
   getEditableCustomHero: serviceMocks.getEditableCustomHero,
   likeCustomHero: serviceMocks.likeCustomHero,
   listBookmarkedCustomHeroPage: serviceMocks.listBookmarkedCustomHeroPage,
+  listCurrentUserCustomHeroes: serviceMocks.listCurrentUserCustomHeroes,
   listCustomHeroPage: serviceMocks.listCustomHeroPage,
   recordCustomHeroCopy: serviceMocks.recordCustomHeroCopy,
   saveCustomHero: serviceMocks.saveCustomHero,
 }))
 
-import { GET, POST, PUT } from '@/app/api/heroes/route'
+import { DELETE, GET, POST, PUT } from '@/app/api/heroes/route'
 import { DELETE as DELETE_HERO } from '@/app/api/heroes/[slug]/route'
 import { POST as POST_COPY } from '@/app/api/heroes/[slug]/copy/route'
 import { POST as POST_LIKE } from '@/app/api/heroes/[slug]/like/route'
@@ -106,6 +110,39 @@ describe('heroes API route', () => {
     })
   })
 
+  it('lists all private and published heroes owned by the current user', async () => {
+    serviceMocks.listCurrentUserCustomHeroes.mockResolvedValueOnce([
+      { id: 'private_hero', displayName: 'Private Hero', status: 'private' },
+      { id: 'published_hero', displayName: 'Published Hero', status: 'published' },
+    ])
+
+    const response = await GET(buildNextRequest('http://localhost/api/heroes?mine=true'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      heroes: [
+        { id: 'private_hero', displayName: 'Private Hero', status: 'private' },
+        { id: 'published_hero', displayName: 'Published Hero', status: 'published' },
+      ],
+    })
+    expect(serviceMocks.listCurrentUserCustomHeroes).toHaveBeenCalledOnce()
+    expect(serviceMocks.listCustomHeroPage).not.toHaveBeenCalled()
+  })
+
+  it('requires authentication when listing current-user heroes', async () => {
+    serviceMocks.listCurrentUserCustomHeroes.mockRejectedValueOnce(
+      Object.assign(new Error('Authentication required'), { status: 401 }),
+    )
+
+    const response = await GET(buildNextRequest('http://localhost/api/heroes?mine=true'))
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Authentication required',
+      code: 'AUTH_REQUIRED',
+    })
+  })
+
   it('saves new and existing hero payloads', async () => {
     serviceMocks.saveCustomHero.mockResolvedValueOnce({ id: 'new_hero', status: 'private' })
     serviceMocks.saveCustomHero.mockResolvedValueOnce({ id: 'old_hero', status: 'published' })
@@ -163,5 +200,18 @@ describe('heroes API route', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ id: 'hero_4', deleted: true })
     expect(serviceMocks.deleteCustomHero).toHaveBeenCalledWith('hero_4')
+  })
+
+  it('bulk deletes owned heroes through the collection route', async () => {
+    serviceMocks.deleteCustomHeroes.mockResolvedValueOnce({ ids: ['hero_4', 'hero_5'], deletedCount: 2 })
+
+    const response = await DELETE(buildMutationRequest('http://localhost/api/heroes', {
+      method: 'DELETE',
+      body: JSON.stringify({ ids: ['hero_4', 'hero_5'] }),
+    }))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ids: ['hero_4', 'hero_5'], deletedCount: 2 })
+    expect(serviceMocks.deleteCustomHeroes).toHaveBeenCalledWith({ ids: ['hero_4', 'hero_5'] })
   })
 })

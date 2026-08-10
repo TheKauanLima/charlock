@@ -8,6 +8,24 @@ export interface ICustomHeroEngagementEvent {
   createdAt: Date
 }
 
+export interface IDialogueLine {
+  id: string
+  speakerSide: 'left' | 'right'
+  speakerHeroId: string
+  text: string
+  order: number
+}
+
+export interface IHeroInteraction {
+  id: string
+  targetHeroId: string
+  targetHeroName: string
+  title: string
+  lines: IDialogueLine[]
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface ICustomHero {
   name: string
   slug: string
@@ -28,6 +46,7 @@ export interface ICustomHero {
   publishedAt?: Date | null
   reports: ContentReport[]
   moderationStatus: ModerationStatus
+  interactions: IHeroInteraction[]
   createdAt: Date
   updatedAt: Date
 }
@@ -47,6 +66,30 @@ const customHeroEngagementEventSchema = new Schema<ICustomHeroEngagementEvent>(
   {
     _id: false,
   },
+)
+
+const dialogueLineSchema = new Schema<IDialogueLine>(
+  {
+    id: { type: String, required: true },
+    speakerSide: { type: String, enum: ['left', 'right'], required: true },
+    speakerHeroId: { type: String, required: true },
+    text: { type: String, default: '', maxlength: 500 },
+    order: { type: Number, required: true },
+  },
+  { _id: false },
+)
+
+const heroInteractionSchema = new Schema<IHeroInteraction>(
+  {
+    id: { type: String, required: true },
+    targetHeroId: { type: String, required: true },
+    targetHeroName: { type: String, required: true },
+    title: { type: String, default: 'New Conversation', maxlength: 100 },
+    lines: { type: [dialogueLineSchema], default: [] },
+    createdAt: { type: Date, required: true, default: Date.now },
+    updatedAt: { type: Date, required: true, default: Date.now },
+  },
+  { _id: false },
 )
 
 const customHeroSchema = new Schema<ICustomHero>(
@@ -121,6 +164,10 @@ const customHeroSchema = new Schema<ICustomHero>(
       enum: ['clean', 'flagged', 'hidden'],
       default: 'clean',
       index: true,
+    },
+    interactions: {
+      type: [heroInteractionSchema],
+      default: [],
     },
   },
   {

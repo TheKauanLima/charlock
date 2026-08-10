@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent, WheelEvent } from 'react'
-import { ArrowLeft, Sparkles, UserRound } from 'lucide-react'
+import { ArrowLeft, MessageSquareText, Sparkles, UserRound } from 'lucide-react'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import CharacterExportButton from '@/components/CharacterExport/CharacterExportButton'
 import EditorAssetModal from '@/components/EditorAssetModal/EditorAssetModal'
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
+import InteractionCreator from '@/components/InteractionCreator/InteractionCreator'
 import HeroStatsSpiritPanel from '@/components/panels/hero-stats-spirit-panel'
 import HeroStatsVitalityPanel from '@/components/panels/hero-stats-vitality-panel'
 import HeroStatsBoonPanel from '@/components/panels/hero-stats-boon-panel'
@@ -32,9 +33,9 @@ import {
   normalizeSecondaryAbilitySlots,
   normalizeAbilityStats,
 } from '@/lib/ability-editor-types'
-import type { CustomHeroSavePayload, CustomHeroStatus } from '@/lib/custom-hero-types'
+import type { CustomHeroSavePayload, CustomHeroStatus, HeroInteraction } from '@/lib/custom-hero-types'
 import { getCustomHeroSaveIssueMessages } from '@/lib/custom-hero-validation'
-import { buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
+import { ANONYMOUS_RECOVERY_OWNER_ID, buildEditorRecoverySnapshot, readEditorRecovery, writeEditorRecovery, type EditorRecoveryReason } from '@/lib/editor-recovery'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponPanelVariant, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import { getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
@@ -54,9 +55,11 @@ interface HeroInfoEditorProps {
   savedHeroId?: string | null
   savedHeroName?: string
   savedHeroStatus?: CustomHeroStatus
+  recoveryOwnerId?: string
   allowCopies?: boolean
   initialStats?: HeroStatsPayload | null
   initialAbilityStats?: AbilityStatsPayload | null
+  initialInteractions?: HeroInteraction[]
   isSaving?: boolean
   isDraftSaving?: boolean
   saveStatusMessage?: string | null
@@ -166,7 +169,7 @@ interface AbilityControl {
 }
 
 type AbilitySetId = 'primary' | 'secondary'
-type ControlRailTabId = 'text' | 'colors' | 'images' | 'options'
+type ControlRailTabId = 'text' | 'colors' | 'images' | 'interactions' | 'options'
 
 interface ActiveAbilityTarget {
   set: AbilitySetId
@@ -469,9 +472,11 @@ export default function HeroInfoEditor({
   savedHeroId = null,
   savedHeroName = '',
   savedHeroStatus = 'private',
+  recoveryOwnerId = ANONYMOUS_RECOVERY_OWNER_ID,
   allowCopies = false,
   initialStats = null,
   initialAbilityStats = null,
+  initialInteractions = [],
   isSaving = false,
   isDraftSaving = false,
   saveStatusMessage = null,
@@ -499,8 +504,13 @@ export default function HeroInfoEditor({
   const initialStatsDraft = initialStats ?? (hasPersistedHeroId(hero) ? buildEmptyHeroStats(hero) : buildHeroStatsSeed(hero))
   const initialAbilityDraft = initialAbilityStats ?? buildDefaultAbilityStats(hero)
   const normalizedInitialAbilityDraft = normalizeAbilityStats(initialAbilityDraft, hero)
+  const initialInteractionsRef = useRef(initialInteractions)
   const [statsDraft, setStatsDraft] = useState<HeroStatsPayload>(() => initialStatsDraft)
   const [abilityStatsDraft, setAbilityStatsDraft] = useState<AbilityStatsPayload>(() => normalizedInitialAbilityDraft)
+  const [interactionsDraft, setInteractionsDraft] = useState<HeroInteraction[]>(() => initialInteractions.map(interaction => ({
+    ...interaction,
+    lines: interaction.lines.map(line => ({ ...line })),
+  })))
   const [secondarySlotSelection, setSecondarySlotSelection] = useState<number[]>(() => normalizedInitialAbilityDraft.secondaryAbilitySlots ?? [])
   const [activeBoonPanelId, setActiveBoonPanelId] = useState(BASE_PANEL_ID)
   const [activeWeaponPanelId, setActiveWeaponPanelId] = useState(BASE_PANEL_ID)
@@ -517,54 +527,64 @@ export default function HeroInfoEditor({
   const [isUnpublishConfirmOpen, setIsUnpublishConfirmOpen] = useState(false)
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false)
   const [recoveryStatus, setRecoveryStatus] = useState<string | null>(null)
+  const [recoveryNotice, setRecoveryNotice] = useState<string | null>(null)
   const recoveryReadyRef = useRef(false)
+  const recoveryReasonRef = useRef<EditorRecoveryReason>('editing')
+  const recoveryFailureMessageRef = useRef<string | undefined>(undefined)
+  const lastCloudSavedRecoverySignatureRef = useRef<string | null>(null)
+  const recoveryCheckpointRef = useRef<(reason?: EditorRecoveryReason, failureMessage?: string, force?: boolean) => void>(() => undefined)
   const draftAutosaveIntervalMs = useMemo(() => getDraftAutosaveIntervalMs(draftAutosavePreference), [draftAutosavePreference])
   const draftAutosaveIntervalLabel = useMemo(() => getDraftAutosaveIntervalLabel(draftAutosavePreference), [draftAutosavePreference])
 
   useEffect(() => {
-    const snapshot = readEditorRecovery()
+    recoveryReadyRef.current = false
+    const snapshot = readEditorRecovery(recoveryOwnerId)
     const timeoutId = window.setTimeout(() => {
-      if (snapshot) {
+      const matchesCurrentEditor = snapshot
+        ? snapshot.savedHeroId
+          ? snapshot.savedHeroId === savedHeroId
+          : !savedHeroId && snapshot.heroSlug === hero.slug
+        : false
+
+      if (snapshot && matchesCurrentEditor) {
         onDraftChange(snapshot.heroInfo)
         onBackgroundChange(snapshot.background)
         onRenderSelectionChange(snapshot.renderSelection)
         setStatsDraft(snapshot.stats)
         setAbilityStatsDraft(snapshot.abilityStats)
+        setInteractionsDraft(snapshot.interactions ?? initialInteractionsRef.current)
         setSecondarySlotSelection(snapshot.abilityStats.secondaryAbilitySlots ?? [])
         setWeaponBaseValuesByPanel(buildWeaponPanelBaseValues(snapshot.stats.weapon))
         setWeaponTagsInputByPanel(buildWeaponTagsInputByPanel(snapshot.stats.weapon))
         setHeroNameInput(snapshot.heroName)
         setHeroPortraitInput(snapshot.portrait)
         setAllowCopiesInput(snapshot.allowCopies)
-        setRecoveryStatus(`Recovered local draft from ${new Date(snapshot.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`)
+        recoveryReasonRef.current = snapshot.recoveryReason
+        recoveryFailureMessageRef.current = snapshot.failureMessage
+        const recoveredAt = new Date(snapshot.savedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
+        const recoveryMessage = snapshot.recoveryReason === 'editing'
+          ? `Recovered unsaved changes from this device (${recoveredAt}).`
+          : `Recovered a draft whose cloud save did not complete (${recoveredAt}). Review it, then use Save Draft Now.`
+
+        setRecoveryStatus(recoveryMessage)
+        setRecoveryNotice(recoveryMessage)
       }
 
       recoveryReadyRef.current = true
     }, 0)
 
     return () => window.clearTimeout(timeoutId)
-  }, [onBackgroundChange, onDraftChange, onRenderSelectionChange])
+  }, [hero.slug, onBackgroundChange, onDraftChange, onRenderSelectionChange, recoveryOwnerId, savedHeroId])
 
   useEffect(() => {
     if (!recoveryReadyRef.current) return undefined
 
     const timeoutId = window.setTimeout(() => {
-      writeEditorRecovery(buildEditorRecoverySnapshot({
-        heroSlug: hero.slug,
-        savedHeroId,
-        heroInfo: draft,
-        background: selectedBackground,
-        renderSelection,
-        heroName: heroNameInput,
-        portrait: heroPortraitInput,
-        allowCopies: allowCopiesInput,
-        stats: statsDraft,
-        abilityStats: abilityStatsDraft,
-      }))
+      recoveryCheckpointRef.current()
     }, 250)
 
     return () => window.clearTimeout(timeoutId)
-  }, [abilityStatsDraft, allowCopiesInput, draft, hero.slug, heroNameInput, heroPortraitInput, renderSelection, savedHeroId, selectedBackground, statsDraft])
+  }, [abilityStatsDraft, allowCopiesInput, draft, hero.slug, heroNameInput, heroPortraitInput, interactionsDraft, recoveryOwnerId, renderSelection, savedHeroId, selectedBackground, statsDraft])
 
   useEffect(() => {
     try {
@@ -638,7 +658,7 @@ export default function HeroInfoEditor({
     if (!activeTabId) return undefined
 
     function handlePanelClickAway(event: globalThis.PointerEvent) {
-      if (event.target instanceof Element && event.target.closest('[data-testid="hero-sidebar-tabs"], [data-hero-stat-panel="true"], [role="dialog"]')) return
+      if (event.target instanceof Element && event.target.closest('[data-testid="hero-sidebar-tabs"], [data-hero-stat-panel="true"], [data-interaction-creator="true"], [role="dialog"]')) return
       setActiveTabId(null)
     }
 
@@ -648,6 +668,7 @@ export default function HeroInfoEditor({
 
   function handleTabSelect(tabId: SidebarTabId) {
     closeFocusedAbilityEditorWithSave()
+    setActiveControlRailTab(currentTab => currentTab === 'interactions' ? 'text' : currentTab)
     setActiveTabId(current => current === tabId ? null : tabId)
   }
 
@@ -890,11 +911,62 @@ export default function HeroInfoEditor({
       vitality: statsDraft.vitality,
       spirit: statsDraft.spirit,
       abilityStats: getAbilityStatsForSave(),
+      interactions: interactionsDraft,
     }
   }
 
   function getDraftSaveSignature(payload: CustomHeroSavePayload) {
     return JSON.stringify(payload)
+  }
+
+  function getRecoveryContentSignature(payload: CustomHeroSavePayload) {
+    return JSON.stringify({ ...payload, id: undefined })
+  }
+
+  function persistRecoveryCheckpoint(
+    reason = recoveryReasonRef.current,
+    failureMessage = recoveryFailureMessageRef.current,
+    force = false,
+  ) {
+    if (!recoveryReadyRef.current) {
+      return
+    }
+
+    recoveryReasonRef.current = reason
+    recoveryFailureMessageRef.current = failureMessage
+    const payload = buildSavePayload('private')
+
+    if (!force && lastCloudSavedRecoverySignatureRef.current === getRecoveryContentSignature(payload)) {
+      return
+    }
+
+    try {
+      writeEditorRecovery(buildEditorRecoverySnapshot({
+        ownerId: recoveryOwnerId,
+        recoveryReason: reason,
+        failureMessage,
+        heroSlug: hero.slug,
+        savedHeroId,
+        heroInfo: payload.heroInfo,
+        background: payload.hero.background,
+        renderSelection,
+        heroName: payload.name,
+        portrait: payload.hero.portrait,
+        allowCopies: payload.allowCopies,
+        stats: {
+          ...statsDraft,
+          heroInfo: payload.heroInfo,
+          boon: payload.boon,
+          weapon: payload.weapon,
+          vitality: payload.vitality,
+          spirit: payload.spirit,
+        },
+        abilityStats: payload.abilityStats,
+        interactions: payload.interactions,
+      }))
+    } catch {
+      // The active in-memory draft remains usable if browser storage is unavailable.
+    }
   }
 
   function getSaveIssueMessage(payload: CustomHeroSavePayload, label: 'Draft' | 'Hero') {
@@ -904,7 +976,13 @@ export default function HeroInfoEditor({
   }
 
   async function handleGlobalSave(status: CustomHeroStatus) {
+    if (isSaving || isDraftSaving || draftSaveInFlightRef.current) {
+      return
+    }
+
     const payload = buildSavePayload(status)
+    recoveryFailureMessageRef.current = undefined
+    persistRecoveryCheckpoint('editing', undefined, true)
     const issueMessage = getSaveIssueMessage(payload, status === 'private' ? 'Draft' : 'Hero')
 
     if (issueMessage) {
@@ -914,10 +992,21 @@ export default function HeroInfoEditor({
     }
 
     setSaveError(null)
-    const didSave = await onSaveHero(payload, { mode: 'manual' })
+    persistRecoveryCheckpoint('save-pending', undefined, true)
+    draftSaveInFlightRef.current = true
 
-    if (didSave && status === 'private') {
-      lastSavedDraftSignatureRef.current = getDraftSaveSignature(payload)
+    try {
+      const didSave = await onSaveHero(payload, { mode: 'manual' })
+
+      if (didSave && status === 'private') {
+        lastSavedDraftSignatureRef.current = getDraftSaveSignature(payload)
+        lastCloudSavedRecoverySignatureRef.current = getRecoveryContentSignature(payload)
+        recoveryReasonRef.current = 'editing'
+        recoveryFailureMessageRef.current = undefined
+        setRecoveryNotice(null)
+      }
+    } finally {
+      draftSaveInFlightRef.current = false
     }
   }
 
@@ -933,6 +1022,8 @@ export default function HeroInfoEditor({
       return true
     }
 
+    persistRecoveryCheckpoint(recoveryReasonRef.current, recoveryFailureMessageRef.current, true)
+
     const issueMessage = getSaveIssueMessage(payload, 'Draft')
 
     if (issueMessage) {
@@ -947,10 +1038,16 @@ export default function HeroInfoEditor({
 
     try {
       setSaveError(null)
+      recoveryFailureMessageRef.current = undefined
+      persistRecoveryCheckpoint('save-pending', undefined, true)
       const didSave = await onSaveHero(payload, { mode })
 
       if (didSave) {
         lastSavedDraftSignatureRef.current = signature
+        lastCloudSavedRecoverySignatureRef.current = getRecoveryContentSignature(payload)
+        recoveryReasonRef.current = 'editing'
+        recoveryFailureMessageRef.current = undefined
+        setRecoveryNotice(null)
       }
 
       return didSave
@@ -970,6 +1067,41 @@ export default function HeroInfoEditor({
   useEffect(() => {
     savePrivateDraftRef.current = savePrivateDraft
   })
+
+  useEffect(() => {
+    recoveryCheckpointRef.current = persistRecoveryCheckpoint
+  })
+
+  useEffect(() => {
+    function persistBeforePageExit() {
+      recoveryCheckpointRef.current()
+    }
+
+    function persistWhenHidden() {
+      if (document.visibilityState === 'hidden') {
+        persistBeforePageExit()
+      }
+    }
+
+    window.addEventListener('pagehide', persistBeforePageExit)
+    document.addEventListener('visibilitychange', persistWhenHidden)
+
+    return () => {
+      window.removeEventListener('pagehide', persistBeforePageExit)
+      document.removeEventListener('visibilitychange', persistWhenHidden)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!saveFailure || !recoveryReadyRef.current) {
+      return
+    }
+
+    const failureNotice = 'The cloud save did not complete. This draft is preserved on this device and can be recovered after a refresh or sign-in.'
+
+    setRecoveryNotice(failureNotice)
+    recoveryCheckpointRef.current('save-failed', saveFailure, true)
+  }, [saveFailure])
 
   useEffect(() => {
     if (!shouldAutoSaveDraft) {
@@ -1464,10 +1596,11 @@ export default function HeroInfoEditor({
       : secondaryAbilities[activeAbilityTarget.index] ?? buildDefaultSecondaryAbilities(hero, secondaryAbilitySlots)[activeAbilityTarget.index]
     : null
   const isFocusedAbilityEditorOpen = Boolean(activeAbilityTarget && activeAbilityDraft)
+  const isInteractionCreatorOpen = activeControlRailTab === 'interactions' && !isFocusedAbilityEditorOpen
 
   useEffect(() => {
-    onInteractionPanelOpenChange?.(Boolean(activeTabId || isFocusedAbilityEditorOpen))
-  }, [activeTabId, isFocusedAbilityEditorOpen, onInteractionPanelOpenChange])
+    onInteractionPanelOpenChange?.(Boolean(activeTabId || isFocusedAbilityEditorOpen || isInteractionCreatorOpen))
+  }, [activeTabId, isFocusedAbilityEditorOpen, isInteractionCreatorOpen, onInteractionPanelOpenChange])
 
   function saveFocusedAbilityEditorDraft() {
     if (!isFocusedAbilityEditorOpen || !activeAbilityTarget) {
@@ -1488,16 +1621,30 @@ export default function HeroInfoEditor({
     setActiveAbilityTarget(null)
   }
 
+  function handleOpenBackgroundAssetModal() {
+    closeFocusedAbilityEditorWithSave()
+    setIsBackgroundAssetModalOpen(true)
+  }
+
   function handleControlRailTabSelect(tabId: ControlRailTabId) {
     closeFocusedAbilityEditorWithSave()
+    if (tabId === 'interactions') {
+      setActiveTabId(null)
+    }
     setActiveControlRailTab(tabId)
     setIsControlRailCollapsed(false)
   }
 
   function handleOpenAbilityEditorFromRail() {
     saveFocusedAbilityEditorDraft()
+    setActiveControlRailTab('text')
     setActiveAbilityTarget({ set: 'primary', index: 0 })
     setIsControlRailCollapsed(false)
+  }
+
+  function handleAbilityTargetOpen(target: ActiveAbilityTarget) {
+    setActiveControlRailTab('text')
+    setActiveAbilityTarget(target)
   }
 
   function handleEditorExitRequest() {
@@ -1546,7 +1693,20 @@ export default function HeroInfoEditor({
     >
       <SidebarTabs activeTabId={activeTabId} onSelect={handleTabSelect} overviewLabel="Hero render" />
 
-      <div
+      {isInteractionCreatorOpen ? (
+        <InteractionCreator
+          customHeroId={savedHeroId ?? `draft:${hero.slug}`}
+          customHeroName={getDraftName() || heroNamePreview}
+          customHeroPortrait={heroPortraitInput || hero.portrait}
+          accentColor={draft.nameColor}
+          interactions={interactionsDraft}
+          editorPaneCollapsed={isControlRailCollapsed}
+          onChange={setInteractionsDraft}
+        />
+      ) : null}
+
+      {!isInteractionCreatorOpen ? (
+        <div
         className={cn(
           styles.previewStage,
           isControlRailCollapsed && styles.previewStageRailCollapsed,
@@ -1694,7 +1854,7 @@ export default function HeroInfoEditor({
               heroInfo={draft}
               secondaryAbilities={secondaryAbilities}
               secondaryAbilitySlots={secondaryAbilitySlots}
-              onAbilityClick={setActiveAbilityTarget}
+              onAbilityClick={handleAbilityTargetOpen}
               onAbilitySwap={!isPreviewMode ? swapPrimaryAndSecondaryAbility : undefined}
               className={styles.abilitiesRow}
               primaryTestIdPrefix="editor-ability"
@@ -1703,7 +1863,8 @@ export default function HeroInfoEditor({
               secondaryLabel={slot => `${isPreviewMode ? 'Preview' : 'Edit'} Secondary Ability ${slot}`}
               editable={!isPreviewMode}
             />
-      </div>
+        </div>
+      ) : null}
 
       {activeTabId ? (
         <aside className={styles.statsAside} data-hero-stat-panel="true">
@@ -1826,6 +1987,21 @@ export default function HeroInfoEditor({
             <Sparkles aria-hidden="true" />
             <strong>Ability</strong>
           </button>
+          <div className={styles.controlTabList} role="tablist" aria-label="Interaction creator section">
+            <button
+              type="button"
+              id="editor-interactions-tab"
+              role="tab"
+              aria-label="Interactions"
+              aria-selected={isInteractionCreatorOpen}
+              aria-controls="editor-interactions-panel"
+              className={cn(styles.controlTabButton, isInteractionCreatorOpen && styles.controlTabButtonActive)}
+              onClick={() => handleControlRailTabSelect('interactions')}
+            >
+              <MessageSquareText aria-hidden="true" />
+              <strong>Interact</strong>
+            </button>
+          </div>
           <div className={styles.controlTabList} role="tablist" aria-label="Editor options section">
             {CONTROL_RAIL_TABS.filter(tab => tab.id === 'options').map(tab => (
               <button
@@ -2031,7 +2207,7 @@ export default function HeroInfoEditor({
                 <button
                   type="button"
                   className={styles.backgroundPickerButton}
-                  onClick={() => setIsBackgroundAssetModalOpen(true)}
+                  onClick={handleOpenBackgroundAssetModal}
                   aria-label={`Choose background. Current: ${selectedBackgroundOption?.label ?? 'Unknown'}`}
                   data-testid="editor-background-picker"
                 >
@@ -2064,6 +2240,26 @@ export default function HeroInfoEditor({
                     ) : null}
                   </div>
                 </div>
+              </div>
+            </section>
+
+            <section
+              id="editor-interactions-panel"
+              role="tabpanel"
+              aria-labelledby="editor-interactions-tab"
+              className={styles.controlPaneSection}
+              hidden={!isInteractionCreatorOpen}
+            >
+              <div className={styles.interactionPaneIntro}>
+                <MessageSquareText aria-hidden="true" />
+                <div>
+                  <span className={styles.sectionTitle}>Interaction Creator</span>
+                  <p>Create conversations between {getDraftName() || heroNamePreview} and roster heroes in the workspace beside this pane.</p>
+                </div>
+              </div>
+              <div className={styles.editorHint}>
+                <strong>Draft persistence</strong>
+                <span>Conversation titles, targets, and alternating voicelines are included in local recovery and hero saves.</span>
               </div>
             </section>
 
@@ -2140,6 +2336,12 @@ export default function HeroInfoEditor({
             </>
           ) : (
             <>
+              {recoveryNotice ? (
+                <div className={styles.recoveryNotice} role="status" aria-live="polite">
+                  <strong>Local recovery protected</strong>
+                  <span>{recoveryNotice}</span>
+                </div>
+              ) : null}
               <div className={styles.draftAutosavePanel}>
                 <div className={styles.draftAutosaveStatus} role="status" aria-live="polite">
                   <strong>Draft autosaves privately</strong>
@@ -2168,6 +2370,14 @@ export default function HeroInfoEditor({
                   </select>
                 </div>
               </div>
+              <button
+                type="button"
+                className={styles.saveActionButton}
+                disabled={isSaving || isDraftSaving}
+                onClick={() => void handleGlobalSave('private')}
+              >
+                {isSaving ? 'Saving...' : 'Save Draft Now'}
+              </button>
               <button
                 type="button"
                 className={styles.publishActionButton}

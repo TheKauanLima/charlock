@@ -11,12 +11,16 @@ import ProfileUnavailable from '@/components/UserProfile/ProfileUnavailable'
 import { buildDefaultAbilityStats } from '@/lib/ability-editor-types'
 import { ApiRequestError, toApiErrorResponse } from '@/lib/api-errors'
 import { getUserFacingSaveError, parseClientRequestError, readApiResponse } from '@/lib/client-errors'
-import { buildEditorRecoverySnapshot, EDITOR_RECOVERY_STORAGE_KEY, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
+import { buildEditorRecoverySnapshot, clearEditorRecovery, getEditorRecoveryStorageKey, readEditorRecovery, writeEditorRecovery } from '@/lib/editor-recovery'
 import { HEROES } from '@/lib/hero-data'
 import { buildHeroStatsSeed } from '@/lib/hero-stats-shared'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 
 const pushMock = vi.hoisted(() => vi.fn())
+
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
@@ -101,12 +105,40 @@ describe('error and loading states', () => {
 
     writeEditorRecovery(snapshot)
 
-    expect(readEditorRecovery(window.localStorage, new Date('2026-06-30T12:00:00.000Z').getTime())).toMatchObject({
+    expect(readEditorRecovery()).toMatchObject({
       heroName: 'Recovered Hero',
       portrait: '/recovered-portrait.png',
       allowCopies: true,
     })
-    expect(window.localStorage.getItem(EDITOR_RECOVERY_STORAGE_KEY)).toContain('Recovered Hero')
+    expect(window.localStorage.getItem(getEditorRecoveryStorageKey())).toContain('Recovered Hero')
+  })
+
+  it('keeps recovery checkpoints isolated between signed-in accounts', () => {
+    const hero = HEROES[0]
+    const buildSnapshotForOwner = (ownerId: string, heroName: string) => buildEditorRecoverySnapshot({
+      ownerId,
+      heroSlug: hero.slug,
+      savedHeroId: null,
+      heroInfo: { ...hero.heroInfo, nameType: 'text', nameValue: heroName },
+      background: '/recovered-background.png',
+      renderSelection: { mode: 'custom' as const, src: '/recovered-render.png' },
+      heroName,
+      portrait: '/recovered-portrait.png',
+      allowCopies: false,
+      stats: buildHeroStatsSeed(hero),
+      abilityStats: buildDefaultAbilityStats(hero),
+    })
+
+    writeEditorRecovery(buildSnapshotForOwner('user_alpha', 'Alpha Draft'))
+    writeEditorRecovery(buildSnapshotForOwner('user_beta', 'Beta Draft'))
+
+    expect(readEditorRecovery('user_alpha')?.heroName).toBe('Alpha Draft')
+    expect(readEditorRecovery('user_beta')?.heroName).toBe('Beta Draft')
+
+    clearEditorRecovery('user_alpha')
+
+    expect(readEditorRecovery('user_alpha')).toBeNull()
+    expect(readEditorRecovery('user_beta')?.heroName).toBe('Beta Draft')
   })
 
   it('rejects oversized and unsupported upload files before transfer', () => {
@@ -176,22 +208,39 @@ describe('error and loading states', () => {
     render(<HeroGrid initialTab="Create" />)
     await user.click(screen.getByRole('button', { name: 'Use EMPTY template' }))
     await user.type(screen.getByPlaceholderText('Name this draft'), 'Offline Arc')
-    await user.click(screen.getByRole('button', { name: 'Go Back' }))
-    await user.click(await screen.findByRole('button', { name: 'Yes, Go Back' }))
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    await user.clear(screen.getByLabelText('Ability Name'))
+    await user.type(screen.getByLabelText('Ability Name'), 'Recovered Ability')
+    await user.click(screen.getByRole('button', { name: 'Save Draft Now' }))
 
     expect(await screen.findByRole('dialog', { name: 'SESSION CONNECTION TERMINATED' })).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('We could not save this draft.')
-    const submittedPayload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as { heroInfo: { ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string } }
+    const submittedPayload = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as {
+      heroInfo: { ability1Icon: string; ability2Icon: string; ability3Icon: string; ability4Icon: string }
+      abilityStats: { abilities: Array<{ name: string }> }
+    }
     expect([
       submittedPayload.heroInfo.ability1Icon,
       submittedPayload.heroInfo.ability2Icon,
       submittedPayload.heroInfo.ability3Icon,
       submittedPayload.heroInfo.ability4Icon,
     ]).toEqual(['', '', '', ''])
-    await waitFor(() => expect(window.localStorage.getItem(EDITOR_RECOVERY_STORAGE_KEY)).toContain('Offline Arc'))
+    expect(submittedPayload.abilityStats.abilities[0].name).toBe('Recovered Ability')
+    await waitFor(() => expect(window.localStorage.getItem(getEditorRecoveryStorageKey())).toContain('Offline Arc'))
 
     await user.click(screen.getByRole('button', { name: 'Retry Save' }))
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+    cleanup()
+    render(<HeroGrid initialTab="Create" />)
+
+    await user.click(await screen.findByRole('button', { name: /Recover Unsynced Draft/i }))
+
+    expect(await screen.findByPlaceholderText('Name this draft')).toHaveValue('Offline Arc')
+    expect(screen.getByText('Local recovery protected')).toBeInTheDocument()
+    expect(screen.getByText(/cloud save did not complete/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit Ability 1' }))
+    expect(screen.getByLabelText('Ability Name')).toHaveValue('Recovered Ability')
   })
 
   it('searches for another creator from an unavailable profile', async () => {

@@ -10,7 +10,7 @@ import { ApiRequestError } from '@/lib/api-errors'
 import { customHeroSaveSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { RenderPosition } from '@/lib/editor-assets'
-import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary } from '@/lib/custom-hero-types'
+import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary, HeroInteraction } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
 import BoonStats from '@/lib/models/BoonStats'
@@ -134,6 +134,49 @@ function getNumber(value: unknown, fallback = 0) {
   const parsed = Number(value)
 
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function normalizeInteractionDate(value: string, fallback: string) {
+  const timestamp = new Date(value)
+
+  return Number.isNaN(timestamp.getTime()) ? fallback : timestamp.toISOString()
+}
+
+function normalizeInteractions(interactions: HeroInteraction[] | undefined, customHeroId?: string): HeroInteraction[] {
+  const now = new Date().toISOString()
+
+  return (interactions ?? []).map(interaction => {
+    const targetHero = HEROES.find(hero => hero.slug === interaction.targetHeroId)
+
+    if (!targetHero) {
+      throw new CustomHeroError(`Unknown interaction target: ${interaction.targetHeroName}`, 400)
+    }
+
+    const createdAt = normalizeInteractionDate(interaction.createdAt, now)
+
+    return {
+      id: interaction.id,
+      targetHeroId: targetHero.slug,
+      targetHeroName: targetHero.displayName,
+      title: interaction.title.trim() || 'New Conversation',
+      lines: interaction.lines
+        .slice()
+        .sort((left, right) => left.order - right.order)
+        .map((line, order) => ({
+          id: line.id,
+          speakerSide: line.speakerSide,
+          speakerHeroId: line.speakerSide === 'left' && customHeroId
+            ? customHeroId
+            : line.speakerSide === 'right'
+              ? targetHero.slug
+              : line.speakerHeroId,
+          text: line.text,
+          order,
+        })),
+      createdAt,
+      updatedAt: normalizeInteractionDate(interaction.updatedAt, createdAt),
+    }
+  })
 }
 
 function normalizeRenderPosition(value: RenderPosition | null | undefined): RenderPosition {
@@ -407,6 +450,7 @@ function parseSavePayload(rawValue: unknown): CustomHeroSavePayload {
       panels: normalizeSpiritPanels(spiritRecord.panels),
     },
     abilityStats,
+    interactions: normalizeInteractions(value.interactions),
   }
 }
 
@@ -611,6 +655,24 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
     ...summary,
     stats,
     abilityStats,
+    interactions: normalizeInteractions(
+      bundle.hero.interactions?.map(interaction => ({
+        id: interaction.id,
+        targetHeroId: interaction.targetHeroId,
+        targetHeroName: interaction.targetHeroName,
+        title: interaction.title,
+        lines: interaction.lines.map(line => ({
+          id: line.id,
+          speakerSide: line.speakerSide,
+          speakerHeroId: line.speakerHeroId,
+          text: line.text,
+          order: line.order,
+        })),
+        createdAt: interaction.createdAt instanceof Date ? interaction.createdAt.toISOString() : String(interaction.createdAt),
+        updatedAt: interaction.updatedAt instanceof Date ? interaction.updatedAt.toISOString() : String(interaction.updatedAt),
+      })),
+      summary.id,
+    ),
   }
 }
 
@@ -1001,6 +1063,70 @@ export async function deleteCustomHero(id: string) {
   return { id: objectId.toString(), deleted: true as const }
 }
 
+export async function deleteCustomHeroes(value: unknown) {
+  const actor = await getActor()
+  enforceRateLimit({
+    key: `custom-hero-bulk-delete:user:${actor.storageUserId}`,
+    limit: 3,
+    windowMs: 60 * 1000,
+  })
+
+  if (typeof value !== 'object' || value === null || !('ids' in value) || !Array.isArray(value.ids)) {
+    throw new CustomHeroError('Character ids are required', 400)
+  }
+
+  if (!value.ids.length || value.ids.some(id => typeof id !== 'string' || !id.length)) {
+    throw new CustomHeroError('Select at least one character', 400)
+  }
+
+  const heroIds = [...new Set(value.ids as string[])]
+
+  const objectIds = heroIds.map(getValidObjectId)
+
+  await dbConnect()
+  await assertUserNotSuspended(actor.clerkId)
+
+  const ownedHeroes = await CustomHero.find({
+    _id: { $in: objectIds },
+    createdByUserId: { $in: actor.ownerIds },
+  }).select('_id').lean<Array<{ _id: Types.ObjectId }>>()
+
+  if (ownedHeroes.length !== objectIds.length) {
+    throw new CustomHeroError('One or more heroes could not be deleted', 404)
+  }
+
+  const ownedHeroIds = ownedHeroes.map(hero => hero._id)
+  const ownedHeroIdStrings = ownedHeroIds.map(heroId => heroId.toString())
+
+  await Promise.all([
+    CustomHero.deleteMany({ _id: { $in: ownedHeroIds } }),
+    HeroInfo.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    BoonStats.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    WeaponStats.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    VitalityStats.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    SpiritStats.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    AbilityStats.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    Comment.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    Like.deleteMany({ heroId: { $in: ownedHeroIds } }),
+    Notification.deleteMany({
+      $or: [
+        { targetId: { $in: ownedHeroIds } },
+        { relatedHeroId: { $in: ownedHeroIds } },
+      ],
+    }),
+    User.updateMany({}, { $pull: { bookmarks: { $in: ownedHeroIds } } }),
+    User.updateMany(
+      { profileBackground: { $in: ownedHeroIdStrings.map(heroId => `custom:${heroId}`) } },
+      { $set: { profileBackground: null } },
+    ),
+  ])
+
+  return {
+    ids: ownedHeroIdStrings,
+    deletedCount: ownedHeroIdStrings.length,
+  }
+}
+
 export async function getPublishedCustomHero(id: string): Promise<CustomHeroDetail> {
   const actor = await getOptionalActor()
 
@@ -1033,6 +1159,23 @@ export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<Cust
     ...(viewerOwnsProfile ? {} : { moderationStatus: { $ne: 'hidden' } }),
   })
     .sort({ updatedAt: -1 })
+    .lean<HeroRecord[]>()
+  const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
+  const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
+  const bookmarks = await getActorBookmarkSet(actor)
+
+  return heroes.map(hero => serializeSummary(hero, heroInfoById.get(hero._id.toString()) ?? null, actor, bookmarks, abilityStatsById.get(hero._id.toString()) ?? null))
+}
+
+export async function listCurrentUserCustomHeroes(): Promise<CustomHeroSummary[]> {
+  const actor = await getActor()
+
+  await dbConnect()
+
+  const heroes = await CustomHero.find({
+    createdByUserId: { $in: actor.ownerIds },
+  })
+    .sort({ createdAt: 1 })
     .lean<HeroRecord[]>()
   const heroInfoById = await getHeroInfoMap(heroes.map(hero => hero._id))
   const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
@@ -1109,6 +1252,7 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
         status: payload.status,
         allowCopies: payload.allowCopies,
         publishedAt,
+        interactions: normalizeInteractions(payload.interactions, heroId.toString()),
       },
       $setOnInsert: {
         likesCount: 0,

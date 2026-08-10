@@ -393,6 +393,74 @@
   box-shadow: 0 0 0 1px rgba(198, 127, 255, 0.42);
 }
 
+.customIconColor {
+  display: inline-grid;
+  height: 28px;
+  grid-template-columns: 28px max-content max-content;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(230, 202, 252, 0.34);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.09);
+  padding: 0 8px 0 0;
+  color: #efe2ff;
+  cursor: pointer;
+  font-size: 0.64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.customIconColor:focus-within {
+  border-color: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 0 0 1px rgba(198, 127, 255, 0.42);
+}
+
+.customIconColor input {
+  width: 28px;
+  height: 26px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.customIconColor input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.customIconColor input::-webkit-color-swatch {
+  border: 0;
+}
+
+.customIconColor code {
+  color: rgba(245, 234, 219, 0.62);
+  font-family: Consolas, monospace;
+  font-size: 0.62rem;
+  text-transform: lowercase;
+}
+
+.recentIconColors {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 1px solid rgba(230, 202, 252, 0.22);
+  padding-left: 8px;
+}
+
+.recentIconColors > span {
+  color: rgba(245, 234, 219, 0.58);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.iconColorPicker .recentIconColors button {
+  width: 26px;
+  min-width: 26px;
+  padding: 0;
+}
+
 .squareIconPicker {
   display: grid;
   grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.15fr);

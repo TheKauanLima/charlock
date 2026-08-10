@@ -18,6 +18,7 @@ export interface IAbilitySection {
 export interface IAbilityVariant {
   name: string
   icon: string
+  iconColor?: string
   cooldown: IPanelStat
   hasCooldown: boolean
   hasCharges: boolean
@@ -90,6 +91,7 @@ const abilitySectionSchema = new Schema<IAbilitySection>({
 const abilityVariantSchema = new Schema<IAbilityVariant>({
   name: { type: String, required: true },
   icon: { type: String, required: true },
+  iconColor: { type: String, default: '' },
   cooldown: {
     type: statSchema,
     required: true,
@@ -125,6 +127,7 @@ const abilityDefinitionSchema = new Schema<IAbilityDefinition>({
   slot: { type: Number, required: true, min: 1 },
   name: { type: String, required: true },
   icon: { type: String, required: true },
+  iconColor: { type: String, default: '' },
   cooldown: {
     type: statSchema,
     required: true,

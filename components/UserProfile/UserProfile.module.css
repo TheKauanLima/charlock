@@ -426,6 +426,56 @@
   text-transform: uppercase;
 }
 
+.bulkHeroToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bulkHeroToolbar > span {
+  margin: 0 4px 0 0;
+  color: var(--profile-name);
+}
+
+.bulkHeroToolbar button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--citadel-border);
+  background: rgba(15, 14, 16, 0.76);
+  clip-path: var(--citadel-button-cut);
+  color: #ffefd6;
+  cursor: pointer;
+  padding: 8px 11px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.bulkHeroToolbar button:hover,
+.bulkHeroToolbar button:focus-visible {
+  border-color: var(--profile-name);
+  background: var(--citadel-gold-faint);
+  outline: none;
+}
+
+.bulkHeroToolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.bulkHeroToolbar .bulkDeleteButton {
+  border-color: #ff6868;
+  background: var(--citadel-danger-bg);
+  color: #ffd6d7;
+}
+
 .cardGrid {
   position: static;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
@@ -446,6 +496,35 @@
   border: 1px solid var(--citadel-border);
   background: rgba(15, 14, 16, 0.72);
   padding: 16px;
+}
+
+.heroSelectionCard {
+  cursor: pointer;
+}
+
+.profileHeroCardSelected {
+  box-shadow: 0 0 0 2px var(--profile-name), 0 0 30px color-mix(in srgb, var(--profile-accent) 48%, transparent);
+}
+
+.heroSelectionIndicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(255, 239, 214, 0.78);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #06120d;
+}
+
+.heroSelectionIndicatorActive {
+  border-color: var(--profile-name);
+  background: var(--profile-name);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--profile-accent) 64%, transparent);
 }
 
 .backgroundSummary p {

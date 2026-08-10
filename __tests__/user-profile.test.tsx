@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 
 import React from 'react'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -369,6 +369,125 @@ describe('UserProfile', () => {
     }))
     expect(screen.queryByRole('link', { name: 'Open character Asasvc' })).not.toBeInTheDocument()
     expect(screen.getByText('0 total')).toBeInTheDocument()
+  })
+
+  it('selects multiple owned characters and permanently deletes them in one bulk action', async () => {
+    const user = userEvent.setup()
+    const secondHero = HEROES[1]
+    const bulkProfileData: UserProfileData = {
+      ...profileData,
+      authoredHeroes: [
+        ...profileData.authoredHeroes,
+        {
+          id: 'hero_3',
+          name: 'Bulk Second',
+          slug: 'bulk-second',
+          portrait: secondHero.portrait,
+          render: secondHero.render,
+          updatedAt: now,
+          status: 'private',
+        },
+      ],
+      savedHeroes: [
+        ...profileData.savedHeroes,
+        {
+          id: 'hero_3',
+          creatorId: 'clerk_1',
+          slug: 'bulk-second',
+          assetSlug: 'bulk-second',
+          displayName: 'Bulk Second',
+          portrait: secondHero.portrait,
+          render: secondHero.render,
+          background: secondHero.render,
+          heroInfo: secondHero.heroInfo,
+          status: 'private',
+          likesCount: 0,
+          likedByCurrentUser: false,
+          bookmarkedByCurrentUser: false,
+          allowCopies: true,
+          viewerCanEdit: true,
+          publishedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      charactersCreated: 2,
+    }
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(Response.json({
+      ids: ['hero_1', 'hero_3'],
+      deletedCount: 2,
+    }))
+
+    render(<UserProfile data={bulkProfileData} heroes={HEROES} />)
+
+    await user.click(screen.getByRole('button', { name: 'Select Characters' }))
+
+    expect(screen.queryByRole('button', { name: 'Delete character Asasvc' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select character Asasvc' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Select character Bulk Second' })).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(screen.getByRole('button', { name: 'Select All' }))
+
+    expect(screen.getByText('2 selected')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deselect character Asasvc' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Deselect character Bulk Second' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: 'Delete Selected (2)' }))
+
+    expect(screen.getByRole('dialog', { name: 'Delete 2 characters?' })).toBeInTheDocument()
+    expect(screen.getByText(/every selected character/i)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Permanently Delete 2 Characters' }))
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: ['hero_1', 'hero_3'] }),
+    }))
+    expect(screen.queryByRole('link', { name: 'Open character Asasvc' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Open character Bulk Second' })).not.toBeInTheDocument()
+    expect(screen.getByText('0 total')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select Characters' })).not.toBeInTheDocument()
+  })
+
+  it('selects a contiguous character range with Shift-click', async () => {
+    const user = userEvent.setup()
+    const rangeNames = ['Range One', 'Range Two', 'Range Three', 'Range Four']
+    const rangeProfileData: UserProfileData = {
+      ...profileData,
+      authoredHeroes: rangeNames.map((name, index) => ({
+        ...profileData.authoredHeroes[0],
+        id: `range_${index + 1}`,
+        name,
+        slug: `range-${index + 1}`,
+        portrait: HEROES[index].portrait,
+        render: HEROES[index].render,
+      })),
+      savedHeroes: rangeNames.map((name, index) => ({
+        ...profileData.savedHeroes[0],
+        id: `range_${index + 1}`,
+        slug: `range-${index + 1}`,
+        assetSlug: `range-${index + 1}`,
+        displayName: name,
+        portrait: HEROES[index].portrait,
+        render: HEROES[index].render,
+        background: HEROES[index].render,
+        heroInfo: HEROES[index].heroInfo,
+      })),
+      charactersCreated: rangeNames.length,
+    }
+
+    render(<UserProfile data={rangeProfileData} heroes={HEROES} />)
+
+    await user.click(screen.getByRole('button', { name: 'Select Characters' }))
+    await user.click(screen.getByRole('button', { name: 'Select character Range One' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Select character Range Four' }), { shiftKey: true })
+
+    expect(screen.getByText('4 selected')).toBeInTheDocument()
+    rangeNames.forEach(name => {
+      expect(screen.getByRole('button', { name: `Deselect character ${name}` })).toHaveAttribute('aria-pressed', 'true')
+    })
   })
 
   it('restores a hash-linked profile tab after mount without changing the initial render', async () => {

@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server'
 
 import { enforceJsonMutationRequest, readJsonRequestBody } from '@/lib/api-guards'
 import { toApiErrorResponse } from '@/lib/api-errors'
-import { getEditableCustomHero, listBookmarkedCustomHeroPage, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
+import { deleteCustomHeroes, getEditableCustomHero, listBookmarkedCustomHeroPage, listCurrentUserCustomHeroes, listCustomHeroPage, saveCustomHero } from '@/lib/custom-heroes'
 import type { CustomHeroSort, CustomHeroStatus } from '@/lib/custom-hero-types'
 
 function getStatus(value: string | null): CustomHeroStatus {
@@ -47,6 +47,12 @@ export async function GET(request: NextRequest) {
       return Response.json(result)
     }
 
+    if (request.nextUrl.searchParams.get('mine') === 'true') {
+      const heroes = await listCurrentUserCustomHeroes()
+
+      return Response.json({ heroes })
+    }
+
     const result = await listCustomHeroPage({
       status: getStatus(request.nextUrl.searchParams.get('status')),
       sort: getSort(request.nextUrl.searchParams.get('sort')),
@@ -82,5 +88,17 @@ export async function PUT(request: Request) {
     return Response.json({ hero })
   } catch (error) {
     return toApiErrorResponse(error, 'Hero request failed')
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    enforceJsonMutationRequest(request)
+    const payload = await readJsonRequestBody(request)
+    const result = await deleteCustomHeroes(payload)
+
+    return Response.json(result)
+  } catch (error) {
+    return toApiErrorResponse(error, 'Hero deletion failed')
   }
 }

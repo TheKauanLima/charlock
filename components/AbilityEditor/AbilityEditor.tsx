@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ClipboardEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, PointerEvent, ReactNode, RefObject } from 'react'
 
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
+import CommittedColorInput from '@/components/CommittedColorInput/CommittedColorInput'
 import IconSearchModal, { getAbilityIconGroupsAsAssets } from '@/components/IconSearchModal/IconSearchModal'
 import ScalingPicker from '@/components/panels/scaling-picker'
 import ScalingValueEditor from '@/components/panels/scaling-value-editor'
@@ -33,6 +34,7 @@ import {
   getSquareIconStyle,
   isSquareIcon,
 } from '@/lib/square-icon'
+import { getRecentCustomColors, normalizeCustomHexColor, saveRecentCustomColor } from '@/lib/custom-color-history'
 import { getCharacterLimitMessage, getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 import cn from '@/lib/utilsd'
 
@@ -144,9 +146,6 @@ const ABILITY_SECTION_MAX_COUNT = 12
 const ABILITY_MAIN_GRID_CELL_MAX_COUNT = 3
 
 const RICH_TEXT_COLOR_TOKENS = RICH_TEXT_COLORS.map(color => color.token).join('|')
-const CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY = 'charlock_recent_rich_text_colors'
-const MAX_RECENT_CUSTOM_TEXT_COLORS = 8
-
 const PROPERTY_ICON_PATH_PREFIX = '/panorama/images/icons/properties/'
 const INLINE_ICON_CARET_STOP = '\u200B'
 const TIER_BOXES: Array<{ tier: AbilityTierLevel; cost: string }> = [
@@ -188,14 +187,14 @@ function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties
     return getSquareIconStyle(path, iconColor || '#ffffff', 'stat')
   }
 
-  if (isIntrinsicColorPropertyIcon(path)) {
+  if (isIntrinsicColorPropertyIcon(path) && !iconColor) {
     return {
       backgroundImage: `url('${path}')`,
     }
   }
 
   return {
-    ...(iconColor ? { backgroundColor: iconColor } : {}),
+    backgroundColor: iconColor || '#ffffff',
     WebkitMaskImage: `url('${path}')`,
     maskImage: `url('${path}')`,
   }
@@ -243,14 +242,14 @@ function isIntrinsicColorInlineIcon(iconToken: string) {
 
 function getInlineIconHtml(iconName: string, iconColor = '') {
   const iconPath = getInlineIconPath(iconName)
-  const hasIntrinsicColor = isIntrinsicColorInlineIcon(iconName)
+  const hasIntrinsicColor = isIntrinsicColorInlineIcon(iconName) && !iconColor
   const className = hasIntrinsicColor ? `${styles.inlineIcon} ${styles.inlineIconOriginalColor}` : styles.inlineIcon
   const squareOption = isSquareIcon(iconName) ? getSquareIconOption(iconName) : null
   const style = squareOption
     ? `width:${squareOption.statSize};height:${squareOption.statSize};background-color:${iconColor || '#fff8ec'};-webkit-mask-image:none;mask-image:none`
-    : isIntrinsicColorPropertyIcon(iconName)
+    : hasIntrinsicColor
     ? `background-image:url('${iconPath}')`
-    : `${iconColor ? `background-color:${iconColor};` : ''}-webkit-mask-image:url('${iconPath}');mask-image:url('${iconPath}')`
+    : `background-color:${iconColor || '#fff8ec'};-webkit-mask-image:url('${iconPath}');mask-image:url('${iconPath}')`
   const colorAttribute = !hasIntrinsicColor && iconColor ? ` data-inline-icon-color="${iconColor}"` : ''
 
   return `<span class="${className}" data-inline-icon="${iconName}"${colorAttribute} contenteditable="false" style="${style}"></span><span class="${styles.inlineIconCaret}" data-inline-icon-caret="true">${INLINE_ICON_CARET_STOP}</span>`
@@ -296,51 +295,7 @@ function escapeHtml(value: string) {
 }
 
 function normalizeHexColor(value: string) {
-  const trimmed = value.trim()
-
-  if (/^#[\da-f]{6}$/i.test(trimmed)) {
-    return trimmed.toLowerCase()
-  }
-
-  return null
-}
-
-function getRecentCustomTextColors() {
-  if (typeof window === 'undefined') {
-    return []
-  }
-
-  try {
-    const parsedValue: unknown = JSON.parse(window.localStorage.getItem(CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY) ?? '[]')
-
-    if (!Array.isArray(parsedValue)) {
-      return []
-    }
-
-    return parsedValue
-      .map(value => typeof value === 'string' ? normalizeHexColor(value) : null)
-      .filter((value): value is string => Boolean(value))
-      .slice(0, MAX_RECENT_CUSTOM_TEXT_COLORS)
-  } catch {
-    return []
-  }
-}
-
-function saveRecentCustomTextColor(color: string) {
-  const normalizedColor = normalizeHexColor(color)
-
-  if (!normalizedColor || typeof window === 'undefined') {
-    return []
-  }
-
-  const recentColors = [
-    normalizedColor,
-    ...getRecentCustomTextColors().filter(recentColor => recentColor !== normalizedColor),
-  ].slice(0, MAX_RECENT_CUSTOM_TEXT_COLORS)
-
-  window.localStorage.setItem(CUSTOM_RICH_TEXT_COLOR_STORAGE_KEY, JSON.stringify(recentColors))
-
-  return recentColors
+  return normalizeCustomHexColor(value)
 }
 
 function tokenTextToHtml(text: string) {
@@ -623,6 +578,143 @@ function elementMatchesRichTextEffect(element: HTMLElement, effect: RichTextEffe
   return element.dataset.richColor === effect.token || element.dataset.richCustomColor === effect.token
 }
 
+function getRichTextFormattingIdentity(element: HTMLElement) {
+  if (element.tagName === 'STRONG' || element.tagName === 'B') {
+    return 'bold'
+  }
+
+  if (element.tagName === 'EM') {
+    return 'italic'
+  }
+
+  if (element.dataset.richDark === 'true') {
+    return 'dark'
+  }
+
+  if (element.dataset.richColor) {
+    return `color:${element.dataset.richColor}`
+  }
+
+  if (element.dataset.richCustomColor) {
+    return `custom-color:${element.dataset.richCustomColor}`
+  }
+
+  return null
+}
+
+function getCrossedStartFormattingAncestor(range: Range, root: HTMLElement) {
+  let current: Node | null = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer
+    : range.startContainer.parentNode
+  let outermostCrossedAncestor: HTMLElement | null = null
+
+  while (current && current !== root) {
+    if (current instanceof HTMLElement && getRichTextFormattingIdentity(current) && !current.contains(range.endContainer)) {
+      outermostCrossedAncestor = current
+    }
+
+    current = current.parentNode
+  }
+
+  return outermostCrossedAncestor
+}
+
+function normalizeRichTextStructure(root: HTMLElement) {
+  root.normalize()
+
+  const parents = [root, ...Array.from(root.querySelectorAll<HTMLElement>('*'))]
+
+  parents.forEach(parent => {
+    let current = parent.firstChild
+
+    while (current) {
+      const next = current.nextSibling
+
+      if (current instanceof HTMLElement && next instanceof HTMLElement) {
+        const currentIdentity = getRichTextFormattingIdentity(current)
+        const nextIdentity = getRichTextFormattingIdentity(next)
+
+        if (currentIdentity && currentIdentity === nextIdentity) {
+          while (next.firstChild) {
+            current.append(next.firstChild)
+          }
+
+          next.remove()
+          continue
+        }
+      }
+
+      current = next
+    }
+  })
+
+  Array.from(root.querySelectorAll<HTMLElement>('strong, b, em, [data-rich-dark], [data-rich-color], [data-rich-custom-color]'))
+    .reverse()
+    .forEach(element => {
+      const text = (element.textContent ?? '').replaceAll(INLINE_ICON_CARET_STOP, '')
+      const hasNonTextContent = Boolean(element.querySelector('br, [data-inline-icon], [data-inline-icon-marker]'))
+
+      if (!text && !hasNonTextContent) {
+        element.remove()
+      }
+    })
+
+  root.normalize()
+}
+
+function removeRichTextEffectFromFragment(fragment: DocumentFragment, effect: RichTextEffect) {
+  Array.from(fragment.querySelectorAll<HTMLElement>('*'))
+    .filter(element => elementMatchesRichTextEffect(element, effect))
+    .forEach(element => {
+      unwrapRichTextElement(element)
+    })
+}
+
+function mergeAdjacentRichTextEffectElements(element: HTMLElement, effect: RichTextEffect) {
+  let mergedElement = element
+  const previousSibling = mergedElement.previousSibling
+
+  if (previousSibling instanceof HTMLElement && elementMatchesRichTextEffect(previousSibling, effect)) {
+    while (mergedElement.firstChild) {
+      previousSibling.append(mergedElement.firstChild)
+    }
+
+    mergedElement.remove()
+    mergedElement = previousSibling
+  }
+
+  const nextSibling = mergedElement.nextSibling
+
+  if (nextSibling instanceof HTMLElement && elementMatchesRichTextEffect(nextSibling, effect)) {
+    while (nextSibling.firstChild) {
+      mergedElement.append(nextSibling.firstChild)
+    }
+
+    nextSibling.remove()
+  }
+
+  return mergedElement
+}
+
+function getNormalizedInsertedEffectRange(wrapper: HTMLElement, root: HTMLElement, effect: RichTextEffect) {
+  const nextRange = document.createRange()
+  const containingEffectElement = wrapper.parentNode
+    ? findRichTextEffectElement(wrapper.parentNode, effect, root)
+    : null
+  let normalizedEffectElement = wrapper
+
+  if (containingEffectElement) {
+    unwrapRichTextElement(wrapper)
+    normalizedEffectElement = containingEffectElement
+  }
+
+  normalizedEffectElement = mergeAdjacentRichTextEffectElements(normalizedEffectElement, effect)
+  normalizedEffectElement.normalize()
+  nextRange.selectNodeContents(normalizedEffectElement)
+
+  return nextRange
+}
+
 function findRichTextEffectElement(node: Node, effect: RichTextEffect, root: HTMLElement) {
   let current: Node | null = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode
 
@@ -635,6 +727,22 @@ function findRichTextEffectElement(node: Node, effect: RichTextEffect, root: HTM
   }
 
   return null
+}
+
+function expandRangeToExistingEffectEdges(range: Range, root: HTMLElement, effect: RichTextEffect) {
+  const expandedRange = range.cloneRange()
+  const startEffectElement = findRichTextEffectElement(range.startContainer, effect, root)
+  const endEffectElement = findRichTextEffectElement(range.endContainer, effect, root)
+
+  if (startEffectElement) {
+    expandedRange.setStartBefore(startEffectElement)
+  }
+
+  if (endEffectElement) {
+    expandedRange.setEndAfter(endEffectElement)
+  }
+
+  return expandedRange
 }
 
 function getRangeUnits(range: Range, root: HTMLElement) {
@@ -782,6 +890,7 @@ function unwrapSingleContainingEffectFromRange(range: Range, root: HTMLElement, 
 
   nextRange.setStartBefore(firstNode)
   nextRange.setEndAfter(lastNode)
+  parent.normalize()
 
   return nextRange
 }
@@ -824,6 +933,7 @@ function unwrapEffectFromRange(range: Range, root: HTMLElement, effect: RichText
 
   nextRange.setStartBefore(firstNode)
   nextRange.setEndAfter(lastNode)
+  root.normalize()
 
   return nextRange
 }
@@ -1365,7 +1475,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   }
 
   function openIconModal(target: IconTarget) {
-    setSelectedIconColor(getIconTargetStat(target)?.iconColor ?? '')
+    setSelectedIconColor(target.type === 'abilityIcon' ? activeAbility.iconColor ?? '' : getIconTargetStat(target)?.iconColor ?? '')
     setIconTarget(target)
   }
 
@@ -1376,9 +1486,14 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       return
     }
 
+    if (iconTarget.type === 'abilityIcon') {
+      setActiveAbility(current => ({ ...current, iconColor: color }))
+      return
+    }
+
     const targetStat = getIconTargetStat(iconTarget)
 
-    if (!targetStat || isIntrinsicColorPropertyIcon(targetStat.icon)) {
+    if (!targetStat) {
       return
     }
 
@@ -1391,11 +1506,9 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     }
 
     if (iconTarget.type === 'abilityIcon') {
-      setActiveAbility(current => ({ ...current, icon: path }))
+      setActiveAbility(current => ({ ...current, icon: path, iconColor: selectedIconColor }))
     } else if (iconTarget.type !== 'inlineIcon') {
-      const iconColor = isIntrinsicColorPropertyIcon(path) ? '' : selectedIconColor
-
-      updateIconTarget(iconTarget, { icon: path, iconColor })
+      updateIconTarget(iconTarget, { icon: path, iconColor: selectedIconColor })
     } else {
       updateSection(iconTarget.sectionId, section => {
         if (section.type !== 'richText') {
@@ -1404,7 +1517,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
         const markerToken = `[[inline-icon-marker:${iconTarget.marker}]]`
         const iconName = getInlineIconToken(path)
-        const iconColor = isIntrinsicColorInlineIcon(iconName) ? '' : selectedIconColor
+        const iconColor = selectedIconColor
         const iconToken = iconColor ? `[i:${iconName}|${iconColor}]` : `[i:${iconName}]`
 
         return {
@@ -1426,6 +1539,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
       onHeroInfoChange({
         ...heroInfo,
         [iconKey]: iconPath,
+        abilityIconColor: selectedIconColor,
       })
     }
 
@@ -1440,6 +1554,18 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
 
     setAbilityIconTarget(null)
     setIconSearch('')
+    setSelectedIconColor('')
+  }
+
+  function applyHeroAbilityIconColor(color: string) {
+    setSelectedIconColor(color)
+
+    if (heroInfo && onHeroInfoChange) {
+      onHeroInfoChange({
+        ...heroInfo,
+        abilityIconColor: color,
+      })
+    }
   }
 
   function closeIconModal() {
@@ -1472,6 +1598,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
   function closeAbilityIconModal() {
     setAbilityIconTarget(null)
     setIconSearch('')
+    setSelectedIconColor('')
   }
 
   function renderInlineStat(stat: AbilityStat, label: string, onChange: (stat: AbilityStat) => void, onIconClick: () => void, variant: 'timing' | 'sub' | 'main' | 'lower' = 'sub') {
@@ -1495,7 +1622,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
     const statLabel = capabilities.canEditStats ? `${label} stat. Scaling ${stat.scaling}. Use the scaling button to edit scaling.` : `${label} stat`
     const iconContent = (
       <span
-        className={cn(styles.propertyIcon, isIntrinsicColorPropertyIcon(stat.icon) && styles.propertyIconOriginalColor)}
+        className={cn(styles.propertyIcon, isIntrinsicColorPropertyIcon(stat.icon) && !stat.iconColor && styles.propertyIconOriginalColor)}
         aria-hidden="true"
         style={getPropertyIconVisualStyle(stat.icon, stat.iconColor)}
       />
@@ -1682,6 +1809,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               }
 
               if (target.set === currentTarget.set && target.index === currentTarget.index) {
+                setSelectedIconColor(heroInfo?.abilityIconColor ?? '')
                 setAbilityIconTarget(target)
                 return
               }
@@ -1711,7 +1839,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               <div className={styles.titleGroup}>
                 {capabilities.canChangeIcons ? (
                   <button type="button" className={styles.abilityIconButton} aria-label="Choose ability icon" onClick={() => openIconModal({ type: 'abilityIcon' })}>
-                  <span aria-hidden="true" style={getWhiteAbilityIconVisualStyle(activeAbility.icon)} />
+                  <span aria-hidden="true" style={getWhiteAbilityIconVisualStyle(activeAbility.icon, activeAbility.iconColor || '#ffffff')} />
                   </button>
                 ) : null}
                 <label className={styles.nameInputWrap}>
@@ -1889,14 +2017,13 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
           groups={abilityIconPickerGroups}
           statGroups={filteredIconGroups}
           search={iconSearch}
-          selectedIconColor=""
+          selectedIconColor={selectedIconColor}
           title="Ability icon selector"
           testId="ability-icon-modal"
           searchPlaceholder="Search ability icons"
           previewMode="ability"
-          showColorPicker={false}
           closeLabel="Close ability icon selector"
-          onIconColorChange={() => undefined}
+          onIconColorChange={applyHeroAbilityIconColor}
           onSearch={setIconSearch}
           onSelect={iconPath => applyHeroAbilityIcon(abilityIconTarget, iconPath)}
           onClose={closeAbilityIconModal}
@@ -2095,6 +2222,7 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange, o
       if (nextRange) {
         selection.removeAllRanges()
         selection.addRange(nextRange)
+        normalizeRichTextStructure(editorRef.current)
         lastSelectionRef.current = nextRange.cloneRange()
         editorRef.current.focus()
         syncText()
@@ -2103,19 +2231,29 @@ function TierTextEditor({ text, tier, readOnly = false, onFocus, onTextChange, o
       return
     }
 
+    const expandedRange = expandRangeToExistingEffectEdges(range, editorRef.current, { type: 'bold' })
+
     selection.removeAllRanges()
-    selection.addRange(range)
+    selection.addRange(expandedRange)
 
+    const crossedStartAncestor = getCrossedStartFormattingAncestor(expandedRange, editorRef.current)
     const wrapper = document.createElement('strong')
-    const selectedContent = range.extractContents()
+    const selectedContent = expandedRange.extractContents()
 
+    removeRichTextEffectFromFragment(selectedContent, { type: 'bold' })
     wrapper.append(selectedContent)
-    range.insertNode(wrapper)
-    const nextRange = document.createRange()
 
-    nextRange.selectNodeContents(wrapper)
+    if (crossedStartAncestor?.isConnected) {
+      expandedRange.setStartAfter(crossedStartAncestor)
+      expandedRange.collapse(true)
+    }
+
+    expandedRange.insertNode(wrapper)
+    const nextRange = getNormalizedInsertedEffectRange(wrapper, editorRef.current, { type: 'bold' })
+
     selection.removeAllRanges()
     selection.addRange(nextRange)
+    normalizeRichTextStructure(editorRef.current)
     lastSelectionRef.current = nextRange.cloneRange()
     editorRef.current?.focus()
     syncText()
@@ -2282,7 +2420,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
   const lastSelectionRef = useRef<Range | null>(null)
   const [isSwatchOpen, setIsSwatchOpen] = useState(false)
   const [customColorValue, setCustomColorValue] = useState('#ffffff')
-  const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomTextColors)
+  const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomColors)
   const [swatchPanelPosition, setSwatchPanelPosition] = useState({ left: 8, top: 8 })
 
   useEffect(() => {
@@ -2656,11 +2794,18 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
       if (nextRange) {
         selection.removeAllRanges()
         selection.addRange(nextRange)
+        normalizeRichTextStructure(editorRef.current)
         lastSelectionRef.current = nextRange.cloneRange()
         editorRef.current.focus()
         syncEditorText()
         return
       }
+    }
+
+    if (editorRef.current && options.toggleEffect) {
+      range = expandRangeToExistingEffectEdges(range, editorRef.current, options.toggleEffect)
+      selection.removeAllRanges()
+      selection.addRange(range)
     }
 
     const wrapper = document.createElement(tagName)
@@ -2673,19 +2818,43 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
       wrapper.setAttribute(name, value)
     })
 
+    const crossedStartAncestor = editorRef.current
+      ? getCrossedStartFormattingAncestor(range, editorRef.current)
+      : null
     const selectedContent = range.extractContents()
 
     if (options.clearColoring) {
       removeRichTextColoring(selectedContent)
     }
 
+    if (options.toggleEffect) {
+      removeRichTextEffectFromFragment(selectedContent, options.toggleEffect)
+    }
+
     wrapper.append(selectedContent)
+
+    if (crossedStartAncestor?.isConnected) {
+      range.setStartAfter(crossedStartAncestor)
+      range.collapse(true)
+    }
+
     range.insertNode(wrapper)
     removeAdjacentDuplicateInlineIcons(wrapper)
-    const nextRange = document.createRange()
-    nextRange.selectNodeContents(wrapper)
+    const nextRange = options.toggleEffect && editorRef.current
+      ? getNormalizedInsertedEffectRange(wrapper, editorRef.current, options.toggleEffect)
+      : document.createRange()
+
+    if (!options.toggleEffect || !editorRef.current) {
+      nextRange.selectNodeContents(wrapper)
+    }
+
     selection.removeAllRanges()
     selection.addRange(nextRange)
+
+    if (editorRef.current) {
+      normalizeRichTextStructure(editorRef.current)
+    }
+
     lastSelectionRef.current = nextRange.cloneRange()
     editorRef.current?.focus()
     syncEditorText()
@@ -2743,7 +2912,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     }
 
     setCustomColorValue(customColor)
-    setRecentCustomColors(saveRecentCustomTextColor(customColor))
+    setRecentCustomColors(saveRecentCustomColor(customColor))
     applyInlineElement(
       'span',
       {
@@ -2808,7 +2977,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
             aria-label="Open text color swatches"
             onMouseDown={handleToolbarMouseDown}
             onClick={() => {
-              setRecentCustomColors(getRecentCustomTextColors())
+              setRecentCustomColors(getRecentCustomColors())
               setSwatchPanelPosition(getSwatchPanelPosition())
               setIsSwatchOpen(open => !open)
             }}
@@ -2853,12 +3022,11 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
               </div>
               <label className={styles.customColorPicker}>
                 <span>Custom</span>
-                <input
-                  type="color"
+                <CommittedColorInput
                   value={customColorValue}
-                  aria-label="Custom text color"
+                  ariaLabel="Custom text color"
                   onMouseDown={handleCustomColorMouseDown}
-                  onChange={event => applyCustomTextColor(event.target.value)}
+                  onCommit={applyCustomTextColor}
                 />
               </label>
               {recentCustomColors.length ? (

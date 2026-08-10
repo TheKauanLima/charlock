@@ -36,6 +36,7 @@ export type AbilitySection = AbilityRichTextSection | AbilityGridSection
 export interface AbilityVariant {
   name: string
   icon: string
+  iconColor?: string
   cooldown: AbilityStat
   hasCooldown: boolean
   hasCharges: boolean
@@ -224,6 +225,7 @@ function buildDefaultAbilityVariant(slot: number, hero: AbilityHeroLike, idPrefi
   return {
     name: `${hero.displayName} Ability ${slot}`,
     icon: getAbilityIcon(hero.heroInfo, slot),
+    iconColor: '',
     cooldown: buildAbilityStat({
       label: 'Cooldown',
       value: baseCooldown,
@@ -364,6 +366,7 @@ export function normalizeAbilityDefinition(value: unknown, fallback: AbilityDefi
     return {
       name: getString(variantRecord.name, fallbackVariant.name),
       icon: getString(variantRecord.icon, fallbackVariant.icon),
+      iconColor: getString(variantRecord.iconColor, fallbackVariant.iconColor ?? ''),
       cooldown: normalizeAbilityStat(variantRecord.cooldown, fallbackVariant.cooldown),
       hasCooldown: getBoolean(variantRecord.hasCooldown, fallbackVariant.hasCooldown),
       hasCharges: getBoolean(variantRecord.hasCharges, fallbackVariant.hasCharges),

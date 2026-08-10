@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import { buildDefaultAbilityStats, normalizeAbilityStats } from '@/lib/ability-editor-types'
+import { CUSTOM_COLOR_HISTORY_STORAGE_KEY } from '@/lib/custom-color-history'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import { HEROES } from '@/lib/hero-data'
 
@@ -275,10 +276,13 @@ describe('AbilityEditor', () => {
 
     const iconModal = screen.getByTestId('ability-icon-modal')
 
+    fireEvent.change(within(iconModal).getByLabelText('Custom icon color'), { target: { value: '#3157c8' } })
+
     await user.click(within(iconModal).getByRole('button', { name: 'Use Abrams 2' }))
 
     expect(onHeroInfoChange).toHaveBeenCalledWith(expect.objectContaining({
       ability1Icon: hero.heroInfo.ability2Icon,
+      abilityIconColor: '#3157c8',
     }))
     expect(onAbilityIconChange).toHaveBeenCalledWith({ set: 'primary', index: 0 }, hero.heroInfo.ability2Icon)
 
@@ -318,7 +322,10 @@ describe('AbilityEditor', () => {
     await user.click(statIconsTab)
 
     expect(statIconsTab).toHaveAttribute('aria-selected', 'true')
-    expect(within(iconModal).getAllByRole('button', { name: /^Use / })).toHaveLength(
+    const iconChoiceButtons = within(iconModal).getAllByRole('button', { name: /^Use / })
+      .filter(button => !button.getAttribute('aria-label')?.startsWith('Use recent icon color'))
+
+    expect(iconChoiceButtons).toHaveLength(
       PROPERTY_ICON_GROUPS.flatMap(group => group.assets).length + 1,
     )
 
@@ -379,11 +386,16 @@ describe('AbilityEditor', () => {
     const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
     const iconModalAbilityRule = stylesheet.match(/\.iconModalAbility\s*\{([^}]*)\}/)?.[1]
     const iconTabsRule = stylesheet.match(/\.iconTabs\s*\{([^}]*)\}/)?.[1]
+    const iconGridAbilityRule = stylesheet.match(/\.iconGridAbility\s*\{([^}]*)\}/)?.[1]
     const iconAbilityGroupRule = stylesheet.match(/\.iconAbilityGroup\s*\{([^}]*)\}/)?.[1]
     const iconAbilityGroupTitleRule = stylesheet.match(/\.iconAbilityGroupTitle\s*\{([^}]*)\}/)?.[1]
 
     expect(iconModalAbilityRule).toMatch(/grid-template-rows:\s*auto auto auto auto minmax\(0,\s*1fr\)/)
+    expect(iconModalAbilityRule).toMatch(/height:\s*min\(700px,\s*calc\(100dvh - 44px\)\)/)
     expect(iconTabsRule).toMatch(/min-height:\s*38px/)
+    expect(iconGridAbilityRule).toMatch(/max-height:\s*none/)
+    expect(iconGridAbilityRule).toMatch(/padding:\s*8px 6px 28px 2px/)
+    expect(iconGridAbilityRule).toMatch(/scroll-padding-bottom:\s*28px/)
     expect(iconAbilityGroupRule).toMatch(/grid-template-rows:\s*minmax\(14px,\s*auto\) repeat\(1,\s*72px\)/)
     expect(iconAbilityGroupTitleRule).not.toMatch(/margin:\s*0 0 -/)
 
@@ -1041,6 +1053,60 @@ describe('AbilityEditor', () => {
     expect(savedTierTwo?.variant.name).toBe('Unified Ability Name')
   })
 
+  it('extends tier bolding from inside an existing run without nesting strong elements', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+    const tierOne = ability.tiers.find(tier => tier.tier === 1)
+
+    if (!tierOne) {
+      throw new Error('Expected tier one ability data')
+    }
+
+    tierOne.upgradeText = '[b]Rapid[/b] fire'
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const tierTextEditor = screen.getByRole('textbox', { name: 'Tier 1 upgrade text' })
+
+    await waitFor(() => {
+      expect(tierTextEditor.querySelector('strong')).not.toBeNull()
+    })
+
+    const boldTextNode = tierTextEditor.querySelector('strong')?.firstChild
+    const plainTextNode = tierTextEditor.querySelector('strong')?.nextSibling
+
+    expect(boldTextNode).not.toBeNull()
+    expect(plainTextNode).not.toBeNull()
+
+    const range = document.createRange()
+
+    range.setStart(boldTextNode!, 2)
+    range.setEnd(plainTextNode!, ' fire'.length)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+
+    await user.click(screen.getByRole('button', { name: 'Bold Tier 1 selected text' }))
+
+    expect(tierTextEditor.querySelector('strong strong')).toBeNull()
+    expect(tierTextEditor.querySelectorAll('strong')).toHaveLength(1)
+    expect(tierTextEditor.querySelector('strong')).toHaveTextContent('Rapid fire')
+
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedTierOne = savedAbility?.tiers.find(tier => tier.tier === 1)
+
+    expect(savedTierOne?.upgradeText).toBe('[b]Rapid fire[/b]')
+  })
+
   it('cascades stat edits from lower tiers into higher tiers', async () => {
     const user = userEvent.setup()
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
@@ -1316,6 +1382,71 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text).not.toContain('[c:healing]Abrams')
   })
 
+  it('toggles darkening across an italic boundary without changing or fragmenting italics', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.sections = [{
+      id: 'description',
+      type: 'richText',
+      title: 'Description',
+      text: '[i]ability[/i] detail.',
+    }]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+
+    await waitFor(() => {
+      expect(richTextEditor.querySelector('em')).not.toBeNull()
+    })
+
+    const italicTextNode = richTextEditor.querySelector('em')?.firstChild
+    const plainTextNode = richTextEditor.querySelector('em')?.nextSibling
+
+    expect(italicTextNode).not.toBeNull()
+    expect(plainTextNode).not.toBeNull()
+
+    const range = document.createRange()
+
+    range.setStart(italicTextNode!, 0)
+    range.setEnd(plainTextNode!, ' de'.length)
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+
+    const darkButton = screen.getByRole('button', { name: 'Darken selected text' })
+
+    await user.click(darkButton)
+
+    expect(richTextEditor).toHaveTextContent('ability detail.')
+    expect(richTextEditor.querySelectorAll('[data-rich-dark="true"]')).toHaveLength(1)
+    expect(richTextEditor.querySelector('em')?.textContent).toBe('ability')
+    expect(Array.from(richTextEditor.querySelectorAll('em')).some(element => element.textContent === '')).toBe(false)
+
+    await user.click(darkButton)
+
+    expect(richTextEditor).toHaveTextContent('ability detail.')
+    expect(richTextEditor.querySelector('[data-rich-dark="true"]')).toBeNull()
+    expect(richTextEditor.querySelectorAll('em')).toHaveLength(1)
+    expect(richTextEditor.querySelector('em')?.textContent).toBe('ability')
+    expect(Array.from(richTextEditor.querySelectorAll('em')).some(element => element.textContent === '')).toBe(false)
+
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toBe('[i]ability[/i] detail.')
+  })
+
   it('unbolds only the selected part of an existing bold run', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
@@ -1343,18 +1474,26 @@ describe('AbilityEditor', () => {
       expect(richTextEditor.querySelector('strong')).not.toBeNull()
     })
 
-    const boldTextNode = richTextEditor.querySelector('strong')?.firstChild
+    const boldElement = richTextEditor.querySelector('strong')
+    const boldTextNode = boldElement?.firstChild
 
     expect(boldTextNode).not.toBeNull()
 
+    const secondSelectedTextNode = (boldTextNode as Text).splitText(4)
+    secondSelectedTextNode.splitText(2)
     const range = document.createRange()
 
     range.setStart(boldTextNode!, 2)
-    range.setEnd(boldTextNode!, 6)
+    range.setEnd(secondSelectedTextNode, 2)
     window.getSelection()?.removeAllRanges()
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Bold selected text' }))
+
+    expect(richTextEditor.childNodes).toHaveLength(3)
+    expect(richTextEditor.childNodes[1]).toHaveProperty('nodeType', Node.TEXT_NODE)
+    expect(richTextEditor.childNodes[1]).toHaveTextContent('rams')
+
     await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
@@ -1396,6 +1535,7 @@ describe('AbilityEditor', () => {
   })
 
   it('adds custom text colors to recently made swatches and saves reusable custom color tokens', async () => {
+    window.localStorage.removeItem(CUSTOM_COLOR_HISTORY_STORAGE_KEY)
     window.localStorage.removeItem('charlock_recent_rich_text_colors')
 
     const user = userEvent.setup()
@@ -1431,7 +1571,7 @@ describe('AbilityEditor', () => {
     fireEvent.change(screen.getByLabelText('Custom text color'), { target: { value: '#123456' } })
 
     expect(richTextEditor.querySelector('[data-rich-custom-color="#123456"]')).not.toBeNull()
-    expect(window.localStorage.getItem('charlock_recent_rich_text_colors')).toContain('#123456')
+    expect(window.localStorage.getItem(CUSTOM_COLOR_HISTORY_STORAGE_KEY)).toContain('#123456')
 
     const channelsTextNode = findTextNodeContaining(richTextEditor, 'channels')
     const channelsRange = document.createRange()
@@ -1509,7 +1649,7 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text).not.toContain('[c:orange]')
   })
 
-  it('extends an effect when only part of the selection already has it', async () => {
+  it('expands one continuous bold run when a mixed selection starts inside bold text', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
     const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
@@ -1537,24 +1677,35 @@ describe('AbilityEditor', () => {
     })
 
     const boldElement = richTextEditor.querySelector('strong')
+    const boldTextNode = boldElement?.firstChild
     const plainTextNode = boldElement?.nextSibling
 
     expect(boldElement).not.toBeNull()
+    expect(boldTextNode).not.toBeNull()
     expect(plainTextNode).not.toBeNull()
 
     const range = document.createRange()
-    range.setStartBefore(boldElement!)
+    range.setStart(boldTextNode!, 2)
     range.setEnd(plainTextNode!, ' channels'.length)
     window.getSelection()?.removeAllRanges()
     window.getSelection()?.addRange(range)
 
     await user.click(screen.getByRole('button', { name: 'Bold selected text' }))
+
+    const extendedBoldElement = richTextEditor.querySelector('strong')
+
+    expect(richTextEditor.querySelector('strong strong')).toBeNull()
+    expect(richTextEditor.querySelectorAll('strong')).toHaveLength(1)
+    expect(extendedBoldElement).toHaveTextContent('Abrams channels')
+    expect(extendedBoldElement?.childNodes).toHaveLength(1)
+    expect(extendedBoldElement?.firstChild).toHaveProperty('nodeType', Node.TEXT_NODE)
+
     await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
 
-    expect(savedRichText?.text).toMatch(/\[b\][\s\S]*channels\[\/b\]/)
+    expect(savedRichText?.text).toBe('[b]Abrams channels[/b] custom ability 1.')
   })
 
   it('partitions main grid cells across the full grid width with editable top labels', async () => {
@@ -1689,6 +1840,50 @@ describe('AbilityEditor', () => {
     }))
   })
 
+  it('keeps an open main-cell scaling menu above lower-cell scaling controls', async () => {
+    const user = userEvent.setup()
+    const ability = structuredClone(buildDefaultAbilityStats(HEROES[0]).abilities[0])
+
+    ability.sections = ability.sections.filter(section => section.type === 'richText')
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Grid' }))
+    await user.click(screen.getByRole('button', { name: 'Add Lower Cell' }))
+
+    const mainStat = screen.getByTestId('ability-stat-main-damage')
+    const lowerStat = screen.getByTestId('ability-stat-lower-detail')
+
+    await user.click(within(lowerStat).getByRole('button', { name: 'Edit Detail scaling' }))
+    await user.click(screen.getByRole('button', { name: 'Set Detail scaling to spirit' }))
+    await user.click(within(mainStat).getByRole('button', { name: 'Edit Damage scaling' }))
+
+    const mainCellGrid = mainStat.closest('[class*="mainCellGrid"]')
+    const openMenu = screen.getByRole('dialog', { name: 'Damage scaling controls' })
+
+    expect(mainCellGrid).toContainElement(openMenu)
+    expect(lowerStat).toHaveAttribute('data-scaling', 'spirit')
+
+    const stylesheet = readFileSync('components/AbilityEditor/AbilityEditor.module.css', 'utf8')
+    const openMainGridRule = stylesheet.match(/\.gridEditor:has\(\.mainCellGrid \[data-scaling-picker-menu\]\) \.mainCellGrid\s*\{([^}]*)\}/m)?.[1]
+    const openPreviewCellRule = stylesheet.match(/\.mainEditorColumnPreview \.mainCellGrid > \.mainCell:has\(\[data-scaling-picker-menu\]\)\s*\{([^}]*)\}/m)?.[1]
+    const pickerStylesheet = readFileSync('components/panels/ScalingPicker.module.css', 'utf8')
+    const pickerRootRule = pickerStylesheet.match(/^\.root\s*\{([^}]*)\}/m)?.[1]
+    const openMainGridZIndex = Number(openMainGridRule?.match(/z-index:\s*(\d+)/)?.[1])
+    const pickerRootZIndex = Number(pickerRootRule?.match(/z-index:\s*(\d+)/)?.[1])
+
+    expect(openMainGridRule).toMatch(/position:\s*relative/)
+    expect(openPreviewCellRule).toMatch(/z-index:\s*12001/)
+    expect(openMainGridZIndex).toBeGreaterThan(pickerRootZIndex)
+  })
+
   it('keeps lower-stat IDs unique after removing and adding rows', async () => {
     const user = userEvent.setup()
     const onSave = vi.fn()
@@ -1807,9 +2002,24 @@ describe('AbilityEditor', () => {
 
     expect(coloredIconPreview?.style.backgroundImage).toContain('damage_bullet_color.svg')
     expect(coloredIconPreview?.style.maskImage).toBe('')
+
+    fireEvent.change(within(iconModal).getByLabelText('Custom icon color'), { target: { value: '#a143d8' } })
+
+    expect(coloredIconPreview?.style.backgroundImage).toBe('')
+    expect(coloredIconPreview?.style.maskImage).toContain('damage_bullet_color.svg')
+
+    await user.click(coloredIconOption)
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toContain('[i:damage_bullet_color|#a143d8]')
   })
 
   it('applies selected icon swatch colors to tintable inline icons', async () => {
+    window.localStorage.removeItem(CUSTOM_COLOR_HISTORY_STORAGE_KEY)
+
     const user = userEvent.setup()
     const onSave = vi.fn()
     const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
@@ -1853,13 +2063,73 @@ describe('AbilityEditor', () => {
 
     expect(healPreview?.style.backgroundColor).toBe('rgb(132, 201, 85)')
 
+    const customIconColorInput = within(iconModal).getByLabelText('Custom icon color')
+
+    fireEvent.input(customIconColorInput, { target: { value: '#203142' } })
+    fireEvent.input(customIconColorInput, { target: { value: '#1d2e3f' } })
+
+    expect(healPreview?.style.backgroundColor).toBe('rgb(132, 201, 85)')
+    expect(window.localStorage.getItem(CUSTOM_COLOR_HISTORY_STORAGE_KEY)).toBeNull()
+    expect(within(iconModal).queryByRole('button', { name: 'Use recent icon color #203142' })).not.toBeInTheDocument()
+
+    fireEvent.input(customIconColorInput, { target: { value: '#1a2b3c' } })
+    fireEvent.change(customIconColorInput)
+
+    expect(healPreview?.style.backgroundColor).toBe('rgb(26, 43, 60)')
+    expect(within(iconModal).getByRole('button', { name: 'Use recent icon color #1a2b3c' })).toBeInTheDocument()
+    expect(window.localStorage.getItem(CUSTOM_COLOR_HISTORY_STORAGE_KEY)).toContain('#1a2b3c')
+
     await user.click(healOption)
+
+    const endRange = document.createRange()
+
+    endRange.selectNodeContents(richTextEditor)
+    endRange.collapse(false)
+    richTextEditor.focus()
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(endRange)
+
+    await user.click(screen.getByRole('button', { name: 'Inline Icon' }))
+
+    const reopenedIconModal = screen.getByTestId('property-icon-modal')
+
+    expect(within(reopenedIconModal).getByRole('button', { name: 'Use recent icon color #1a2b3c' })).toBeInTheDocument()
+    await user.click(within(reopenedIconModal).getByRole('button', { name: 'Close property icon selector' }))
     await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
 
-    expect(savedRichText?.text).toContain('[i:heal|#84c955]')
+    expect(savedRichText?.text).toContain('[i:heal|#1a2b3c]')
+  })
+
+  it('persists a custom color for the focused ability icon', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Choose ability icon' }))
+
+    const iconModal = screen.getByTestId('property-icon-modal')
+
+    fireEvent.change(within(iconModal).getByLabelText('Custom icon color'), { target: { value: '#d04f91' } })
+    await user.type(within(iconModal).getByPlaceholderText('Search property icons'), 'heal')
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Heal' }))
+    await confirmFocusedGoBack(user)
+
+    expect(onSave.mock.calls[0]?.[0]).toMatchObject({
+      icon: '/panorama/images/icons/properties/heal.svg',
+      iconColor: '#d04f91',
+    })
   })
 
   it('inserts hero ability icons from the inline icon selector', async () => {
@@ -1897,6 +2167,8 @@ describe('AbilityEditor', () => {
     expect(screen.getByRole('dialog', { name: 'Inline icon selector' })).toBeInTheDocument()
     expect(heroAbilitiesTab).toHaveAttribute('aria-selected', 'true')
 
+    fireEvent.change(within(iconModal).getByLabelText('Custom icon color'), { target: { value: '#bada55' } })
+
     await user.click(within(iconModal).getByRole('button', { name: 'Use Abrams 2' }))
 
     await waitFor(() => {
@@ -1905,14 +2177,67 @@ describe('AbilityEditor', () => {
 
     const inlineAbilityIcon = richTextEditor.querySelector<HTMLElement>(`[data-inline-icon="${hero.heroInfo.ability2Icon}"]`)
 
-    expect(inlineAbilityIcon?.getAttribute('style')).toContain(hero.heroInfo.ability2Icon)
+    expect(inlineAbilityIcon).toHaveAttribute('data-inline-icon-color', '#bada55')
+    expect(inlineAbilityIcon?.style.backgroundColor).toBe('rgb(186, 218, 85)')
+    expect(inlineAbilityIcon?.style.maskImage).toContain(hero.heroInfo.ability2Icon)
+    expect(inlineAbilityIcon?.style.backgroundImage).toBe('')
 
     await confirmFocusedGoBack(user)
 
     const savedAbility = onSave.mock.calls[0]?.[0]
     const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
 
-    expect(savedRichText?.text).toContain(`[i:${hero.heroInfo.ability2Icon}]`)
+    expect(savedRichText?.text).toContain(`[i:${hero.heroInfo.ability2Icon}|#bada55]`)
+  })
+
+  it('renders custom-colored inline square icons without a white fallback', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn()
+    const ability = buildDefaultAbilityStats(HEROES[0]).abilities[0]
+
+    render(
+      <AbilityEditor
+        ability={ability}
+        propertyIconGroups={PROPERTY_ICON_GROUPS}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    )
+
+    const richTextEditor = screen.getByRole('textbox', { name: 'Description rich text' })
+    const firstTextNode = richTextEditor.firstChild
+    const range = document.createRange()
+
+    expect(firstTextNode).not.toBeNull()
+    range.setStart(firstTextNode!, 6)
+    range.collapse(true)
+    richTextEditor.focus()
+    window.getSelection()?.removeAllRanges()
+    window.getSelection()?.addRange(range)
+
+    await user.click(screen.getByRole('button', { name: 'Inline Icon' }))
+
+    const iconModal = screen.getByTestId('property-icon-modal')
+
+    fireEvent.change(within(iconModal).getByLabelText('Custom icon color'), { target: { value: '#c44d88' } })
+    await user.click(within(iconModal).getByRole('button', { name: 'Use Square Icon' }))
+
+    await waitFor(() => {
+      expect(richTextEditor.querySelector('[data-inline-icon="square:medium"]')).not.toBeNull()
+    })
+
+    const inlineSquare = richTextEditor.querySelector<HTMLElement>('[data-inline-icon="square:medium"]')
+
+    expect(inlineSquare).toHaveAttribute('data-inline-icon-color', '#c44d88')
+    expect(inlineSquare?.style.backgroundColor).toBe('rgb(196, 77, 136)')
+    expect(inlineSquare?.style.maskImage).toBe('none')
+
+    await confirmFocusedGoBack(user)
+
+    const savedAbility = onSave.mock.calls[0]?.[0]
+    const savedRichText = savedAbility?.sections.find(section => section.type === 'richText')
+
+    expect(savedRichText?.text).toContain('[i:square:medium|#c44d88]')
   })
 
   it('persists selected icon swatch colors on tintable stat icons', async () => {

@@ -165,12 +165,32 @@
   margin-right: 0;
 }
 
-.attributeInput {
-  box-sizing: content-box;
+.attributeInputSizer {
+  display: inline-grid;
+  min-width: 1ch;
   max-width: none;
   flex: 0 0 auto;
+}
+
+.attributeInputSizer::after {
+  grid-area: 1 / 1;
+  min-width: 1ch;
+  visibility: hidden;
+  content: attr(data-tag-input-value) " ";
+  white-space: pre;
+}
+
+.attributeInput {
+  box-sizing: border-box;
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
   border: 0;
+  background: transparent;
+  padding: 0;
   color: #ffefd7;
+  font: inherit;
+  line-height: inherit;
   outline: none;
 }
 
@@ -444,6 +464,15 @@
 
 .statCell:has([data-scaling-picker-menu]) {
   z-index: 10000;
+}
+
+.rows:has([data-scaling-value-overlay]),
+.row:has([data-scaling-value-overlay]),
+.bottomBand:has([data-scaling-value-overlay]),
+.bottomRow:has([data-scaling-value-overlay]),
+.pelletBand:has([data-scaling-value-overlay]),
+.statCell:has([data-scaling-value-overlay]) {
+  z-index: auto;
 }
 
 .editableCell {

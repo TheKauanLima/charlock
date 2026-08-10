@@ -163,10 +163,12 @@ describe('migrated stat panels', () => {
 
     await user.click(within(iconModal).getByRole('button', { name: 'Spirit icon color' }))
     expect(within(iconModal).getByRole('button', { name: 'Spirit icon color' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.change(within(iconModal).getByLabelText('Custom Boon icon color'), { target: { value: '#2468ac' } })
+    expect(within(iconModal).getByRole('button', { name: 'Use recent Boon icon color #2468ac' })).toBeInTheDocument()
     await user.click(within(iconModal).getByRole('button', { name: 'Large square icon size' }))
     await user.click(within(iconModal).getByRole('button', { name: 'Use Square Icon' }))
 
-    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: 'square:large', iconColor: '#7e61a1' })
+    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: 'square:large', iconColor: '#2468ac' })
     expect(screen.getByRole('button', { name: 'Change Bullet Bonus icon' }).querySelector('[aria-hidden="true"]')).toHaveAttribute(
       'style',
       expect.stringContaining('width: 22px'),
@@ -176,7 +178,7 @@ describe('migrated stat panels', () => {
     iconModal = screen.getByTestId('boon-stat-icon-modal')
     await user.click(within(iconModal).getByRole('button', { name: 'Use Spirit' }))
 
-    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: '/panorama/images/icons/properties/spirit.svg', iconColor: '#7e61a1' })
+    expect(latestStats[0]).toMatchObject({ label: 'Bullet Bonus', icon: '/panorama/images/icons/properties/spirit.svg', iconColor: '#2468ac' })
     expect(screen.queryByRole('button', { name: 'Remove Bullet Bonus' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Add Boon Stat' }))
@@ -215,6 +217,35 @@ describe('migrated stat panels', () => {
 
     for (const stylesheet of stylesheets) {
       expect(stylesheet).toMatch(/:has\(\[data-scaling-picker-menu\]\)[^{]*\{[^}]*z-index:\s*10000/)
+    }
+  })
+
+  it('keeps visible scaling values above neighboring panel cells', () => {
+    const scalingValueStyles = readFileSync('components/panels/ScalingValueEditor.module.css', 'utf8')
+    const stylesheets = [
+      'components/panels/HeroStatsVitalityPanel.module.css',
+      'components/panels/HeroStatsSpiritPanel.module.css',
+      'components/panels/WeaponPanel.module.css',
+    ].map(path => readFileSync(path, 'utf8'))
+
+    render(
+      <HeroStatsVitalityPanel
+        stats={[
+          {
+            ...buildVitalityStatsArray()[0],
+            scaling: 'spirit',
+            scalingValue: '0.25',
+          },
+        ]}
+        showDetails
+      />,
+    )
+
+    expect(screen.getByLabelText('spirit scaling value x0.25').parentElement).toHaveAttribute('data-scaling-value-overlay', 'true')
+    expect(scalingValueStyles).toMatch(/\.root\s*\{[^}]*position:\s*relative;[^}]*z-index:\s*1000/)
+
+    for (const stylesheet of stylesheets) {
+      expect(stylesheet).toMatch(/:has\(\[data-scaling-value-overlay\]\)[^{]*\{[^}]*z-index:\s*auto/)
     }
   })
 
@@ -318,6 +349,47 @@ describe('migrated stat panels', () => {
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
   })
 
+  it('sizes the active weapon tag from its rendered text without clipping wide characters', () => {
+    function WeaponTagsHarness() {
+      const [weaponTags, setWeaponTags] = useState('TANK, BRAWLER')
+
+      return (
+        <WeaponPanel
+          isEditable
+          weaponAttributesText={weaponTags}
+          onWeaponAttributesTextChange={setWeaponTags}
+        />
+      )
+    }
+
+    render(<WeaponTagsHarness />)
+
+    const weaponTagsInput = screen.getByLabelText('Weapon tags')
+
+    expect(screen.getByText('TANK')).toBeInTheDocument()
+    expect(weaponTagsInput).toHaveValue('BRAWLER')
+    expect(weaponTagsInput.parentElement).toHaveAttribute('data-tag-input-value', 'BRAWLER')
+    expect(weaponTagsInput).not.toHaveAttribute('style')
+
+    fireEvent.change(weaponTagsInput, { target: { value: 'BRAWLER,' } })
+
+    const nextWeaponTagInput = screen.getByLabelText('Weapon tags')
+
+    fireEvent.change(nextWeaponTagInput, { target: { value: 'NEXT' } })
+
+    expect(screen.getByText('BRAWLER')).toBeInTheDocument()
+    expect(nextWeaponTagInput).toHaveValue('NEXT')
+    expect(nextWeaponTagInput.parentElement).toHaveAttribute('data-tag-input-value', 'NEXT')
+
+    const stylesheet = readFileSync('components/panels/WeaponPanel.module.css', 'utf8')
+    const inputSizerRule = stylesheet.match(/\.attributeInputSizer::after\s*\{([^}]*)\}/)?.[1]
+    const inputRule = stylesheet.match(/\.attributeInput\s*\{([^}]*)\}/)?.[1]
+
+    expect(inputSizerRule).toMatch(/content:\s*attr\(data-tag-input-value\) " "/)
+    expect(inputRule).toMatch(/width:\s*100%/)
+    expect(inputRule).toMatch(/font:\s*inherit/)
+  })
+
   it('enables pellet count only for shotgun weapons', async () => {
     const user = userEvent.setup()
     const weaponStats = buildWeaponStatsArray()
@@ -346,18 +418,22 @@ describe('migrated stat panels', () => {
     expect(screen.queryByLabelText('Shotgun Pellets')).not.toBeInTheDocument()
   })
 
-  it('opens bottom weapon and spirit scaling menus above their buttons', async () => {
+  it('opens bottom weapon, vitality, and spirit scaling menus above their buttons', async () => {
     const user = userEvent.setup()
 
     render(
       <>
         <WeaponPanel isEditable />
+        <HeroStatsVitalityPanel isEditable />
         <HeroStatsSpiritPanel isEditable />
       </>,
     )
 
     await user.click(screen.getByRole('button', { name: 'Edit Heavy Melee scaling' }))
     expect(screen.getByRole('dialog', { name: 'Heavy Melee scaling controls' }).parentElement).toHaveAttribute('data-menu-position', 'above')
+
+    await user.click(screen.getByRole('button', { name: 'Edit Gravity Scale scaling' }))
+    expect(screen.getByRole('dialog', { name: 'Gravity Scale scaling controls' }).parentElement).toHaveAttribute('data-menu-position', 'above')
 
     await user.click(screen.getByRole('button', { name: 'Edit Spirit Power scaling' }))
     expect(screen.getByRole('dialog', { name: 'Spirit Power scaling controls' }).parentElement).toHaveAttribute('data-menu-position', 'above')
@@ -460,6 +536,8 @@ describe('migrated stat panels', () => {
     expect(iconDialog.parentElement).toBe(document.body)
     expect(screen.getByRole('tablist', { name: 'Ability icon categories' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Stat icons' })).toBeInTheDocument()
+    fireEvent.change(within(iconDialog).getByLabelText('Custom icon color'), { target: { value: '#4f6e8a' } })
+    expect(latestStats[0].customScaling?.color).toBe('#4f6e8a')
     await user.click(screen.getByRole('button', { name: 'Use Abrams 1' }))
     expect(latestStats[0].customScaling?.icon).toBe('/panorama/images/hud/abilities/abrams/1.png')
   })

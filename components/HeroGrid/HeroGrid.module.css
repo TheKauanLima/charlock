@@ -286,6 +286,20 @@
   margin-top: 10px;
 }
 
+.selectHeroActions {
+  position: absolute;
+  top: 76px;
+  left: 24px;
+  z-index: 60;
+  margin-top: 0;
+}
+
+@media (min-width: 1024px) {
+  .selectHeroActions {
+    left: 32px;
+  }
+}
+
 .browseHeroActions button {
   border: 1px solid var(--citadel-gold);
   background: var(--citadel-bg-raised);
@@ -302,6 +316,29 @@
 
 .browseHeroActions button:hover {
   background: var(--citadel-gold-soft);
+}
+
+.browseHeroActions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.interactionViewerError {
+  margin: 8px 0 0;
+  color: #ff9b9b;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.7rem;
+}
+
+.interactionModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2190;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.82);
+  padding: clamp(12px, 3vw, 32px);
+  backdrop-filter: blur(10px);
 }
 
 .browseStatus {
@@ -589,23 +626,25 @@
   transform: translate(0, -50%);
 }
 
-.grid > .heroCard:nth-child(8n) .heroNameBadge,
-.grid > .browseCard:nth-child(8n) .heroNameBadge {
-  right: calc(100% + 8px);
-  left: auto;
-  border-right: 3px solid var(--citadel-gold);
-  border-left-width: 1px;
-  text-align: right;
-  transform: translate(8px, -50%);
-}
+@media (min-width: 1024px) {
+  .grid > .heroCard:nth-child(8n) .heroNameBadge,
+  .grid > .browseCard:nth-child(8n) .heroNameBadge {
+    right: calc(100% + 8px);
+    left: auto;
+    border-right: 3px solid var(--citadel-gold);
+    border-left-width: 1px;
+    text-align: right;
+    transform: translate(8px, -50%);
+  }
 
-.grid > .heroCard:nth-child(8n):hover .heroNameBadge,
-.grid > .heroCard:nth-child(8n):focus-visible .heroNameBadge,
-.grid > .heroCardActive:nth-child(8n) .heroNameBadge,
-.grid > .browseCard:nth-child(8n) .heroCard:hover .heroNameBadge,
-.grid > .browseCard:nth-child(8n) .heroCard:focus-visible .heroNameBadge,
-.grid > .browseCard:nth-child(8n) .heroCardActive .heroNameBadge {
-  transform: translate(0, -50%);
+  .grid > .heroCard:nth-child(8n):hover .heroNameBadge,
+  .grid > .heroCard:nth-child(8n):focus-visible .heroNameBadge,
+  .grid > .heroCardActive:nth-child(8n) .heroNameBadge,
+  .grid > .browseCard:nth-child(8n) .heroCard:hover .heroNameBadge,
+  .grid > .browseCard:nth-child(8n) .heroCard:focus-visible .heroNameBadge,
+  .grid > .browseCard:nth-child(8n) .heroCardActive .heroNameBadge {
+    transform: translate(0, -50%);
+  }
 }
 
 .heroCardActive .heroTint {
@@ -809,6 +848,54 @@
   color: var(--citadel-gold);
 }
 
+.recoveryCard {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--citadel-gold);
+  background: rgba(229, 184, 71, 0.12);
+  color: #ffefd6;
+  cursor: pointer;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.recoveryCard:hover,
+.recoveryCard:focus-visible {
+  background: rgba(229, 184, 71, 0.2);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--citadel-gold);
+}
+
+.recoveryCard > span {
+  display: grid;
+  gap: 4px;
+}
+
+.recoveryCard strong {
+  color: var(--citadel-gold);
+  font-family: var(--block, "Valve Pulp", Arial, sans-serif);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.recoveryCard small,
+.recoveryCard > span:last-child {
+  color: rgba(255, 239, 214, 0.68);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.recoveryCard > span:last-child {
+  max-width: 220px;
+  text-align: right;
+}
+
 .templateGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -882,6 +969,13 @@
 @media (max-width: 640px) {
   .content {
     padding-top: 82px;
+  }
+
+  .selectHeroActions {
+    top: 92px;
+    right: 24px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
   }
 
   .tabs {

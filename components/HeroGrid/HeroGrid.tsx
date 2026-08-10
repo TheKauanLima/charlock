@@ -1,5 +1,6 @@
 'use client'
 
+import { useUser } from '@clerk/nextjs'
 import { Heart } from 'lucide-react'
 import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -8,13 +9,14 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
 import HeroInfoEditor from '@/components/HeroInfoEditor/HeroInfoEditor'
+import InteractionCreator from '@/components/InteractionCreator/InteractionCreator'
 import { ConnectionStatus, LoadingOverlay, SessionExpiredModal, SystemToast } from '@/components/system-feedback/SystemFeedback'
 import { HERO_BACKGROUND_OPTIONS } from '@/lib/editor-assets'
 import type { EditorRenderSelection, RenderPosition } from '@/lib/editor-assets'
 import { buildDefaultAbilityStats, type AbilityStatsPayload } from '@/lib/ability-editor-types'
 import type { CustomHeroDetail, CustomHeroSavePayload, CustomHeroSort, CustomHeroSummary } from '@/lib/custom-hero-types'
 import { getNetworkRequestError, getUserFacingSaveError, parseClientRequestError, readApiResponse, type ApiErrorPayload } from '@/lib/client-errors'
-import { clearEditorRecovery } from '@/lib/editor-recovery'
+import { ANONYMOUS_RECOVERY_OWNER_ID, clearEditorRecovery, readEditorRecovery, type EditorRecoverySnapshot } from '@/lib/editor-recovery'
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
@@ -31,9 +33,17 @@ interface TabItem {
 
 type PrimaryTab = 'Select' | 'Browse' | 'Bookmarks' | 'Notifications' | 'Create'
 
-interface HeroGridProps {
+export interface HeroGridProps {
   initialTab?: PrimaryTab
   initialHeroId?: string
+}
+
+interface GridHeroItem {
+  id: string
+  displayName: string
+  isCustom: boolean
+  hero: HeroDefinition | CustomHeroSummary
+  createdAt?: string
 }
 
 interface RenderDragState {
@@ -61,6 +71,36 @@ const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
 const RENDER_POSITION_LIMIT = 2000
 const HERO_BACKGROUND_SLUG_OVERRIDES: Record<string, string> = {
   ladygeist: 'geist',
+}
+const OFFICIAL_GRID_SORT_NAME_OVERRIDES: Record<string, string> = {
+  doorman: 'Drifter Doorman',
+}
+
+function getGridHeroSortName(item: GridHeroItem) {
+  return (!item.isCustom ? OFFICIAL_GRID_SORT_NAME_OVERRIDES[item.id] : undefined)
+    ?? item.displayName.replace(/^the\s+/i, '')
+}
+
+function compareGridHeroItems(left: GridHeroItem, right: GridHeroItem) {
+  const displayNameComparison = getGridHeroSortName(left).localeCompare(getGridHeroSortName(right), undefined, { sensitivity: 'base' })
+
+  if (displayNameComparison !== 0) {
+    return displayNameComparison
+  }
+
+  if (left.isCustom !== right.isCustom) {
+    return left.isCustom ? 1 : -1
+  }
+
+  if (left.isCustom && right.isCustom) {
+    const createdAtComparison = (left.createdAt ?? '').localeCompare(right.createdAt ?? '')
+
+    if (createdAtComparison !== 0) {
+      return createdAtComparison
+    }
+  }
+
+  return left.id.localeCompare(right.id)
 }
 
 function getStoredShowDetails() {
@@ -216,6 +256,9 @@ function mergeSubmittedSecondaryAbilities(savedAbilityStats: AbilityStatsPayload
 }
 
 export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroGridProps) {
+  const { isLoaded: isAuthLoaded, isSignedIn, user } = useUser()
+  const authUserId = user?.id ?? null
+  const recoveryOwnerId = authUserId ?? ANONYMOUS_RECOVERY_OWNER_ID
   const renderDragStateRef = useRef<RenderDragState | null>(null)
   const latestEditorRenderSelectionRef = useRef<EditorRenderSelection>({ mode: 'background', src: null })
   const startsInCreate = initialTab === 'Create'
@@ -224,6 +267,9 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   const [browseSort, setBrowseSort] = useState<CustomHeroSort>('new')
   const [browseSearch, setBrowseSearch] = useState('')
   const [browseHeroes, setBrowseHeroes] = useState<CustomHeroSummary[]>([])
+  const [selectCustomHeroes, setSelectCustomHeroes] = useState<CustomHeroSummary[]>([])
+  const [selectCustomHeroesOwnerId, setSelectCustomHeroesOwnerId] = useState<string | null>(null)
+  const [selectedSelectCustomHeroId, setSelectedSelectCustomHeroId] = useState<string | null>(null)
   const [browsePagination, setBrowsePagination] = useState<BrowsePagination | null>(null)
   const [isBrowseLoadingMore, setIsBrowseLoadingMore] = useState(false)
   const [selectedBrowseHeroId, setSelectedBrowseHeroId] = useState<string | null>(null)
@@ -245,6 +291,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   const [editingHeroStats, setEditingHeroStats] = useState<HeroStatsPayload | null>(null)
   const [editingAbilityStats, setEditingAbilityStats] = useState<AbilityStatsPayload | null>(null)
   const [editorRevision, setEditorRevision] = useState(0)
+  const [availableRecovery, setAvailableRecovery] = useState<EditorRecoverySnapshot | null>(null)
   const [showDetails, setShowDetails] = useState(false)
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(startsInCreate && !startsInCreateForExistingHero)
 
@@ -261,10 +308,26 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   const [lastSaveOptions, setLastSaveOptions] = useState<SaveHeroOptions | null>(null)
   const [isSessionExpired, setIsSessionExpired] = useState(false)
   const [isEditorInteractionPanelOpen, setIsEditorInteractionPanelOpen] = useState(false)
+  const [interactionViewerHero, setInteractionViewerHero] = useState<CustomHeroDetail | null>(null)
+  const [interactionViewerLoadingId, setInteractionViewerLoadingId] = useState<string | null>(null)
+  const [interactionViewerError, setInteractionViewerError] = useState<string | null>(null)
+  const interactionViewerRequestRef = useRef(0)
   const [blockedActionToast, setBlockedActionToast] = useState<{ id: number; message: string } | null>(null)
   const activeHero = HEROES.find(hero => hero.slug === activeHeroSlug) ?? HEROES[0]
   const renderHero = HEROES.find(hero => hero.slug === renderHeroSlug) ?? activeHero
   const editorHero = editingCustomHero ?? templateHero ?? activeHero
+
+  useEffect(() => {
+    if (!isAuthLoaded) {
+      return undefined
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAvailableRecovery(readEditorRecovery(recoveryOwnerId))
+    }, 0)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [isAuthLoaded, recoveryOwnerId])
   const selectedBrowseHero = useMemo(
     () => browseHeroes.find(hero => hero.id === selectedBrowseHeroId) ?? browseHeroes[0] ?? null,
     [browseHeroes, selectedBrowseHeroId],
@@ -273,7 +336,32 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     () => bookmarkedHeroes.find(hero => hero.id === selectedBookmarkedHeroId) ?? bookmarkedHeroes[0] ?? null,
     [bookmarkedHeroes, selectedBookmarkedHeroId],
   )
+  const visibleSelectCustomHeroes = useMemo(
+    () => selectCustomHeroesOwnerId === authUserId ? selectCustomHeroes : [],
+    [authUserId, selectCustomHeroes, selectCustomHeroesOwnerId],
+  )
+  const selectedSelectCustomHero = useMemo(
+    () => visibleSelectCustomHeroes.find(hero => hero.id === selectedSelectCustomHeroId) ?? null,
+    [selectedSelectCustomHeroId, visibleSelectCustomHeroes],
+  )
+  const selectGridHeroes = useMemo<GridHeroItem[]>(() => [
+    ...HEROES.map(hero => ({
+      id: hero.slug,
+      displayName: hero.displayName,
+      isCustom: false as const,
+      hero,
+    })),
+    ...visibleSelectCustomHeroes.map(hero => ({
+      id: hero.id,
+      displayName: hero.displayName,
+      isCustom: true as const,
+      hero,
+      createdAt: hero.createdAt,
+    })),
+  ].sort(compareGridHeroItems), [visibleSelectCustomHeroes])
   const selectedCollectionHero = activeTab === 'Browse' ? selectedBrowseHero : activeTab === 'Bookmarks' ? selectedBookmarkedHero : null
+  const selectedCustomStageHero = selectedCollectionHero ?? (activeTab === 'Select' ? selectedSelectCustomHero : null)
+  const hasVisibleSelectedHero = hasSelectedHero && (!selectedSelectCustomHeroId || Boolean(selectedSelectCustomHero))
   const [editorDraft, setEditorDraft] = useState<HeroInfoDefinition>(() => cloneHeroInfo(activeHero.heroInfo))
   const [editorBackground, setEditorBackground] = useState(() => getEditorBackgroundForHero(activeHero))
   const [editorRenderSelection, setEditorRenderSelectionState] = useState<EditorRenderSelection>({ mode: 'background', src: null })
@@ -285,39 +373,39 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   }, [])
   const isCreateMode = activeTab === 'Create'
   const isCollectionTab = activeTab === 'Browse' || activeTab === 'Bookmarks'
-  const shouldShowRender = isCreateMode || (isCollectionTab ? Boolean(selectedCollectionHero) : activeTab === 'Select' && hasSelectedHero)
+  const shouldShowRender = isCreateMode || (isCollectionTab ? Boolean(selectedCollectionHero) : activeTab === 'Select' && hasVisibleSelectedHero)
   const editorRenderImage = editorRenderSelection.mode !== 'background' && editorRenderSelection.src ? editorRenderSelection.src : editorBackground
   const isCreateCustomRender = isCreateMode && editorRenderSelection.mode === 'custom' && Boolean(editorRenderSelection.src)
-  const isCollectionCustomRender = Boolean(selectedCollectionHero && isCustomRenderPath(selectedCollectionHero.render))
+  const isSelectedCustomRender = Boolean(selectedCustomStageHero && isCustomRenderPath(selectedCustomStageHero.render))
   const baseRenderImage = isCreateMode
     ? isCreateCustomRender
       ? editorBackground
       : editorRenderImage
-    : selectedCollectionHero
-      ? isCollectionCustomRender
-        ? selectedCollectionHero.background || FALLBACK_EDITOR_BACKGROUND
-        : selectedCollectionHero.render
+    : selectedCustomStageHero
+      ? isSelectedCustomRender
+        ? selectedCustomStageHero.background || FALLBACK_EDITOR_BACKGROUND
+        : selectedCustomStageHero.render
       : renderHero.render
   const customRenderImage = isCreateCustomRender
     ? editorRenderSelection.src
-    : isCollectionCustomRender
-      ? selectedCollectionHero?.render ?? null
+    : isSelectedCustomRender
+      ? selectedCustomStageHero?.render ?? null
       : null
-  const customRenderPosition = isCreateCustomRender ? editorRenderSelection.position : selectedCollectionHero?.renderPosition
+  const customRenderPosition = isCreateCustomRender ? editorRenderSelection.position : selectedCustomStageHero?.renderPosition
   const isEditorRenderMovable = isCreateCustomRender && !isEditorInteractionPanelOpen
   const baseRenderLabel = isCreateMode
     ? editorRenderSelection.mode === 'hero'
       ? 'Selected editor hero render'
       : 'Selected editor background'
-    : selectedCollectionHero
-      ? isCollectionCustomRender
-        ? `${selectedCollectionHero.displayName} background`
-        : `${selectedCollectionHero.displayName} render`
+    : selectedCustomStageHero
+      ? isSelectedCustomRender
+        ? `${selectedCustomStageHero.displayName} background`
+        : `${selectedCustomStageHero.displayName} render`
       : `${activeHero.displayName} render`
   const customRenderLabel = isCreateCustomRender
     ? 'Custom editor hero render'
-    : selectedCollectionHero
-      ? `${selectedCollectionHero.displayName} render`
+    : selectedCustomStageHero
+      ? `${selectedCustomStageHero.displayName} render`
       : 'Custom hero render'
   const backstoryHero = useMemo(
     () =>
@@ -330,8 +418,11 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     [activeHero, editorDraft, editorHero, isCreateMode],
   )
 
-  const applySavedHeroToEditor = useCallback((hero: CustomHeroDetail) => {
-    clearEditorRecovery()
+  const applySavedHeroToEditor = useCallback((hero: CustomHeroDetail, options: { clearRecovery?: boolean } = {}) => {
+    if (options.clearRecovery !== false) {
+      clearEditorRecovery(recoveryOwnerId)
+      setAvailableRecovery(null)
+    }
     const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
 
     setEditingCustomHero(hero)
@@ -344,7 +435,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     setEditorRevision(currentRevision => currentRevision + 1)
     setActiveTab('Create')
     setIsTemplateModalOpen(false)
-  }, [setEditorRenderSelection])
+  }, [recoveryOwnerId, setEditorRenderSelection])
 
   const applyTemplateHeroToEditor = useCallback((hero: CustomHeroDetail) => {
     const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
@@ -403,7 +494,8 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   }, [setEditorRenderSelection])
 
   const startCreateFromTemplate = useCallback((template: HeroTemplateDefinition) => {
-    clearEditorRecovery()
+    clearEditorRecovery(recoveryOwnerId)
+    setAvailableRecovery(null)
     const hero = template.hero
     const renderState = getSavedRenderSelection(hero.render, hero.renderPosition)
 
@@ -418,7 +510,52 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     setActiveTab('Create')
     setIsTemplateModalOpen(false)
     setSaveStatusMessage(`${template.label} template loaded.`)
-  }, [setEditorRenderSelection])
+  }, [recoveryOwnerId, setEditorRenderSelection])
+
+  const startCreateFromRecovery = useCallback((snapshot: EditorRecoverySnapshot) => {
+    const templateHeroForRecovery = HERO_TEMPLATES.find(template => template.hero.slug === snapshot.heroSlug)?.hero
+    const officialHeroForRecovery = HEROES.find(hero => hero.slug === snapshot.heroSlug)
+    const baseHero = templateHeroForRecovery ?? officialHeroForRecovery ?? HERO_TEMPLATES.find(template => template.id === 'empty')?.hero ?? HEROES[0]
+    const recoveredRender = snapshot.renderSelection.mode === 'background'
+      ? snapshot.background
+      : snapshot.renderSelection.src ?? snapshot.background
+    const recoveredHero: CustomHeroDetail = {
+      ...baseHero,
+      id: snapshot.savedHeroId ?? `local-recovery-${snapshot.heroSlug}`,
+      slug: snapshot.heroSlug,
+      assetSlug: baseHero.assetSlug,
+      displayName: snapshot.heroName.trim() || snapshot.heroInfo.nameValue.trim() || baseHero.displayName,
+      portrait: snapshot.portrait,
+      render: recoveredRender,
+      background: snapshot.background,
+      heroInfo: snapshot.heroInfo,
+      creatorId: authUserId ?? 'local-recovery',
+      status: 'private',
+      likesCount: 0,
+      likedByCurrentUser: false,
+      bookmarkedByCurrentUser: false,
+      allowCopies: snapshot.allowCopies,
+      viewerCanEdit: Boolean(snapshot.savedHeroId),
+      publishedAt: null,
+      createdAt: snapshot.savedAt,
+      updatedAt: snapshot.savedAt,
+      stats: snapshot.stats,
+      abilityStats: snapshot.abilityStats,
+      interactions: snapshot.interactions ?? [],
+    }
+
+    setEditingCustomHero(snapshot.savedHeroId ? recoveredHero : null)
+    setTemplateHero(snapshot.savedHeroId ? null : recoveredHero)
+    setEditingHeroStats(snapshot.stats)
+    setEditingAbilityStats(snapshot.abilityStats)
+    setEditorDraft(cloneHeroInfo(snapshot.heroInfo))
+    setEditorBackground(snapshot.background)
+    setEditorRenderSelection(snapshot.renderSelection)
+    setEditorRevision(currentRevision => currentRevision + 1)
+    setActiveTab('Create')
+    setIsTemplateModalOpen(false)
+    setSaveStatusMessage('Unsynced draft recovered from this device.')
+  }, [authUserId, setEditorRenderSelection])
 
   const loadSavedHero = useCallback(async (heroId: string) => {
     await Promise.resolve()
@@ -433,7 +570,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         throw new Error(getHeroResponseError(body, `Saved hero request failed with ${response.status}`))
       }
 
-      applySavedHeroToEditor(body.hero)
+      applySavedHeroToEditor(body.hero, { clearRecovery: false })
       setSaveStatusMessage('Saved hero loaded.')
     } catch (error) {
       setSaveStatusMessage(error instanceof Error ? error.message : 'Failed to load saved hero.')
@@ -538,6 +675,47 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
 
     return undefined
   }, [initialHeroId, loadSavedHero])
+
+  useEffect(() => {
+    if (!isAuthLoaded || !isSignedIn || !authUserId || activeTab !== 'Select') {
+      return undefined
+    }
+
+    const abortController = new AbortController()
+
+    async function loadSelectCustomHeroes() {
+      try {
+        const response = await fetch('/api/heroes?mine=true', {
+          signal: abortController.signal,
+        })
+        const body = await response.json() as { heroes?: CustomHeroSummary[]; error?: string }
+
+        if (!response.ok) {
+          throw new Error(getHeroResponseError(body, `Owned heroes request failed with ${response.status}`))
+        }
+
+        const nextHeroes = body.heroes ?? []
+
+        setSelectCustomHeroes(nextHeroes)
+        setSelectCustomHeroesOwnerId(authUserId)
+        setSelectedSelectCustomHeroId(currentId => (
+          currentId && nextHeroes.some(hero => hero.id === currentId) ? currentId : null
+        ))
+      } catch {
+        if (abortController.signal.aborted) {
+          return
+        }
+
+        setSelectCustomHeroes([])
+        setSelectCustomHeroesOwnerId(authUserId)
+        setSelectedSelectCustomHeroId(null)
+      }
+    }
+
+    void loadSelectCustomHeroes()
+
+    return () => abortController.abort()
+  }, [activeTab, authUserId, isAuthLoaded, isSignedIn])
 
   const getBrowseUrl = useCallback((offset: number, limit = offset === 0 ? INITIAL_BROWSE_PAGE_SIZE : NEXT_BROWSE_PAGE_SIZE) => {
     const searchParams = new URLSearchParams({
@@ -705,6 +883,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
 
   function handleHeroSelect(heroSlug: string) {
     setHasSelectedHero(true)
+    setSelectedSelectCustomHeroId(null)
 
     if (heroSlug === activeHeroSlug) {
       return
@@ -713,7 +892,8 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     const nextHero = HEROES.find(hero => hero.slug === heroSlug)
 
     if (nextHero) {
-      clearEditorRecovery()
+      clearEditorRecovery(recoveryOwnerId)
+      setAvailableRecovery(null)
       setEditingCustomHero(null)
       setTemplateHero(null)
       setEditingHeroStats(null)
@@ -727,6 +907,13 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     setActiveHeroSlug(heroSlug)
     setPendingRenderHeroSlug(heroSlug)
     setRenderPhase('fade-out')
+  }
+
+  function handleSelectCustomHero(heroId: string) {
+    setHasSelectedHero(true)
+    setSelectedSelectCustomHeroId(heroId)
+    setPendingRenderHeroSlug(null)
+    setRenderPhase('idle')
   }
 
   async function handleSaveHero(payload: CustomHeroSavePayload, options: SaveHeroOptions = {}) {
@@ -808,7 +995,8 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
       } else {
         applySavedHeroToEditor(savedHero)
       }
-      clearEditorRecovery()
+      clearEditorRecovery(recoveryOwnerId)
+      setAvailableRecovery(null)
       setLastSavePayload(null)
       setLastSaveOptions(null)
       if (isUnpublishing) {
@@ -971,6 +1159,35 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     }
   }
 
+  async function handleViewInteractions(hero: CustomHeroSummary) {
+    const requestId = interactionViewerRequestRef.current + 1
+
+    interactionViewerRequestRef.current = requestId
+    setInteractionViewerLoadingId(hero.id)
+    setInteractionViewerError(null)
+
+    try {
+      const response = await fetch(`/api/heroes?id=${encodeURIComponent(hero.id)}`)
+      const body = await readApiResponse<{ hero?: CustomHeroDetail; error?: string }>(response)
+
+      if (!response.ok || !body?.hero) {
+        throw new Error(getHeroResponseError(body, `Interaction request failed with ${response.status}`))
+      }
+
+      if (interactionViewerRequestRef.current === requestId) {
+        setInteractionViewerHero(body.hero)
+      }
+    } catch (error) {
+      if (interactionViewerRequestRef.current === requestId) {
+        setInteractionViewerError(error instanceof Error ? error.message : 'Failed to load character interactions.')
+      }
+    } finally {
+      if (interactionViewerRequestRef.current === requestId) {
+        setInteractionViewerLoadingId(null)
+      }
+    }
+  }
+
   async function handleCreateFromSelectedHero(hero: HeroDefinition) {
     const fallbackStats = buildHeroStatsSeed(hero)
     const fallbackAbilityStats = buildDefaultAbilityStats(hero)
@@ -1005,7 +1222,15 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   }
 
   function handleTabSelect(tab: PrimaryTab) {
+    if (tab !== 'Browse') {
+      interactionViewerRequestRef.current += 1
+      setInteractionViewerHero(null)
+      setInteractionViewerLoadingId(null)
+      setInteractionViewerError(null)
+    }
+
     if (tab === 'Create') {
+      setAvailableRecovery(readEditorRecovery(recoveryOwnerId))
       setIsTemplateModalOpen(true)
       return
     }
@@ -1057,7 +1282,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         <div className={styles.renderFade} />
         {shouldShowRender ? (
           <div
-            key={isCreateMode ? `${editorRenderSelection.mode}:${baseRenderImage}` : isCollectionTab ? selectedCollectionHero?.id ?? `${activeTab.toLowerCase()}-empty` : renderHero.slug}
+            key={isCreateMode ? `${editorRenderSelection.mode}:${baseRenderImage}` : selectedCustomStageHero ? `custom:${selectedCustomStageHero.id}` : renderHero.slug}
             className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
             role="img"
             aria-label={baseRenderLabel}
@@ -1083,7 +1308,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         ) : null}
       </div>
 
-      {activeTab === 'Select' && !hasSelectedHero ? (
+      {activeTab === 'Select' && !hasVisibleSelectedHero ? (
         <h1 className={styles.landingTitle} data-testid="landing-title">CURSED CONCEPTS</h1>
       ) : null}
 
@@ -1152,6 +1377,34 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                 Use as Template
               </button>
             ) : null}
+            {activeTab === 'Browse' ? (
+              <button
+                type="button"
+                disabled={interactionViewerLoadingId === selectedCollectionHero.id}
+                aria-label={`View ${selectedCollectionHero.displayName} interactions`}
+                onClick={() => void handleViewInteractions(selectedCollectionHero)}
+              >
+                {interactionViewerLoadingId === selectedCollectionHero.id ? 'Loading Interactions...' : 'View Interactions'}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeTab === 'Browse' && interactionViewerError ? (
+          <p className={styles.interactionViewerError} role="alert">{interactionViewerError}</p>
+        ) : null}
+
+        {activeTab === 'Select' && selectedSelectCustomHero ? (
+          <div className={`${styles.browseHeroActions} ${styles.selectHeroActions}`} data-testid="select-hero-actions">
+            <button type="button" onClick={() => loadSavedHero(selectedSelectCustomHero.id)}>
+              Edit Hero
+            </button>
+            <button type="button" onClick={() => setShowDetails(true)}>
+              View Stats
+            </button>
+            <button type="button" onClick={() => handleUseTemplate(selectedSelectCustomHero.id)}>
+              Create Copy
+            </button>
           </div>
         ) : null}
 
@@ -1186,7 +1439,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
           </main>
         ) : !isCreateMode ? (
           <main className={`${styles.main} ${isCollectionTab ? styles.browseMain : ''}`}>
-            {(isCollectionTab ? Boolean(selectedCollectionHero) : hasSelectedHero) ? (
+            {(isCollectionTab ? Boolean(selectedCollectionHero) : hasVisibleSelectedHero) ? (
               <button
                 type="button"
                 className={`${styles.detailsToggle} ${showDetails ? styles.detailsToggleActive : ''}`}
@@ -1201,7 +1454,9 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
             {activeTab === 'Browse' && browseStatus ? <p className={styles.browseStatus} role="status">{browseStatus}</p> : null}
             {activeTab === 'Bookmarks' && bookmarksStatus ? <p className={styles.browseStatus} role="status">{bookmarksStatus}</p> : null}
             <section className={styles.grid}>
-              {Array.from({ length: isCollectionTab ? Math.max(GRID_SIZE, activeTab === 'Browse' ? browseHeroes.length : bookmarkedHeroes.length) : GRID_SIZE }).map((_, index) => {
+              {Array.from({ length: isCollectionTab
+                ? Math.max(GRID_SIZE, activeTab === 'Browse' ? browseHeroes.length : bookmarkedHeroes.length)
+                : Math.max(GRID_SIZE, selectGridHeroes.length) }).map((_, index) => {
                 if (isCollectionTab) {
                   const heroes = activeTab === 'Browse' ? browseHeroes : bookmarkedHeroes
                   const hero = heroes[index]
@@ -1261,29 +1516,69 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                   )
                 }
 
-                const hero = HEROES[index]
+                const gridHero = selectGridHeroes[index]
 
-                if (!hero) {
+                if (!gridHero) {
                   return <div key={`empty-${index}`} data-testid="hero-empty-slot" aria-hidden="true" className={styles.emptySlot} />
                 }
 
-                const isSelected = hasSelectedHero && hero.slug === activeHero.slug
+                const hero = gridHero.hero
+
+                if (gridHero.isCustom) {
+                  const customHero = hero as CustomHeroSummary
+                  const isSelected = hasVisibleSelectedHero && customHero.id === selectedSelectCustomHero?.id
+
+                  return (
+                    <button
+                      key={`custom:${customHero.id}`}
+                      type="button"
+                      data-testid="hero-card"
+                      aria-label={`Select character ${customHero.displayName}`}
+                      aria-pressed={isSelected}
+                      onClick={() => handleSelectCustomHero(customHero.id)}
+                      className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
+                    >
+                      <span className={styles.heroBacker} />
+                      <span className={styles.heroPortraitWrap}>
+                        <Image
+                          src={getThumbnailUrl(customHero.portrait, 260, 420)}
+                          alt={customHero.displayName}
+                          fill
+                          className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
+                          sizes="(max-width: 1024px) 25vw, 12vw"
+                          preload={index < 8}
+                          placeholder="blur"
+                          blurDataURL={IMAGE_BLUR_DATA_URL}
+                        />
+                      </span>
+                      <span className={styles.heroBorder} />
+                      <span className={styles.heroTint} />
+                      <span className={styles.heroNameBadge} data-testid="hero-name-badge" aria-hidden="true">
+                        {customHero.displayName}
+                      </span>
+                    </button>
+                  )
+                }
+
+                const officialHero = hero as HeroDefinition
+
+                const isSelected = hasVisibleSelectedHero && !selectedSelectCustomHero && officialHero.slug === activeHero.slug
 
                 return (
                   <button
-                    key={hero.slug}
+                    key={officialHero.slug}
                     type="button"
                     data-testid="hero-card"
-                    aria-label={`Select character ${hero.displayName}`}
+                    aria-label={`Select character ${officialHero.displayName}`}
                     aria-pressed={isSelected}
-                    onClick={() => handleHeroSelect(hero.slug)}
+                    onClick={() => handleHeroSelect(officialHero.slug)}
                     className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
                   >
                     <span className={styles.heroBacker} />
                     <span className={styles.heroPortraitWrap}>
                       <Image
-                        src={hero.portrait}
-                        alt={hero.displayName}
+                        src={officialHero.portrait}
+                        alt={officialHero.displayName}
                         fill
                         className={`${styles.heroPortrait} ${isSelected ? styles.heroPortraitActive : ''}`}
                         sizes="(max-width: 1024px) 25vw, 12vw"
@@ -1295,7 +1590,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                     <span className={styles.heroBorder} />
                     <span className={styles.heroTint} />
                     <span className={styles.heroNameBadge} data-testid="hero-name-badge" aria-hidden="true">
-                      {hero.displayName}
+                      {officialHero.displayName}
                     </span>
                   </button>
                 )
@@ -1317,7 +1612,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
 
       {isCreateMode ? (
         <HeroInfoEditor
-          key={`editor:${editorRevision}`}
+          key={`editor:${recoveryOwnerId}:${editorRevision}`}
           hero={editorHero}
           draft={editorDraft}
           backgroundOptions={HERO_BACKGROUND_OPTIONS}
@@ -1326,9 +1621,11 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
           savedHeroId={editingCustomHero?.id ?? null}
           savedHeroName={editingCustomHero?.displayName ?? ''}
           savedHeroStatus={editingCustomHero?.status ?? 'private'}
+          recoveryOwnerId={recoveryOwnerId}
           allowCopies={editingCustomHero?.allowCopies ?? false}
           initialStats={editingHeroStats}
           initialAbilityStats={editingAbilityStats}
+          initialInteractions={editingCustomHero?.interactions ?? templateHero?.interactions ?? []}
           isSaving={isSavingHero}
           isDraftSaving={isDraftSaving}
           saveStatusMessage={saveStatusMessage}
@@ -1343,8 +1640,10 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         />
       ) : isCollectionTab ? (
         selectedCollectionHero ? <HeroInfoCluster hero={selectedCollectionHero} showDetails={showDetails} /> : null
-      ) : activeTab === 'Select' && hasSelectedHero ? (
-        <HeroInfoCluster hero={activeHero} showDetails={showDetails} onCreateFromHero={() => void handleCreateFromSelectedHero(activeHero)} />
+      ) : activeTab === 'Select' && hasVisibleSelectedHero ? (
+        selectedSelectCustomHero
+          ? <HeroInfoCluster hero={selectedSelectCustomHero} showDetails={showDetails} />
+          : <HeroInfoCluster hero={activeHero} showDetails={showDetails} onCreateFromHero={() => void handleCreateFromSelectedHero(activeHero)} />
       ) : null}
 
       {isCreateMode ? (
@@ -1381,6 +1680,19 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                 x
               </button>
             </header>
+            {availableRecovery ? (
+              <button
+                type="button"
+                className={styles.recoveryCard}
+                onClick={() => startCreateFromRecovery(availableRecovery)}
+              >
+                <span>
+                  <strong>Recover Unsynced Draft</strong>
+                  <small>{availableRecovery.heroName.trim() || availableRecovery.heroInfo.nameValue.trim() || 'Unnamed character'}</small>
+                </span>
+                <span>Saved on this device {new Date(availableRecovery.savedAt).toLocaleString()}</span>
+              </button>
+            ) : null}
             <div className={styles.templateGrid}>
               {HERO_TEMPLATES.map(template => (
                 <button
@@ -1401,6 +1713,27 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
               ))}
             </div>
           </section>
+        </div>
+      ) : null}
+      {interactionViewerHero ? (
+        <div
+          className={styles.interactionModalBackdrop}
+          data-testid="interaction-viewer-modal"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setInteractionViewerHero(null)
+          }}
+        >
+          <InteractionCreator
+            customHeroId={interactionViewerHero.id}
+            customHeroName={interactionViewerHero.displayName}
+            customHeroPortrait={interactionViewerHero.portrait}
+            accentColor={interactionViewerHero.heroInfo.nameColor}
+            interactions={interactionViewerHero.interactions}
+            readOnly
+            onClose={() => setInteractionViewerHero(null)}
+            onChange={() => undefined}
+          />
         </div>
       ) : null}
       <ConnectionStatus />

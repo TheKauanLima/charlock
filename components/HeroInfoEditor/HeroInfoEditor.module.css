@@ -389,6 +389,7 @@
 .controlRail {
   pointer-events: auto;
   position: absolute;
+  z-index: 60;
   top: 52px;
   bottom: 0;
   left: 0;
@@ -695,6 +696,33 @@
 
 .controlPaneSection[hidden] {
   display: none;
+}
+
+.interactionPaneIntro {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--citadel-gold) 32%, transparent);
+  background: color-mix(in srgb, var(--citadel-gold) 7%, rgba(0, 0, 0, 0.22));
+  padding: 12px;
+}
+
+.interactionPaneIntro > svg {
+  width: 26px;
+  height: 26px;
+  color: var(--citadel-gold);
+}
+
+.interactionPaneIntro > div {
+  display: grid;
+  gap: 7px;
+}
+
+.interactionPaneIntro p {
+  color: rgba(255, 239, 214, 0.62);
+  font-size: 0.68rem;
+  line-height: 1.35;
 }
 
 .editorHint {
@@ -1016,6 +1044,7 @@
 .heroNamePrompt,
 .portraitUploadPanel,
 .copyToggle,
+.recoveryNotice,
 .draftAutosavePanel,
 .saveError,
 .actionStatus,
@@ -1381,6 +1410,26 @@
   background: rgba(229, 184, 71, 0.08);
   padding: 10px 12px;
   color: rgba(255, 239, 214, 0.82);
+}
+
+.recoveryNotice {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(116, 196, 154, 0.5);
+  background: rgba(49, 125, 87, 0.16);
+  padding: 10px 12px;
+  color: rgba(225, 255, 238, 0.82);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.recoveryNotice strong {
+  color: #9de0b9;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .draftAutosaveStatus {

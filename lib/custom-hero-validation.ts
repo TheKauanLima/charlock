@@ -63,6 +63,7 @@ const EXACT_FIELD_LABELS: Record<string, string> = {
   'abilityStats.secondaryAbilities': 'Secondary abilities',
   'abilityStats.secondaryAbilitySlots': 'Secondary ability slots',
   'abilityStats.secondaryAbilityAnchorIndex': 'Secondary ability anchor',
+  interactions: 'Interactions',
 }
 
 const GENERIC_FIELD_LABELS: Record<string, string> = {
@@ -108,6 +109,14 @@ const GENERIC_FIELD_LABELS: Record<string, string> = {
   text: 'Ability text',
   mainCells: 'Main stat cells',
   lowerCells: 'Lower stat cells',
+  targetHeroId: 'Target hero',
+  targetHeroName: 'Target hero name',
+  lines: 'Dialogue lines',
+  speakerSide: 'Dialogue speaker',
+  speakerHeroId: 'Speaker hero',
+  order: 'Dialogue line order',
+  createdAt: 'Conversation created date',
+  updatedAt: 'Conversation edited date',
 }
 
 function pathToKey(path: Array<PropertyKey>) {

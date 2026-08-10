@@ -5,7 +5,9 @@ import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import type { CSSProperties, PointerEvent } from 'react'
 
+import CommittedColorInput from '@/components/CommittedColorInput/CommittedColorInput'
 import type { AbilityIconGroup, EditorAssetGroup } from '@/lib/editor-assets'
+import { getRecentCustomColors, normalizeCustomHexColor, saveRecentCustomColor } from '@/lib/custom-color-history'
 import {
   SQUARE_ICON_SIZE_OPTIONS,
   getSquareIconOption,
@@ -29,6 +31,10 @@ const ICON_COLOR_SWATCHES = [
   { id: 'cream', label: 'Cream', value: '#f5eadb' },
 ] as const
 
+function getCustomColorInputValue(value: string) {
+  return normalizeCustomHexColor(value) ?? '#ffffff'
+}
+
 function isIntrinsicColorPropertyIcon(pathOrName: string) {
   if (isSquareIcon(pathOrName)) {
     return false
@@ -44,14 +50,14 @@ function getPropertyIconVisualStyle(path: string, iconColor = ''): CSSProperties
     return getSquareIconStyle(path, iconColor || '#ffffff', 'stat')
   }
 
-  if (isIntrinsicColorPropertyIcon(path)) {
+  if (isIntrinsicColorPropertyIcon(path) && !iconColor) {
     return {
       backgroundImage: `url('${path}')`,
     }
   }
 
   return {
-    ...(iconColor ? { backgroundColor: iconColor } : {}),
+    backgroundColor: iconColor || '#ffffff',
     WebkitMaskImage: `url('${path}')`,
     maskImage: `url('${path}')`,
   }
@@ -115,6 +121,7 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
   const isAbilityPicker = previewMode === 'ability'
   const [abilityIconTab, setAbilityIconTab] = useState(initialAbilityIconTab)
   const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
+  const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomColors)
   const squareIconOption = getSquareIconOption(squareIconSize)
   const upgradeAbilityGroups = isAbilityPicker ? groups.filter(group => group.id.startsWith('ability-icons-upgrade')) : []
   const heroAbilityGroups = isAbilityPicker ? groups.filter(group => !group.id.startsWith('ability-icons-upgrade')) : groups
@@ -137,6 +144,17 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
     }
   }
 
+  function handleCustomColorChange(color: string) {
+    const normalizedColor = normalizeCustomHexColor(color)
+
+    if (!normalizedColor) {
+      return
+    }
+
+    setRecentCustomColors(saveRecentCustomColor(normalizedColor))
+    onIconColorChange(normalizedColor)
+  }
+
   const renderIconButton = (asset: EditorAssetGroup['assets'][number], assetPreviewMode: 'property' | 'image' | 'ability' = previewMode) => (
     <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => onSelect(asset.path)}>
       <span
@@ -144,7 +162,7 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
           styles.iconPreview,
           assetPreviewMode === 'ability' && styles.iconPreviewAbility,
           assetPreviewMode === 'image' && styles.iconPreviewImage,
-          assetPreviewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && styles.iconPreviewOriginalColor,
+          assetPreviewMode === 'property' && isIntrinsicColorPropertyIcon(asset.path) && !selectedIconColor && styles.iconPreviewOriginalColor,
         )}
         aria-hidden="true"
         style={
@@ -152,7 +170,7 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
             ? { backgroundImage: `url('${asset.path}')` }
             : assetPreviewMode === 'ability'
               ? getWhiteAbilityIconVisualStyle(asset.path, selectedIconColor || '#ffffff')
-              : getPropertyIconVisualStyle(asset.path, selectedIconColor || '#ffffff')
+              : getPropertyIconVisualStyle(asset.path, selectedIconColor)
         }
       />
       {assetPreviewMode === 'ability' ? null : asset.label}
@@ -184,6 +202,31 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
                 {swatch.value ? null : 'Default'}
               </button>
             ))}
+            <label className={styles.customIconColor}>
+              <CommittedColorInput
+                value={getCustomColorInputValue(selectedIconColor)}
+                ariaLabel="Custom icon color"
+                onCommit={handleCustomColorChange}
+              />
+              <span>Custom</span>
+              <code>{getCustomColorInputValue(selectedIconColor)}</code>
+            </label>
+            {recentCustomColors.length ? (
+              <div className={styles.recentIconColors} aria-label="Recent custom icon colors">
+                <span>Recent</span>
+                {recentCustomColors.map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={cn(styles.iconColorSwatch, selectedIconColor === color && styles.iconColorSwatchActive)}
+                    style={{ backgroundColor: color }}
+                    aria-label={`Use recent icon color ${color}`}
+                    aria-pressed={selectedIconColor === color}
+                    onClick={() => onIconColorChange(color)}
+                  />
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
         <section className={styles.squareIconPicker} aria-label="Square icon">

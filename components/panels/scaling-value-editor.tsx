@@ -88,7 +88,12 @@ export default function ScalingValueEditor({ scaling, scalingValue, customScalin
   }
 
   return (
-    <span className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''} ${valuePosition === 'lower' ? styles.rootValueLower : ''}`} data-scaling-editor="true" title={`${scalingLabel} scaling ${scalingValue}`}>
+    <span
+      className={`${styles.root} ${position === 'raised' ? styles.rootRaised : ''} ${valuePosition === 'lower' ? styles.rootValueLower : ''}`}
+      data-scaling-editor="true"
+      data-scaling-value-overlay="true"
+      title={`${scalingLabel} scaling ${scalingValue}`}
+    >
       <span className={styles.icon} style={scalingIconStyle} aria-hidden="true" />
       {isEditable && scaling !== 'none' ? (
         <span className={styles.valueWrap} style={getScalingValueStyle(scaling, customScaling)}>

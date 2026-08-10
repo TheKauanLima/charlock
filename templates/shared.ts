@@ -231,6 +231,7 @@ export function buildTemplateDefinition(id: HeroTemplateId, label: string, avail
       updatedAt: TEMPLATE_TIMESTAMP,
       stats: buildEmptyStats(hero),
       abilityStats: buildEmptyAbilityStats(hero),
+      interactions: [],
     } satisfies CustomHeroDetail,
   }
 }

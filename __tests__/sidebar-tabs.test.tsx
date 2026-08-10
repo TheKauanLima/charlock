@@ -36,4 +36,10 @@ describe('SidebarTabs', () => {
     expect(inactiveRule).toMatch(/color:\s*rgb\(0 0 0 \/ 45%\)/)
     expect(hoverRule).toMatch(/color:\s*#000/)
   })
+
+  it('keeps the right sidebar limited to hero stat panels', () => {
+    render(<SidebarTabs activeTabId="overview" onSelect={() => undefined} />)
+
+    expect(screen.queryByRole('tab', { name: 'Interactions' })).not.toBeInTheDocument()
+  })
 })

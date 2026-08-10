@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
-import { redirect } from 'next/navigation'
 
+import AuthenticatedHome from '@/components/auth/AuthenticatedHome'
 import HeroGrid from '@/components/HeroGrid/HeroGrid'
 
 interface HomeProps {
@@ -34,14 +34,13 @@ function getInitialTab(tab: string | string[] | undefined) {
 
 export default async function Home({ searchParams }: HomeProps = {}) {
   const { userId } = await auth()
-
-  if (!userId) {
-    redirect('/sign-up')
-  }
-
   const resolvedSearchParams = await searchParams
   const initialTab = getInitialTab(resolvedSearchParams?.tab)
   const initialHeroId = Array.isArray(resolvedSearchParams?.heroId) ? resolvedSearchParams?.heroId[0] : resolvedSearchParams?.heroId
+
+  if (!userId) {
+    return <AuthenticatedHome key={`${initialTab}:${initialHeroId ?? ''}`} initialTab={initialTab} initialHeroId={initialHeroId} />
+  }
 
   return <HeroGrid key={`${initialTab}:${initialHeroId ?? ''}`} initialTab={initialTab} initialHeroId={initialHeroId} />
 }

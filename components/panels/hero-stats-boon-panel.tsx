@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useState } from 'react'
 import type { CSSProperties, ChangeEvent, PointerEvent } from 'react'
 
+import CommittedColorInput from '@/components/CommittedColorInput/CommittedColorInput'
 import { BOON_DEFAULT_STAT_COUNT, BOON_STAT_DEFINITIONS, buildBoonStatsArray, createBoonStat } from '@/components/panels/boon-stats-mapper'
 import { formatPanelValue, type PanelStat } from '@/components/panels/scaling-utils'
 import { PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
@@ -16,6 +17,7 @@ import {
   isSquareIcon,
   type SquareIconSize,
 } from '@/lib/square-icon'
+import { getRecentCustomColors, normalizeCustomHexColor, saveRecentCustomColor } from '@/lib/custom-color-history'
 import { getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 
 import styles from './HeroStatsBoonPanel.module.css'
@@ -47,6 +49,10 @@ const BOON_ICON_COLOR_SWATCHES = [
 ] as const
 const BOON_STAT_LABEL_MAX_LENGTH = 120
 const BOON_STAT_MAX_COUNT = 24
+
+function getCustomColorInputValue(value: string) {
+  return normalizeCustomHexColor(value) ?? '#ffffff'
+}
 
 function getNextCustomBoonStatLabel(stats: PanelStat[]) {
   const baseLabel = 'Extra Stat'
@@ -100,7 +106,7 @@ function getIconVisualStyle(icon: string | undefined, iconColor = ''): CSSProper
     return getSquareIconStyle(iconPath, iconColor || '#fff8ec', 'stat')
   }
 
-  if (isIntrinsicColorPropertyIcon(iconPath)) {
+  if (isIntrinsicColorPropertyIcon(iconPath) && !iconColor) {
     return {
       backgroundImage: `url('${iconPath}')`,
     }
@@ -117,6 +123,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
   const normalizedStats = buildBoonStatsArray(stats)
   const [iconTargetIndex, setIconTargetIndex] = useState<number | null>(null)
   const [squareIconSize, setSquareIconSize] = useState<SquareIconSize>('medium')
+  const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomColors)
   const selectedIconColor = iconTargetIndex === null ? '' : normalizedStats[iconTargetIndex]?.iconColor ?? ''
   const squareIconOption = getSquareIconOption(squareIconSize)
 
@@ -145,15 +152,18 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
     onStatsChange?.(normalizedStats.filter((_, statIndex) => statIndex !== index))
   }
 
+  function openIconPicker(index: number) {
+    setRecentCustomColors(getRecentCustomColors())
+    setIconTargetIndex(index)
+  }
+
   function handleIconChange(iconPath: string) {
     if (iconTargetIndex === null) {
       return
     }
 
-    const iconColor = isIntrinsicColorPropertyIcon(iconPath) ? '' : selectedIconColor
-
     onStatsChange?.(normalizedStats.map((stat, statIndex) => (
-      statIndex === iconTargetIndex ? { ...stat, icon: iconPath, iconColor, scaling: 'boon', scalingValue: String(stat.value) } : stat
+      statIndex === iconTargetIndex ? { ...stat, icon: iconPath, iconColor: selectedIconColor, scaling: 'boon', scalingValue: String(stat.value) } : stat
     )))
     setIconTargetIndex(null)
   }
@@ -177,6 +187,17 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
     onStatsChange?.(normalizedStats.map((stat, statIndex) => (
       statIndex === iconTargetIndex ? { ...stat, iconColor, scaling: 'boon', scalingValue: String(stat.value) } : stat
     )))
+  }
+
+  function handleCustomIconColorChange(iconColor: string) {
+    const normalizedColor = normalizeCustomHexColor(iconColor)
+
+    if (!normalizedColor) {
+      return
+    }
+
+    setRecentCustomColors(saveRecentCustomColor(normalizedColor))
+    handleIconColorChange(normalizedColor)
   }
 
   function handleIconPickerBackdropPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -209,6 +230,30 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
               {swatch.value ? null : 'Default'}
             </button>
           ))}
+          <label className={styles.customIconColor}>
+            <CommittedColorInput
+              value={getCustomColorInputValue(selectedIconColor)}
+              ariaLabel="Custom Boon icon color"
+              onCommit={handleCustomIconColorChange}
+            />
+            <span>Custom</span>
+            <code>{getCustomColorInputValue(selectedIconColor)}</code>
+          </label>
+          {recentCustomColors.length ? (
+            <div className={styles.recentIconColors} aria-label="Recent custom Boon icon colors">
+              <span>Recent</span>
+              {recentCustomColors.map(color => (
+                <button
+                  key={color}
+                  type="button"
+                  style={{ backgroundColor: color }}
+                  aria-label={`Use recent Boon icon color ${color}`}
+                  aria-pressed={selectedIconColor === color}
+                  onClick={() => handleIconColorChange(color)}
+                />
+              ))}
+            </div>
+          ) : null}
         </section>
         <section className={styles.squareIconPicker} aria-label="Boon square icon">
           <button type="button" className={styles.squareIconSelect} aria-label="Use Square Icon" onClick={() => handleIconChange(getSquareIconToken(squareIconSize))}>
@@ -254,7 +299,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
         <div className={styles.iconPickerGrid}>
           {PROPERTY_ICON_GROUPS.flatMap(group => group.assets).map(asset => (
             <button key={asset.path} type="button" aria-label={`Use ${asset.label}`} onClick={() => handleIconChange(asset.path)}>
-              <span aria-hidden="true" style={getIconVisualStyle(asset.path, selectedIconColor || '#ffffff')} />
+              <span aria-hidden="true" style={getIconVisualStyle(asset.path, selectedIconColor)} />
               {asset.label}
             </button>
           ))}
@@ -290,7 +335,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
             <div className={styles.stat} key={isProtectedStat ? `default-boon-stat-${index}` : `custom-boon-stat-${index}`}>
               <span className={styles.valueRow}>
                 {isEditable ? (
-                  <button type="button" className={styles.iconButton} aria-label={`Change ${stat.label || 'Boon stat'} icon`} onClick={() => setIconTargetIndex(index)}>
+                  <button type="button" className={styles.iconButton} aria-label={`Change ${stat.label || 'Boon stat'} icon`} onClick={() => openIconPicker(index)}>
                     <span data-testid={stat.icon === 'health' ? 'boon-base-health-icon' : undefined} aria-hidden="true" style={getIconVisualStyle(stat.icon, stat.iconColor)} />
                   </button>
                 ) : stat.icon === 'health' ? (
