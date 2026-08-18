@@ -254,6 +254,7 @@ async function ensureCurrentUserRecord() {
     emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
     firstName: clerkUser.firstName,
     lastName: clerkUser.lastName,
+    profileImageUrl: clerkUser.imageUrl || null,
   }) as Promise<UserRecord | null>
 }
 

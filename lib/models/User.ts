@@ -7,6 +7,7 @@ export interface IUser {
   emailVerified: boolean
   firstName: string | null
   lastName: string | null
+  profileImageUrl?: string | null
   preferredHero: string
   profileBackground?: string | null
   isPublic: boolean
@@ -48,6 +49,11 @@ const userSchema = new Schema<IUser>(
     lastName: {
       type: String,
       default: null,
+    },
+    profileImageUrl: {
+      type: String,
+      default: null,
+      maxlength: 2048,
     },
     preferredHero: {
       type: String,

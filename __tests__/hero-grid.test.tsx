@@ -137,14 +137,29 @@ describe('HeroGrid', () => {
   it('keeps the desktop grid at eight columns and custom hero actions out of layout flow', () => {
     const stylesheet = readFileSync('components/HeroGrid/HeroGrid.module.css', 'utf8')
     const gridRule = stylesheet.match(/\.grid\s*\{[^}]*grid-template-columns:\s*repeat\(8,\s*minmax\(0,\s*1fr\)\)/)?.[0]
+    const gridViewportRule = stylesheet.match(/\.gridViewport\s*\{([^}]*)\}/)?.[1] ?? ''
+    const mainRule = stylesheet.match(/\.main\s*\{([^}]*)\}/)?.[1] ?? ''
     const selectActionsRule = stylesheet.match(/\.selectHeroActions\s*\{[^}]*position:\s*absolute/)?.[0]
     const interactionModalRule = stylesheet.match(/\.interactionModalBackdrop\s*\{([^}]*)\}/)?.[1] ?? ''
 
     expect(gridRule).toBeTruthy()
+    expect(mainRule).toMatch(/min-height:\s*0/)
+    expect(gridViewportRule).toMatch(/max-height:\s*100%/)
+    expect(gridViewportRule).toMatch(/overflow-y:\s*auto/)
+    expect(gridViewportRule).toMatch(/scrollbar-gutter:\s*stable/)
     expect(selectActionsRule).toBeTruthy()
     expect(interactionModalRule).toMatch(/position:\s*fixed/)
     expect(interactionModalRule).toMatch(/place-items:\s*center/)
     expect(interactionModalRule).toMatch(/background:\s*rgba\(0,\s*0,\s*0,\s*0\.82\)/)
+  })
+
+  it('provides a keyboard-focusable scroll region around the main character grid', () => {
+    render(<HeroGrid />)
+
+    const gridViewport = screen.getByRole('region', { name: 'Select character grid' })
+
+    expect(gridViewport).toHaveAttribute('tabindex', '0')
+    expect(gridViewport).toContainElement(screen.getAllByTestId('hero-card')[0])
   })
 
   it('shows logged-out users only the 38 official heroes on Select', () => {
@@ -394,6 +409,34 @@ describe('HeroGrid', () => {
 
     expect(screen.getByTestId('editor-control-rail')).toHaveAttribute('data-collapsed', 'true')
     expect(screen.getByTestId('interaction-creator').className).toContain('creatorPaneCollapsed')
+  })
+
+  it('offers the signed-in user\'s custom heroes as interaction targets', async () => {
+    const user = userEvent.setup()
+    const ownedTarget = buildCustomHero('507f1f77bcf86cd799439011', 'Clockmaker')
+
+    clerkState.isSignedIn = true
+    clerkState.user = { id: 'user_1' }
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input)
+
+      if (url === '/api/heroes?mine=true') {
+        return Response.json({ heroes: [ownedTarget] })
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    render(<HeroGrid />)
+
+    await screen.findByRole('button', { name: 'Select character Clockmaker' })
+    await openEmptyCreateEditor(user)
+    await user.click(within(screen.getByRole('navigation', { name: 'Hero editor navigation' })).getByRole('tab', { name: 'Interactions' }))
+    await user.click(screen.getByRole('button', { name: /new conversation/i }))
+
+    const targetDialog = screen.getByRole('dialog', { name: /choose target hero/i })
+
+    expect(within(targetDialog).getByRole('button', { name: 'Clockmaker (Your hero)' })).toBeInTheDocument()
   })
 
   it('removes the interaction creator before opening the incompatible ability editor', async () => {
@@ -649,6 +692,15 @@ describe('HeroGrid', () => {
         ...abrams.heroInfo,
         nameType: 'text' as const,
         nameValue: 'Saved Arc Light',
+      },
+      creatorId: 'creator_mongo_id',
+      creator: {
+        userId: 'user_creator_1',
+        username: 'Rift Smith',
+        profileSlug: 'rift_smith',
+        avatarUrl: 'https://example.com/rift-smith-avatar.png',
+        level: 'Power User' as const,
+        preferredHero: 'haze',
       },
       status: 'published',
       likesCount: 7,
@@ -1802,6 +1854,15 @@ describe('HeroGrid', () => {
         nameType: 'text' as const,
         nameValue: 'Public Arc Light',
       },
+      creatorId: 'creator_mongo_id',
+      creator: {
+        userId: 'user_creator_1',
+        username: 'Rift Smith',
+        profileSlug: 'rift_smith',
+        avatarUrl: 'https://example.com/rift-smith-avatar.png',
+        level: 'Power User' as const,
+        preferredHero: 'haze',
+      },
       status: 'published',
       likesCount: 4,
       likedByCurrentUser: false,
@@ -1888,10 +1949,21 @@ describe('HeroGrid', () => {
     expect(screen.getByRole('button', { name: 'Like Public Arc Light' })).toHaveTextContent('4')
     expect(screen.getByTestId('hero-name-badge')).toHaveTextContent('Public Arc Light')
     expect(await screen.findByTestId('hero-info-secondary-ability-1')).toBeInTheDocument()
+    const creatorLink = screen.getByRole('link', { name: 'View Rift Smith profile' })
+    const browseCard = screen.getByRole('button', { name: 'Select character Public Arc Light' }).closest('article')
+    const socialActions = screen.getByRole('region', { name: 'Public Arc Light social actions' })
+
+    expect(creatorLink).toHaveAttribute('href', '/profile/rift_smith')
+    expect(creatorLink).toHaveAttribute('title', 'View Rift Smith profile')
+    expect(creatorLink.querySelector('img')).toHaveAttribute('src', 'https://example.com/rift-smith-avatar.png')
+    expect(socialActions).toContainElement(creatorLink)
+    expect(browseCard).not.toBeNull()
+    expect(within(browseCard as HTMLElement).queryByRole('link', { name: 'View Rift Smith profile' })).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Like Public Arc Light' }))
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Unlike Public Arc Light' })).toHaveTextContent('5'))
+    expect(screen.getByRole('link', { name: 'View Rift Smith profile' })).toBeInTheDocument()
     await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'Arc')
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/heroes?status=published&sort=new&limit=24&offset=0&search=Arc', expect.objectContaining({ signal: expect.any(AbortSignal) })))
     await user.click(screen.getByRole('button', { name: 'Use as Template' }))

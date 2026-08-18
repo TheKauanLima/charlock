@@ -20,10 +20,20 @@ export interface HeroInteraction {
   id: string
   targetHeroId: string
   targetHeroName: string
+  targetHeroPortrait?: string
   title: string
   lines: DialogueLine[]
   createdAt: string
   updatedAt: string
+}
+
+export interface CreatorProfileSummary {
+  userId: string
+  username: string
+  profileSlug: string
+  avatarUrl?: string
+  level: 'New User' | 'Contributor' | 'Power User' | 'Community Leader'
+  preferredHero?: string
 }
 
 export interface CustomHeroListFilters {
@@ -69,6 +79,7 @@ export interface CustomHeroSavePayload {
 export interface CustomHeroSummary extends HeroDefinition {
   id: string
   creatorId: string
+  creator?: CreatorProfileSummary
   status: CustomHeroStatus
   likesCount: number
   likedByCurrentUser: boolean

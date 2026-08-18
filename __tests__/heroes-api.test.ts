@@ -58,7 +58,19 @@ function buildMutationRequest(url: string, init: RequestInit = {}) {
 describe('heroes API route', () => {
   it('lists published heroes with requested sort', async () => {
     serviceMocks.listCustomHeroPage.mockResolvedValueOnce({
-      heroes: [{ id: 'hero_1', displayName: 'Arc Light', likesCount: 3 }],
+      heroes: [{
+        id: 'hero_1',
+        displayName: 'Arc Light',
+        likesCount: 3,
+        creator: {
+          userId: 'user_creator_1',
+          username: 'Rift Smith',
+          profileSlug: 'rift_smith',
+          avatarUrl: 'https://example.com/rift-smith.png',
+          level: 'Contributor',
+          preferredHero: 'haze',
+        },
+      }],
       pagination: { limit: 12, offset: 24, total: 30, hasMore: false },
     })
 
@@ -66,7 +78,19 @@ describe('heroes API route', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({
-      heroes: [{ id: 'hero_1', displayName: 'Arc Light', likesCount: 3 }],
+      heroes: [{
+        id: 'hero_1',
+        displayName: 'Arc Light',
+        likesCount: 3,
+        creator: {
+          userId: 'user_creator_1',
+          username: 'Rift Smith',
+          profileSlug: 'rift_smith',
+          avatarUrl: 'https://example.com/rift-smith.png',
+          level: 'Contributor',
+          preferredHero: 'haze',
+        },
+      }],
       pagination: { limit: 12, offset: 24, total: 30, hasMore: false },
     })
     expect(serviceMocks.listCustomHeroPage).toHaveBeenCalledWith({

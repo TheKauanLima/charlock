@@ -9,6 +9,7 @@ export interface ClerkUserRecordInput {
   emailVerified: boolean
   firstName?: string | null
   lastName?: string | null
+  profileImageUrl?: string | null
 }
 
 export interface SyncedUserRecord {
@@ -16,6 +17,7 @@ export interface SyncedUserRecord {
   clerkId: string
   email: string
   username?: string | null
+  profileImageUrl?: string | null
   preferredHero?: string | null
   profileBackground?: string | null
   isPublic?: boolean | null
@@ -77,6 +79,10 @@ export async function syncUserRecordFromClerk(input: ClerkUserRecordInput) {
     emailVerified: input.emailVerified,
     firstName: input.firstName ?? null,
     lastName: input.lastName ?? null,
+  }
+
+  if (input.profileImageUrl !== undefined) {
+    setFields.profileImageUrl = input.profileImageUrl?.trim() || null
   }
 
   if (!hasSplitIdentity) {

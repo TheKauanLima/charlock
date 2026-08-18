@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { auth } from '@clerk/nextjs/server'
+import { auth, clerkClient } from '@clerk/nextjs/server'
 import { Types, type PipelineStage } from 'mongoose'
 
 import dbConnect, { isDatabaseConnectionError } from '@/lib/dbConnect'
@@ -10,7 +10,7 @@ import { ApiRequestError } from '@/lib/api-errors'
 import { customHeroSaveSchema, stripDatabaseMetadata } from '@/lib/custom-hero-schemas'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, HEROES, type HeroInfoDefinition } from '@/lib/hero-data'
 import type { RenderPosition } from '@/lib/editor-assets'
-import type { CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary, HeroInteraction } from '@/lib/custom-hero-types'
+import type { CreatorProfileSummary, CustomHeroDetail, CustomHeroListFilters, CustomHeroListResult, CustomHeroSavePayload, CustomHeroSort, CustomHeroStatus, CustomHeroSummary, HeroInteraction } from '@/lib/custom-hero-types'
 import type { HeroStatsPayload } from '@/lib/hero-stats-shared'
 import AbilityStats from '@/lib/models/AbilityStats'
 import BoonStats from '@/lib/models/BoonStats'
@@ -33,6 +33,7 @@ import { createNotification, resolveRecipientClerkId } from '@/lib/notifications
 import { enforceRateLimit } from '@/lib/rate-limit'
 import { getMissingAbilityIconSaveIssueMessages } from '@/lib/custom-hero-validation'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
+import { getUserLevel } from '@/lib/user-level'
 
 interface Actor {
   clerkId: string
@@ -136,17 +137,54 @@ function getNumber(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+interface CreatorUserRecord {
+  _id: Types.ObjectId
+  clerkId: string
+  email: string
+  username?: string | null
+  profileImageUrl?: string | null
+  preferredHero?: string | null
+}
+
+interface CreatorContributionCount {
+  _id: string
+  count: number
+}
+
 function normalizeInteractionDate(value: string, fallback: string) {
   const timestamp = new Date(value)
 
   return Number.isNaN(timestamp.getTime()) ? fallback : timestamp.toISOString()
 }
 
-function normalizeInteractions(interactions: HeroInteraction[] | undefined, customHeroId?: string): HeroInteraction[] {
+interface CustomInteractionTarget {
+  id: string
+  name: string
+  portrait: string
+}
+
+function normalizeInteractions(
+  interactions: HeroInteraction[] | undefined,
+  customHeroId?: string,
+  customTargets: Map<string, CustomInteractionTarget> = new Map(),
+  requireKnownTargets = false,
+): HeroInteraction[] {
   const now = new Date().toISOString()
 
   return (interactions ?? []).map(interaction => {
-    const targetHero = HEROES.find(hero => hero.slug === interaction.targetHeroId)
+    const officialTarget = HEROES.find(hero => hero.slug === interaction.targetHeroId)
+    const customTarget = customTargets.get(interaction.targetHeroId)
+    const targetHero = officialTarget
+      ? { id: officialTarget.slug, name: officialTarget.displayName, portrait: undefined }
+      : customTarget
+        ? customTarget
+        : !requireKnownTargets && interaction.targetHeroPortrait
+          ? {
+              id: interaction.targetHeroId,
+              name: interaction.targetHeroName,
+              portrait: interaction.targetHeroPortrait,
+            }
+          : null
 
     if (!targetHero) {
       throw new CustomHeroError(`Unknown interaction target: ${interaction.targetHeroName}`, 400)
@@ -156,8 +194,9 @@ function normalizeInteractions(interactions: HeroInteraction[] | undefined, cust
 
     return {
       id: interaction.id,
-      targetHeroId: targetHero.slug,
-      targetHeroName: targetHero.displayName,
+      targetHeroId: targetHero.id,
+      targetHeroName: targetHero.name,
+      ...(targetHero.portrait ? { targetHeroPortrait: targetHero.portrait } : {}),
       title: interaction.title.trim() || 'New Conversation',
       lines: interaction.lines
         .slice()
@@ -168,7 +207,7 @@ function normalizeInteractions(interactions: HeroInteraction[] | undefined, cust
           speakerHeroId: line.speakerSide === 'left' && customHeroId
             ? customHeroId
             : line.speakerSide === 'right'
-              ? targetHero.slug
+              ? targetHero.id
               : line.speakerHeroId,
           text: line.text,
           order,
@@ -177,6 +216,47 @@ function normalizeInteractions(interactions: HeroInteraction[] | undefined, cust
       updatedAt: normalizeInteractionDate(interaction.updatedAt, createdAt),
     }
   })
+}
+
+async function getOwnedCustomInteractionTargets(
+  interactions: HeroInteraction[] | undefined,
+  actor: Actor,
+  customHeroId: string,
+) {
+  const customTargetIds = [...new Set((interactions ?? [])
+    .map(interaction => interaction.targetHeroId)
+    .filter(targetHeroId => !HEROES.some(hero => hero.slug === targetHeroId)))]
+
+  if (customTargetIds.includes(customHeroId)) {
+    throw new CustomHeroError('A hero cannot target itself in an interaction', 400)
+  }
+
+  if (!customTargetIds.length) return new Map<string, CustomInteractionTarget>()
+
+  if (customTargetIds.some(targetHeroId => !Types.ObjectId.isValid(targetHeroId))) {
+    const unknownTarget = (interactions ?? []).find(interaction => customTargetIds.includes(interaction.targetHeroId))
+
+    throw new CustomHeroError(`Unknown interaction target: ${unknownTarget?.targetHeroName ?? 'Custom hero'}`, 400)
+  }
+
+  const targets = await CustomHero.find({
+    _id: { $in: customTargetIds.map(targetHeroId => new Types.ObjectId(targetHeroId)) },
+    createdByUserId: { $in: actor.ownerIds },
+  }).select('_id name portrait').lean<Array<{ _id: Types.ObjectId; name: string; portrait: string }>>()
+  const targetMap = new Map(targets.map(target => [target._id.toString(), {
+    id: target._id.toString(),
+    name: target.name,
+    portrait: target.portrait,
+  }]))
+
+  if (targetMap.size !== customTargetIds.length) {
+    const unknownTargetId = customTargetIds.find(targetHeroId => !targetMap.has(targetHeroId))
+    const unknownTarget = (interactions ?? []).find(interaction => interaction.targetHeroId === unknownTargetId)
+
+    throw new CustomHeroError(`Unknown interaction target: ${unknownTarget?.targetHeroName ?? 'Custom hero'}`, 400)
+  }
+
+  return targetMap
 }
 
 function normalizeRenderPosition(value: RenderPosition | null | undefined): RenderPosition {
@@ -559,7 +639,14 @@ function serializeHeroInfo(heroInfo: HeroInfoRecord | null): HeroInfoDefinition 
   }
 }
 
-function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, actor: Actor | null = null, bookmarks: Set<string> | null = null, abilityStatsRecord: AbilityStatsRecord | null = null): CustomHeroSummary {
+function serializeSummary(
+  hero: HeroRecord,
+  heroInfo: HeroInfoRecord | null,
+  actor: Actor | null = null,
+  bookmarks: Set<string> | null = null,
+  abilityStatsRecord: AbilityStatsRecord | null = null,
+  creator?: CreatorProfileSummary,
+): CustomHeroSummary {
   const likedBy = hero.likedBy ?? []
   const viewerCanEdit = Boolean(actor?.ownerIds.some(ownerId => ownerId === hero.createdByUserId))
   const likedByCurrentUser = Boolean(actor?.ownerIds.some(ownerId => likedBy.includes(ownerId)))
@@ -575,6 +662,7 @@ function serializeSummary(hero: HeroRecord, heroInfo: HeroInfoRecord | null, act
   return {
     id: heroId,
     creatorId: hero.createdByUserId,
+    ...(creator ? { creator } : {}),
     slug: hero.slug,
     assetSlug: hero.slug,
     displayName: hero.name,
@@ -660,6 +748,7 @@ function serializeDetail(bundle: HeroBundle, actor: Actor | null = null): Custom
         id: interaction.id,
         targetHeroId: interaction.targetHeroId,
         targetHeroName: interaction.targetHeroName,
+        targetHeroPortrait: interaction.targetHeroPortrait,
         title: interaction.title,
         lines: interaction.lines.map(line => ({
           id: line.id,
@@ -809,6 +898,87 @@ async function getAbilityStatsMap(heroIds: Types.ObjectId[]) {
   return new Map(abilityStatsRecords.map(abilityStats => [abilityStats.heroId.toString(), abilityStats]))
 }
 
+async function getCreatorAvatarMap(users: CreatorUserRecord[]) {
+  const storedAvatarMap = new Map(users
+    .filter(user => Boolean(user.profileImageUrl))
+    .map(user => [user.clerkId, user.profileImageUrl as string]))
+
+  if (!users.length) return storedAvatarMap
+
+  try {
+    const client = await clerkClient()
+    const response = await client.users.getUserList({
+      userId: users.map(user => user.clerkId),
+      limit: users.length,
+    })
+    const liveAvatarMap = new Map(response.data
+      .filter(user => Boolean(user.imageUrl))
+      .map(user => [user.id, user.imageUrl]))
+
+    return new Map([...storedAvatarMap, ...liveAvatarMap])
+  } catch {
+    return storedAvatarMap
+  }
+}
+
+async function getCreatorProfileMap(heroes: HeroRecord[]) {
+  const creatorIds = [...new Set(heroes.map(hero => hero.createdByUserId).filter(Boolean))]
+
+  if (!creatorIds.length) return new Map<string, CreatorProfileSummary>()
+
+  const creatorObjectIds = creatorIds
+    .filter(creatorId => Types.ObjectId.isValid(creatorId))
+    .map(creatorId => new Types.ObjectId(creatorId))
+  const users = await User.find({
+    $or: [
+      { clerkId: { $in: creatorIds } },
+      ...(creatorObjectIds.length ? [{ _id: { $in: creatorObjectIds } }] : []),
+    ],
+  }).select('_id clerkId email username profileImageUrl preferredHero').lean<CreatorUserRecord[]>()
+  const ownerAliases = [...new Set(users.flatMap(user => [user.clerkId, user._id.toString()]))]
+
+  if (!ownerAliases.length) return new Map<string, CreatorProfileSummary>()
+
+  const [heroCounts, heroInfoCounts, avatarMap] = await Promise.all([
+    CustomHero.aggregate<CreatorContributionCount>([
+      { $match: { createdByUserId: { $in: ownerAliases } } },
+      { $group: { _id: '$createdByUserId', count: { $sum: 1 } } },
+    ]),
+    HeroInfo.aggregate<CreatorContributionCount>([
+      { $match: { createdByUserId: { $in: ownerAliases } } },
+      { $group: { _id: '$createdByUserId', count: { $sum: 1 } } },
+    ]),
+    getCreatorAvatarMap(users),
+  ])
+  const heroCountMap = new Map(heroCounts.map(item => [item._id, item.count]))
+  const heroInfoCountMap = new Map(heroInfoCounts.map(item => [item._id, item.count]))
+  const creatorProfileMap = new Map<string, CreatorProfileSummary>()
+
+  for (const user of users) {
+    const aliases = [user.clerkId, user._id.toString()]
+    const contributionCount = aliases.reduce((total, ownerId) => (
+      total + (heroCountMap.get(ownerId) ?? 0) + (heroInfoCountMap.get(ownerId) ?? 0)
+    ), 0)
+    const registeredUsername = user.username?.trim()
+    const username = registeredUsername || user.email.split('@')[0] || user.clerkId
+    const avatarUrl = avatarMap.get(user.clerkId)
+    const creator: CreatorProfileSummary = {
+      userId: user.clerkId,
+      username,
+      profileSlug: registeredUsername || user.clerkId,
+      ...(avatarUrl ? { avatarUrl } : {}),
+      level: getUserLevel(contributionCount).label,
+      preferredHero: user.preferredHero || 'abrams',
+    }
+
+    for (const ownerId of aliases) {
+      creatorProfileMap.set(ownerId, creator)
+    }
+  }
+
+  return creatorProfileMap
+}
+
 async function getActorBookmarkSet(actor: Actor | null) {
   if (!actor) {
     return null
@@ -874,9 +1044,19 @@ export async function listCustomHeroPage(filters: CustomHeroListFilters): Promis
       { $skip: filters.offset },
       { $limit: filters.limit },
     ])
-    const bookmarks = await getActorBookmarkSet(actor)
-    const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
-    const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
+    const [bookmarks, abilityStatsById, creatorProfiles] = await Promise.all([
+      getActorBookmarkSet(actor),
+      getAbilityStatsMap(heroes.map(hero => hero._id)),
+      getCreatorProfileMap(heroes),
+    ])
+    const summaries = heroes.map(hero => serializeSummary(
+      hero,
+      hero.heroInfo ?? null,
+      actor,
+      bookmarks,
+      hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null,
+      creatorProfiles.get(hero.createdByUserId),
+    ))
 
     return {
       heroes: summaries,
@@ -974,8 +1154,18 @@ export async function listBookmarkedCustomHeroPage(filters: Pick<CustomHeroListF
       { $limit: filters.limit },
     ])
     const bookmarks = new Set(bookmarkedIds.map(heroId => heroId.toString()))
-    const abilityStatsById = await getAbilityStatsMap(heroes.map(hero => hero._id))
-    const summaries = heroes.map(hero => serializeSummary(hero, hero.heroInfo ?? null, actor, bookmarks, hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null))
+    const [abilityStatsById, creatorProfiles] = await Promise.all([
+      getAbilityStatsMap(heroes.map(hero => hero._id)),
+      getCreatorProfileMap(heroes),
+    ])
+    const summaries = heroes.map(hero => serializeSummary(
+      hero,
+      hero.heroInfo ?? null,
+      actor,
+      bookmarks,
+      hero.abilityStats ?? abilityStatsById.get(hero._id.toString()) ?? null,
+      creatorProfiles.get(hero.createdByUserId),
+    ))
 
     return {
       heroes: summaries,
@@ -1237,6 +1427,11 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
   const shouldNotifyPublish = isPublishing && existingHero?.status !== 'published'
   const heroId = existingHero?._id ?? new Types.ObjectId()
   const slug = existingHero?.slug ?? await getUniqueSlug(payload.name)
+  const customInteractionTargets = await getOwnedCustomInteractionTargets(
+    payload.interactions,
+    actor,
+    heroId.toString(),
+  )
   const hero = await CustomHero.findOneAndUpdate(
     { _id: heroId },
     {
@@ -1252,7 +1447,12 @@ export async function saveCustomHero(value: unknown): Promise<CustomHeroDetail> 
         status: payload.status,
         allowCopies: payload.allowCopies,
         publishedAt,
-        interactions: normalizeInteractions(payload.interactions, heroId.toString()),
+        interactions: normalizeInteractions(
+          payload.interactions,
+          heroId.toString(),
+          customInteractionTargets,
+          true,
+        ),
       },
       $setOnInsert: {
         likesCount: 0,
@@ -1429,12 +1629,13 @@ export async function likeCustomHero(id: string): Promise<CustomHeroSummary> {
     }
   }
 
-  const [heroInfo, abilityStats] = await Promise.all([
+  const [heroInfo, abilityStats, creatorProfiles] = await Promise.all([
     HeroInfo.findOne({ heroId: hero._id }).lean<HeroInfoRecord | null>(),
     AbilityStats.findOne({ heroId: hero._id }).lean<AbilityStatsRecord | null>(),
+    getCreatorProfileMap([hero]),
   ])
 
-  return serializeSummary(hero, heroInfo, actor, null, abilityStats)
+  return serializeSummary(hero, heroInfo, actor, null, abilityStats, creatorProfiles.get(hero.createdByUserId))
 }
 
 export async function recordCustomHeroCopy(id: string): Promise<void> {

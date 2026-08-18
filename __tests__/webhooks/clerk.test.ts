@@ -88,6 +88,7 @@ describe('Clerk webhook route', () => {
         username: 'tester',
         first_name: 'Test',
         last_name: 'User',
+        image_url: 'https://img.clerk.com/tester.png',
       },
     })
 
@@ -107,6 +108,7 @@ describe('Clerk webhook route', () => {
       emailVerified: true,
       firstName: 'Test',
       lastName: 'User',
+      profileImageUrl: 'https://img.clerk.com/tester.png',
     })
     expect(mocks.updateUserMock).toHaveBeenCalledWith('clerk_123', {
       publicMetadata: {

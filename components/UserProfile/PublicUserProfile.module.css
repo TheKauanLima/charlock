@@ -1,0 +1,370 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #000;
+  color: #ffefd6;
+  font-family: Radiance, Arial, sans-serif;
+}
+
+.backgroundRender {
+  z-index: 0;
+  object-fit: contain;
+  object-position: right bottom;
+  opacity: 0.42;
+  filter: saturate(1.05) contrast(1.08);
+}
+
+.noiseLayer,
+.washLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.noiseLayer {
+  z-index: 1;
+  background-image: url('/noise.png');
+  background-size: 220px 220px;
+  opacity: 0.05;
+}
+
+.washLayer {
+  z-index: 2;
+  background:
+    linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.9) 48%, rgba(0, 0, 0, 0.55) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--public-profile-accent) 14%, transparent), transparent 46%);
+}
+
+.content {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  gap: 24px;
+  width: min(var(--citadel-container), calc(100% - 48px));
+  margin: 0 auto;
+  padding: 64px 0 58px;
+}
+
+.profileHeader,
+.profileSummary,
+.charactersPanel {
+  border: 1px solid rgba(255, 239, 214, 0.22);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  background: rgba(4, 7, 6, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025), 0 22px 52px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(12px);
+}
+
+.profileHeader {
+  display: grid;
+  gap: 24px;
+  padding: 22px 26px 28px;
+}
+
+.backLink {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 9px;
+  color: rgba(255, 239, 214, 0.7);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.backLink:hover,
+.backLink:focus-visible {
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.identity {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+}
+
+.avatar {
+  position: relative;
+  display: grid;
+  width: 112px;
+  height: 112px;
+  overflow: hidden;
+  place-items: center;
+  border: 3px solid var(--public-profile-accent);
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  background: rgba(0, 0, 0, 0.62);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--public-profile-accent) 34%, transparent);
+  color: var(--public-profile-name);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 2.2rem;
+}
+
+.avatar::after {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, rgba(0, 0, 0, 0.18) 3px 4px);
+  content: '';
+}
+
+.avatarImage {
+  object-fit: cover;
+}
+
+.identityCopy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.identityCopy p,
+.bioPanel > p,
+.charactersPanel > header p {
+  margin: 0;
+  color: var(--public-profile-name);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.identityCopy h1 {
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: clamp(2.7rem, 7vw, 5.8rem);
+  line-height: 0.84;
+  text-transform: uppercase;
+}
+
+.followControl {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.followControl > span,
+.followControl small {
+  color: rgba(255, 239, 214, 0.62);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.followControl button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--public-profile-accent);
+  clip-path: var(--citadel-button-cut);
+  background: rgba(0, 0, 0, 0.58);
+  color: #ffefd6;
+  cursor: pointer;
+  padding: 0 16px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.followControl button:hover,
+.followControl button:focus-visible {
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.followControl button:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.followControl small {
+  max-width: 28ch;
+  color: #ff8e83;
+  text-align: right;
+}
+
+.profileSummary {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);
+  gap: 1px;
+  overflow: hidden;
+}
+
+.bioPanel {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 24px;
+}
+
+.bioPanel h2,
+.charactersPanel > header h2 {
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bioPanel > span {
+  color: rgba(255, 239, 214, 0.74);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+}
+
+.statsGrid {
+  display: grid;
+  margin: 0;
+}
+
+.statsGrid > div {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-height: 160px;
+  border-left: 1px solid rgba(255, 239, 214, 0.13);
+  padding: 18px 22px;
+}
+
+.statsGrid dt {
+  color: rgba(255, 239, 214, 0.5);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.statsGrid dd {
+  margin: 0;
+  color: var(--public-profile-name);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.35rem;
+  text-transform: uppercase;
+}
+
+.charactersPanel {
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+}
+
+.charactersPanel > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.charactersPanel > header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.charactersPanel > header > span {
+  color: rgba(255, 239, 214, 0.54);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.characterGrid {
+  justify-content: start;
+}
+
+.characterCard {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.3);
+}
+
+.emptyState {
+  display: grid;
+  gap: 6px;
+  border: 1px dashed rgba(255, 239, 214, 0.2);
+  padding: 34px;
+  text-align: center;
+}
+
+.emptyState p,
+.emptyState span {
+  margin: 0;
+}
+
+.emptyState p {
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.emptyState span {
+  color: rgba(255, 239, 214, 0.6);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 860px) {
+  .identity {
+    grid-template-columns: 92px minmax(0, 1fr);
+  }
+
+  .avatar {
+    width: 92px;
+    height: 92px;
+  }
+
+  .followControl {
+    grid-column: 1 / -1;
+    justify-items: start;
+  }
+
+  .profileSummary {
+    grid-template-columns: 1fr;
+  }
+
+  .statsGrid > div {
+    border-left: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .content {
+    width: min(100% - 24px, var(--citadel-container));
+    padding-top: 24px;
+  }
+
+  .profileHeader,
+  .charactersPanel {
+    padding: 18px;
+  }
+
+  .identity {
+    grid-template-columns: 1fr;
+  }
+
+  .identityCopy h1 {
+    font-size: clamp(2.3rem, 16vw, 4rem);
+  }
+
+  .statsGrid > div {
+    min-height: 82px;
+    border-left: 0;
+  }
+
+  .charactersPanel > header {
+    align-items: start;
+    flex-direction: column;
+  }
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
+import GoogleAnalytics from '@/components/google-analytics/GoogleAnalytics'
 import GlobalNav from '@/components/GlobalNav/GlobalNav'
 import './globals.css'
 import '@/components/styles/CitadelBaseStyles.css'
@@ -32,6 +33,7 @@ export default function RootLayout({
           <GlobalNav />
           {children}
         </ClerkProvider>
+        <GoogleAnalytics />
       </body>
     </html>
   )

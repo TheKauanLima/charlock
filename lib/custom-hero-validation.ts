@@ -111,6 +111,7 @@ const GENERIC_FIELD_LABELS: Record<string, string> = {
   lowerCells: 'Lower stat cells',
   targetHeroId: 'Target hero',
   targetHeroName: 'Target hero name',
+  targetHeroPortrait: 'Target hero portrait',
   lines: 'Dialogue lines',
   speakerSide: 'Dialogue speaker',
   speakerHeroId: 'Speaker hero',

@@ -1,10 +1,12 @@
 import { HEROES } from '@/lib/hero-data'
+import type { CustomHeroSummary, HeroInteraction } from '@/lib/custom-hero-types'
 
 export interface InteractionRosterHero {
   id: string
   name: string
   portrait: string
   smallPortrait: string
+  isCustom?: boolean
 }
 
 const SMALL_PORTRAIT_ASSET_BY_HERO: Record<string, string> = {
@@ -62,4 +64,40 @@ export const INTERACTION_ROSTER_HEROES: InteractionRosterHero[] = HEROES.map(her
 
 export function getInteractionRosterHero(heroId: string) {
   return INTERACTION_ROSTER_HEROES.find(hero => hero.id === heroId) ?? null
+}
+
+export function buildCustomInteractionHeroes(
+  heroes: CustomHeroSummary[],
+  excludedHeroId?: string | null,
+): InteractionRosterHero[] {
+  return heroes
+    .filter(hero => hero.id !== excludedHeroId)
+    .map(hero => ({
+      id: hero.id,
+      name: hero.displayName,
+      portrait: hero.portrait,
+      smallPortrait: hero.portrait,
+      isCustom: true,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }))
+}
+
+export function getInteractionTargetHero(
+  interaction: Pick<HeroInteraction, 'targetHeroId' | 'targetHeroName' | 'targetHeroPortrait'>,
+  customHeroes: InteractionRosterHero[] = [],
+): InteractionRosterHero | null {
+  const knownHero = getInteractionRosterHero(interaction.targetHeroId)
+    ?? customHeroes.find(hero => hero.id === interaction.targetHeroId)
+
+  if (knownHero) return knownHero
+
+  return interaction.targetHeroPortrait
+    ? {
+        id: interaction.targetHeroId,
+        name: interaction.targetHeroName,
+        portrait: interaction.targetHeroPortrait,
+        smallPortrait: interaction.targetHeroPortrait,
+        isCustom: true,
+      }
+    : null
 }

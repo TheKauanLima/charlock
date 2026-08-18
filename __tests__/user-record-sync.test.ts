@@ -52,6 +52,7 @@ describe('syncUserRecordFromClerk', () => {
       emailVerified: true,
       firstName: 'Tri',
       lastName: 'Logy',
+      profileImageUrl: 'https://img.clerk.com/avatar.png',
     })
 
     expect(result).toEqual(updatedRecord)
@@ -65,6 +66,7 @@ describe('syncUserRecordFromClerk', () => {
           emailVerified: true,
           firstName: 'Tri',
           lastName: 'Logy',
+          profileImageUrl: 'https://img.clerk.com/avatar.png',
         },
       },
       {
@@ -115,5 +117,6 @@ describe('syncUserRecordFromClerk', () => {
       firstName: null,
       lastName: null,
     })
+    expect(update.$set).not.toHaveProperty('profileImageUrl')
   })
 })

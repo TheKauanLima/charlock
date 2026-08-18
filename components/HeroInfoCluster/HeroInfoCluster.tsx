@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
+import CreatorProfileBadge from '@/components/CreatorProfileBadge/CreatorProfileBadge'
 import HeroAbilityIconRow from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import type { AbilityIconTarget } from '@/components/HeroAbilityIconRow/HeroAbilityIconRow'
 import ReportDialog from '@/components/Moderation/ReportDialog'
@@ -22,6 +23,7 @@ import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import cn from '@/lib/utilsd'
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition } from '@/lib/hero-data'
+import type { CreatorProfileSummary } from '@/lib/custom-hero-types'
 
 import styles from './HeroInfoCluster.module.css'
 
@@ -29,6 +31,8 @@ interface HeroInfoClusterProps {
   hero: HeroDefinition
   showDetails?: boolean
   onCreateFromHero?: () => void
+  creatorProfile?: CreatorProfileSummary | null
+  showCreatorAttribution?: boolean
 }
 
 interface SocialHeroDefinition extends HeroDefinition {
@@ -78,7 +82,13 @@ function formatNoteTime(value: string) {
   }).format(new Date(value))
 }
 
-export default function HeroInfoCluster({ hero, showDetails = false, onCreateFromHero }: HeroInfoClusterProps) {
+export default function HeroInfoCluster({
+  hero,
+  showDetails = false,
+  onCreateFromHero,
+  creatorProfile,
+  showCreatorAttribution = false,
+}: HeroInfoClusterProps) {
   const [activeTabId, setActiveTabId] = useState<SidebarTabId | null>(null)
   const heroId = getCustomHeroId(hero)
   const [isCommentsOpen, setIsCommentsOpen] = useState(false)
@@ -461,6 +471,9 @@ export default function HeroInfoCluster({ hero, showDetails = false, onCreateFro
           <>
             <section className={styles.socialPanel} aria-label={`${hero.displayName} social actions`}>
               <div className={styles.socialActions}>
+                {showCreatorAttribution ? (
+                  <CreatorProfileBadge creator={creatorProfile} iconOnly />
+                ) : null}
                 <button
                   type="button"
                   className={cn(styles.actionIconButton, styles.bookmarkButton, isBookmarked && styles.bookmarkButtonActive)}

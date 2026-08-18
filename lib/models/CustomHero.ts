@@ -20,6 +20,7 @@ export interface IHeroInteraction {
   id: string
   targetHeroId: string
   targetHeroName: string
+  targetHeroPortrait?: string
   title: string
   lines: IDialogueLine[]
   createdAt: Date
@@ -84,6 +85,7 @@ const heroInteractionSchema = new Schema<IHeroInteraction>(
     id: { type: String, required: true },
     targetHeroId: { type: String, required: true },
     targetHeroName: { type: String, required: true },
+    targetHeroPortrait: { type: String, default: '' },
     title: { type: String, default: 'New Conversation', maxlength: 100 },
     lines: { type: [dialogueLineSchema], default: [] },
     createdAt: { type: Date, required: true, default: Date.now },

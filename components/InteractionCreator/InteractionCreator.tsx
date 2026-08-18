@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, Copy, MessageSquareText, Pencil, Plus, Search, Tras
 import { useEffect, useMemo, useState } from 'react'
 
 import type { DialogueLine, DialogueSpeakerSide, HeroInteraction } from '@/lib/custom-hero-types'
-import { getInteractionRosterHero, INTERACTION_ROSTER_HEROES, type InteractionRosterHero } from '@/lib/interaction-heroes'
+import { getInteractionTargetHero, INTERACTION_ROSTER_HEROES, type InteractionRosterHero } from '@/lib/interaction-heroes'
 import cn from '@/lib/utilsd'
 
 import styles from './InteractionCreator.module.css'
@@ -16,6 +16,7 @@ interface InteractionCreatorProps {
   customHeroPortrait: string
   accentColor: string
   interactions: HeroInteraction[]
+  customTargetHeroes?: InteractionRosterHero[]
   editorPaneCollapsed?: boolean
   readOnly?: boolean
   onClose?: () => void
@@ -80,6 +81,7 @@ export default function InteractionCreator({
   customHeroPortrait,
   accentColor,
   interactions,
+  customTargetHeroes = [],
   editorPaneCollapsed = false,
   readOnly = false,
   onClose,
@@ -104,7 +106,11 @@ export default function InteractionCreator({
       ? activeInteraction.lines.slice().sort((left, right) => left.order - right.order)
       : activeInteraction.lines
     : []
-  const targetHero = activeInteraction ? getInteractionRosterHero(activeInteraction.targetHeroId) : null
+  const availableTargetHeroes = useMemo(
+    () => [...INTERACTION_ROSTER_HEROES, ...customTargetHeroes],
+    [customTargetHeroes],
+  )
+  const targetHero = activeInteraction ? getInteractionTargetHero(activeInteraction, customTargetHeroes) : null
   const filteredConversations = useMemo(() => {
     const query = conversationSearch.trim().toLowerCase()
 
@@ -118,10 +124,10 @@ export default function InteractionCreator({
   const filteredTargets = useMemo(() => {
     const query = targetSearch.trim().toLowerCase()
 
-    if (!query) return INTERACTION_ROSTER_HEROES
+    if (!query) return availableTargetHeroes
 
-    return INTERACTION_ROSTER_HEROES.filter(hero => hero.name.toLowerCase().includes(query))
-  }, [targetSearch])
+    return availableTargetHeroes.filter(hero => hero.name.toLowerCase().includes(query))
+  }, [availableTargetHeroes, targetSearch])
 
   useEffect(() => {
     if (!readOnly || !onClose) return undefined
@@ -158,6 +164,7 @@ export default function InteractionCreator({
         id: createId('interaction'),
         targetHeroId: hero.id,
         targetHeroName: hero.name,
+        targetHeroPortrait: hero.isCustom ? hero.portrait : undefined,
         title: `Conversation with ${hero.name}`,
         lines: [],
         createdAt: timestamp,
@@ -171,6 +178,7 @@ export default function InteractionCreator({
         ...interaction,
         targetHeroId: hero.id,
         targetHeroName: hero.name,
+        targetHeroPortrait: hero.isCustom ? hero.portrait : undefined,
         title: interaction.title === `Conversation with ${interaction.targetHeroName}`
           ? `Conversation with ${hero.name}`
           : interaction.title,
@@ -318,7 +326,7 @@ export default function InteractionCreator({
           <p className={styles.stageDescription}>
             {activeInteraction
               ? `${activeInteractionLines.length} ${activeInteractionLines.length === 1 ? 'line' : 'lines'} · ${activeInteraction.targetHeroName}`
-              : 'Choose a roster hero to begin a new conversation.'}
+              : 'Choose an official hero or one of your own heroes to begin a new conversation.'}
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -351,7 +359,7 @@ export default function InteractionCreator({
         {readOnly ? (
           <aside className={cn(styles.conversationList, styles.viewerConversationRail)} aria-label="Interactions ordered by character">
             {orderedInteractions.length ? orderedInteractions.map(interaction => {
-              const rosterHero = getInteractionRosterHero(interaction.targetHeroId)
+              const rosterHero = getInteractionTargetHero(interaction, customTargetHeroes)
 
               return (
                 <article key={interaction.id} className={cn(styles.conversationItem, interaction.id === activeInteraction?.id && styles.activeConversationItem)}>
@@ -494,7 +502,7 @@ export default function InteractionCreator({
           <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="target-hero-picker-title">
             <header className={styles.modalHeader}>
               <div>
-                <p className={styles.eyebrow}>Roster</p>
+                <p className={styles.eyebrow}>Characters</p>
                 <h2 id="target-hero-picker-title">Choose Target Hero</h2>
               </div>
               <button type="button" className={styles.iconButton} aria-label="Close target hero selector" onClick={() => setIsTargetPickerOpen(false)}>
@@ -503,14 +511,21 @@ export default function InteractionCreator({
             </header>
             <label className={styles.searchField}>
               <Search aria-hidden="true" />
-              <span className="sr-only">Search roster heroes</span>
+              <span className="sr-only">Search official and custom heroes</span>
               <input value={targetSearch} placeholder="Search heroes" onChange={event => setTargetSearch(event.target.value)} />
             </label>
             <div className={styles.targetGrid}>
               {filteredTargets.map(hero => (
-                <button key={hero.id} type="button" className={styles.targetOption} onClick={() => chooseTarget(hero)}>
+                <button
+                  key={hero.id}
+                  type="button"
+                  className={styles.targetOption}
+                  aria-label={hero.isCustom ? `${hero.name} (Your hero)` : hero.name}
+                  onClick={() => chooseTarget(hero)}
+                >
                   <Image src={hero.smallPortrait} alt="" width={120} height={120} sizes="120px" />
                   <span>{hero.name}</span>
+                  <small aria-hidden="true">{hero.isCustom ? 'Your hero' : '\u00a0'}</small>
                 </button>
               ))}
             </div>
@@ -546,7 +561,7 @@ export default function InteractionCreator({
             </div>
             <div className={styles.conversationList}>
               {filteredConversations.length ? filteredConversations.map(interaction => {
-                const hero = getInteractionRosterHero(interaction.targetHeroId)
+                const hero = getInteractionTargetHero(interaction, customTargetHeroes)
                 const isRenaming = renamingInteractionId === interaction.id
 
                 return (

@@ -143,6 +143,7 @@ describe('Mongoose model schemas', () => {
     expect(CustomHero.schema.path('reports.reporterId')).toBeDefined()
     expect(CustomHero.schema.path('moderationStatus')).toHaveProperty('enumValues', ['clean', 'flagged', 'hidden'])
     expect(CustomHero.schema.path('interactions')).toBeDefined()
+    expect(CustomHero.schema.path('interactions.0.targetHeroPortrait')).toBeDefined()
     expect(CustomHero.schema.path('interactions.0.lines.0.speakerSide')).toHaveProperty('enumValues', ['left', 'right'])
     expect(CustomHero.schema.path('interactions.0.lines.0.text')).toHaveProperty('options.maxlength', 500)
   })
@@ -164,5 +165,10 @@ describe('Mongoose model schemas', () => {
     expect(Notification.schema.path('relatedHeroId')).toBeDefined()
     expect(Notification.schema.path('read')).toBeDefined()
     expect(Notification.schema.path('type')).toHaveProperty('enumValues', ['like', 'comment', 'follow', 'publish'])
+  })
+
+  it('stores the Clerk profile image used by public creator profiles', () => {
+    expect(User.schema.path('profileImageUrl')).toBeDefined()
+    expect(User.schema.path('profileImageUrl')).toHaveProperty('options.maxlength', 2048)
   })
 })

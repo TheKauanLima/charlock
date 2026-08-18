@@ -39,6 +39,7 @@ import { ANONYMOUS_RECOVERY_OWNER_ID, buildEditorRecoverySnapshot, readEditorRec
 import { DEFAULT_HERO_NAME_FONT_FAMILY, DEFAULT_HERO_NAME_FONT_SIZE, DEFAULT_HERO_NAME_FONT_WEIGHT, type HeroDefinition, type HeroInfoDefinition } from '@/lib/hero-data'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload, type WeaponPanelVariant, type WeaponStatsPayload } from '@/lib/hero-stats-shared'
 import { getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
+import type { InteractionRosterHero } from '@/lib/interaction-heroes'
 import { UploadButton } from '@/lib/uploadthing'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
@@ -60,6 +61,7 @@ interface HeroInfoEditorProps {
   initialStats?: HeroStatsPayload | null
   initialAbilityStats?: AbilityStatsPayload | null
   initialInteractions?: HeroInteraction[]
+  customInteractionTargets?: InteractionRosterHero[]
   isSaving?: boolean
   isDraftSaving?: boolean
   saveStatusMessage?: string | null
@@ -477,6 +479,7 @@ export default function HeroInfoEditor({
   initialStats = null,
   initialAbilityStats = null,
   initialInteractions = [],
+  customInteractionTargets = [],
   isSaving = false,
   isDraftSaving = false,
   saveStatusMessage = null,
@@ -1700,6 +1703,7 @@ export default function HeroInfoEditor({
           customHeroPortrait={heroPortraitInput || hero.portrait}
           accentColor={draft.nameColor}
           interactions={interactionsDraft}
+          customTargetHeroes={customInteractionTargets}
           editorPaneCollapsed={isControlRailCollapsed}
           onChange={setInteractionsDraft}
         />

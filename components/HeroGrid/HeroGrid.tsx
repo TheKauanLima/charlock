@@ -20,6 +20,7 @@ import { ANONYMOUS_RECOVERY_OWNER_ID, clearEditorRecovery, readEditorRecovery, t
 import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
+import { buildCustomInteractionHeroes } from '@/lib/interaction-heroes'
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll'
 import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
 import { HERO_TEMPLATES, type HeroTemplateDefinition } from '@/templates'
@@ -339,6 +340,10 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   const visibleSelectCustomHeroes = useMemo(
     () => selectCustomHeroesOwnerId === authUserId ? selectCustomHeroes : [],
     [authUserId, selectCustomHeroes, selectCustomHeroesOwnerId],
+  )
+  const customInteractionTargets = useMemo(
+    () => buildCustomInteractionHeroes(visibleSelectCustomHeroes, editingCustomHero?.id),
+    [editingCustomHero?.id, visibleSelectCustomHeroes],
   )
   const selectedSelectCustomHero = useMemo(
     () => visibleSelectCustomHeroes.find(hero => hero.id === selectedSelectCustomHeroId) ?? null,
@@ -677,7 +682,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   }, [initialHeroId, loadSavedHero])
 
   useEffect(() => {
-    if (!isAuthLoaded || !isSignedIn || !authUserId || activeTab !== 'Select') {
+    if (!isAuthLoaded || !isSignedIn || !authUserId || (activeTab !== 'Select' && activeTab !== 'Create')) {
       return undefined
     }
 
@@ -1038,8 +1043,8 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         throw new Error(getHeroResponseError(body, `Like request failed with ${response.status}`))
       }
 
-      setBrowseHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? body.hero : hero)))
-      setBookmarkedHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? body.hero : hero)))
+      setBrowseHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? { ...hero, ...body.hero } : hero)))
+      setBookmarkedHeroes(currentHeroes => currentHeroes.map(hero => (hero.id === body.hero?.id ? { ...hero, ...body.hero } : hero)))
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to like hero.'
 
@@ -1453,10 +1458,16 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
             ) : null}
             {activeTab === 'Browse' && browseStatus ? <p className={styles.browseStatus} role="status">{browseStatus}</p> : null}
             {activeTab === 'Bookmarks' && bookmarksStatus ? <p className={styles.browseStatus} role="status">{bookmarksStatus}</p> : null}
-            <section className={styles.grid}>
-              {Array.from({ length: isCollectionTab
-                ? Math.max(GRID_SIZE, activeTab === 'Browse' ? browseHeroes.length : bookmarkedHeroes.length)
-                : Math.max(GRID_SIZE, selectGridHeroes.length) }).map((_, index) => {
+            <div
+              className={styles.gridViewport}
+              role="region"
+              aria-label={`${activeTab} character grid`}
+              tabIndex={0}
+            >
+              <section className={styles.grid}>
+                {Array.from({ length: isCollectionTab
+                  ? Math.max(GRID_SIZE, activeTab === 'Browse' ? browseHeroes.length : bookmarkedHeroes.length)
+                  : Math.max(GRID_SIZE, selectGridHeroes.length) }).map((_, index) => {
                 if (isCollectionTab) {
                   const heroes = activeTab === 'Browse' ? browseHeroes : bookmarkedHeroes
                   const hero = heroes[index]
@@ -1594,18 +1605,19 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                     </span>
                   </button>
                 )
-              })}
-            </section>
-            {activeTab === 'Browse' && browsePagination?.hasMore ? (
-              <button ref={browseScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBrowseHeroes} disabled={isBrowseLoadingMore}>
-                {isBrowseLoadingMore ? 'Loading...' : 'Load More'}
-              </button>
-            ) : null}
-            {activeTab === 'Bookmarks' && bookmarksPagination?.hasMore ? (
-              <button ref={bookmarksScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBookmarkedHeroes} disabled={isBookmarksLoadingMore}>
-                {isBookmarksLoadingMore ? 'Loading...' : 'Load More'}
-              </button>
-            ) : null}
+                })}
+              </section>
+              {activeTab === 'Browse' && browsePagination?.hasMore ? (
+                <button ref={browseScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBrowseHeroes} disabled={isBrowseLoadingMore}>
+                  {isBrowseLoadingMore ? 'Loading...' : 'Load More'}
+                </button>
+              ) : null}
+              {activeTab === 'Bookmarks' && bookmarksPagination?.hasMore ? (
+                <button ref={bookmarksScrollRef} type="button" className={styles.loadMoreButton} onClick={handleLoadMoreBookmarkedHeroes} disabled={isBookmarksLoadingMore}>
+                  {isBookmarksLoadingMore ? 'Loading...' : 'Load More'}
+                </button>
+              ) : null}
+            </div>
           </main>
         ) : null}
       </div>
@@ -1626,6 +1638,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
           initialStats={editingHeroStats}
           initialAbilityStats={editingAbilityStats}
           initialInteractions={editingCustomHero?.interactions ?? templateHero?.interactions ?? []}
+          customInteractionTargets={customInteractionTargets}
           isSaving={isSavingHero}
           isDraftSaving={isDraftSaving}
           saveStatusMessage={saveStatusMessage}
@@ -1639,7 +1652,14 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
           onExitEditor={handleExitCreateEditor}
         />
       ) : isCollectionTab ? (
-        selectedCollectionHero ? <HeroInfoCluster hero={selectedCollectionHero} showDetails={showDetails} /> : null
+        selectedCollectionHero ? (
+          <HeroInfoCluster
+            hero={selectedCollectionHero}
+            showDetails={showDetails}
+            creatorProfile={selectedCollectionHero.creator}
+            showCreatorAttribution={activeTab === 'Browse'}
+          />
+        ) : null
       ) : activeTab === 'Select' && hasVisibleSelectedHero ? (
         selectedSelectCustomHero
           ? <HeroInfoCluster hero={selectedSelectCustomHero} showDetails={showDetails} />

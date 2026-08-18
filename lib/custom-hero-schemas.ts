@@ -133,6 +133,7 @@ const heroInteractionSchema = z.object({
   id: z.string().trim().min(1).max(160),
   targetHeroId: z.string().trim().min(1).max(160),
   targetHeroName: z.string().trim().min(1).max(120),
+  targetHeroPortrait: z.string().max(500).optional(),
   title: z.string().trim().min(1).max(100),
   lines: z.array(dialogueLineSchema).max(100),
   createdAt: z.string().max(64),

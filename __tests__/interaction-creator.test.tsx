@@ -9,12 +9,19 @@ import { afterEach, describe, expect, it } from 'vitest'
 
 import InteractionCreator from '@/components/InteractionCreator/InteractionCreator'
 import type { HeroInteraction } from '@/lib/custom-hero-types'
+import type { InteractionRosterHero } from '@/lib/interaction-heroes'
 
 afterEach(() => {
   cleanup()
 })
 
-function InteractionHarness({ initialInteractions = [] }: { initialInteractions?: HeroInteraction[] }) {
+function InteractionHarness({
+  initialInteractions = [],
+  customTargetHeroes = [],
+}: {
+  initialInteractions?: HeroInteraction[]
+  customTargetHeroes?: InteractionRosterHero[]
+}) {
   const [interactions, setInteractions] = useState(initialInteractions)
 
   return (
@@ -25,6 +32,7 @@ function InteractionHarness({ initialInteractions = [] }: { initialInteractions?
         customHeroPortrait="/panorama/images/heroes/abrams.png"
         accentColor="#72d6ff"
         interactions={interactions}
+        customTargetHeroes={customTargetHeroes}
         onChange={setInteractions}
       />
       <output data-testid="interaction-state">{JSON.stringify(interactions)}</output>
@@ -160,6 +168,76 @@ describe('InteractionCreator', () => {
       speakerHeroId: 'apollo',
       order: 0,
     })
+  })
+
+  it('creates and renders conversations with the user\'s custom heroes', async () => {
+    const user = userEvent.setup()
+    const customTarget: InteractionRosterHero = {
+      id: '507f1f77bcf86cd799439011',
+      name: 'Clockmaker',
+      portrait: 'https://example.com/clockmaker.png',
+      smallPortrait: 'https://example.com/clockmaker.png',
+      isCustom: true,
+    }
+
+    render(<InteractionHarness customTargetHeroes={[customTarget]} />)
+
+    await user.click(screen.getByRole('button', { name: /new conversation/i }))
+    const targetDialog = screen.getByRole('dialog', { name: /choose target hero/i })
+    const customOption = within(targetDialog).getByRole('button', { name: 'Clockmaker (Your hero)' })
+
+    expect(customOption).toHaveTextContent('Your hero')
+    expect(customOption.querySelector('img')).toHaveAttribute('src', expect.stringContaining('clockmaker.png'))
+
+    await user.click(customOption)
+    await user.click(screen.getByRole('button', { name: 'Start with Clockmaker' }))
+
+    expect(screen.getByRole('textbox', { name: 'Clockmaker voiceline 1' }).closest('li')?.querySelector('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('clockmaker.png'),
+    )
+    expect(readInteractions()[0]).toMatchObject({
+      targetHeroId: customTarget.id,
+      targetHeroName: customTarget.name,
+      targetHeroPortrait: customTarget.portrait,
+      lines: [{ speakerSide: 'right', speakerHeroId: customTarget.id, order: 0 }],
+    })
+  })
+
+  it('uses the saved portrait snapshot when viewing a custom-hero interaction', () => {
+    const interaction: HeroInteraction = {
+      id: 'interaction-custom-target',
+      targetHeroId: '507f1f77bcf86cd799439011',
+      targetHeroName: 'Clockmaker',
+      targetHeroPortrait: 'https://example.com/clockmaker.png',
+      title: 'Time to Talk',
+      lines: [{
+        id: 'line-custom-target',
+        speakerSide: 'right',
+        speakerHeroId: '507f1f77bcf86cd799439011',
+        text: 'Right on schedule.',
+        order: 0,
+      }],
+      createdAt: '2026-08-12T12:00:00.000Z',
+      updatedAt: '2026-08-12T12:00:00.000Z',
+    }
+
+    render(
+      <InteractionCreator
+        customHeroId="custom-hero-1"
+        customHeroName="Aurora"
+        customHeroPortrait="/panorama/images/heroes/abrams.png"
+        accentColor="#72d6ff"
+        interactions={[interaction]}
+        readOnly
+        onChange={() => undefined}
+      />,
+    )
+
+    const customLine = screen.getByRole('textbox', { name: 'Clockmaker voiceline 1' })
+
+    expect(customLine).toHaveValue('Right on schedule.')
+    expect(customLine.closest('li')?.querySelector('img')).toHaveAttribute('src', expect.stringContaining('clockmaker.png'))
   })
 
   it('renames, duplicates, filters, and deletes conversations', async () => {

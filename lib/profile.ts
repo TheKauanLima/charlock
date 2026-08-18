@@ -12,13 +12,10 @@ import HeroInfo from '@/lib/models/HeroInfo'
 import User from '@/lib/models/User'
 import type { ModerationStatus } from '@/lib/moderation-types'
 import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
+import { getUserLevel, type UserLevel } from '@/lib/user-level'
 
-export interface UserLevel {
-  label: 'New User' | 'Contributor' | 'Power User' | 'Community Leader'
-  tone: 'rookie' | 'investigator' | 'lead' | 'chief'
-  nextAt: number | null
-  progress: number
-}
+export { getUserLevel }
+export type { UserLevel }
 
 export interface ProfileUser {
   id: string
@@ -40,6 +37,7 @@ export interface ProfileHeroCard {
   slug: string
   portrait: string
   render: string
+  background: string
   updatedAt: string
   status: string
   moderationStatus: ModerationStatus
@@ -75,6 +73,7 @@ interface UserRecord {
   clerkId: string
   email: string
   username?: string | null
+  profileImageUrl?: string | null
   preferredHero?: string | null
   profileBackground?: string | null
   isPublic?: boolean | null
@@ -91,6 +90,7 @@ interface HeroRecord {
   slug: string
   portrait: string
   render: string
+  background?: string | null
   status: string
   moderationStatus?: ModerationStatus
   updatedAt: Date
@@ -118,42 +118,6 @@ export class ProfilePrivateError extends Error {
 
 export function isProfilePrivateError(error: unknown) {
   return error instanceof ProfilePrivateError
-}
-
-export function getUserLevel(contributionCount: number): UserLevel {
-  if (contributionCount > 50) {
-    return {
-      label: 'Community Leader',
-      tone: 'chief',
-      nextAt: null,
-      progress: 100,
-    }
-  }
-
-  if (contributionCount > 20) {
-    return {
-      label: 'Power User',
-      tone: 'lead',
-      nextAt: 51,
-      progress: Math.min(100, Math.round((contributionCount / 51) * 100)),
-    }
-  }
-
-  if (contributionCount > 5) {
-    return {
-      label: 'Contributor',
-      tone: 'investigator',
-      nextAt: 21,
-      progress: Math.min(100, Math.round((contributionCount / 21) * 100)),
-    }
-  }
-
-  return {
-    label: 'New User',
-    tone: 'rookie',
-    nextAt: 6,
-    progress: Math.min(100, Math.round((contributionCount / 6) * 100)),
-  }
 }
 
 export function getProfileHero(slug?: string | null) {
@@ -204,18 +168,23 @@ function serializeHero(hero: HeroRecord): ProfileHeroCard {
     slug: hero.slug,
     portrait: hero.portrait,
     render: hero.render,
+    background: hero.background || hero.render,
     updatedAt: hero.updatedAt.toISOString(),
     status: hero.status,
     moderationStatus: hero.moderationStatus ?? 'clean',
   }
 }
 
-async function getAvatarUrl(clerkId: string) {
+async function getAvatarUrl(user: Pick<UserRecord, 'clerkId' | 'profileImageUrl'>) {
+  if (user.profileImageUrl) {
+    return user.profileImageUrl
+  }
+
   try {
     const client = await clerkClient()
-    const user = await client.users.getUser(clerkId)
+    const clerkUser = await client.users.getUser(user.clerkId)
 
-    return user.imageUrl || null
+    return clerkUser.imageUrl || null
   } catch {
     return null
   }
@@ -259,6 +228,7 @@ export async function getCurrentProfileUser() {
       emailVerified: clerkUser.primaryEmailAddress?.verification?.status === 'verified',
       firstName: clerkUser.firstName,
       lastName: clerkUser.lastName,
+      profileImageUrl: clerkUser.imageUrl || null,
     }) as Promise<UserRecord | null>
   } catch (error) {
     if (isDatabaseConnectionError(error)) {
@@ -367,7 +337,7 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
           backstory: { $type: 'string', $ne: '' },
         })
       : Promise.resolve(0),
-    getAvatarUrl(user.clerkId),
+    getAvatarUrl(user),
     viewerIsOwner ? getSavedCustomHeroes(ownerIds) : Promise.resolve([]),
     viewerIsOwner ? getBookmarkedCustomHeroes(user.bookmarks, ownerIds) : Promise.resolve([]),
     userId && !viewerIsOwner

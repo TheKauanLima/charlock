@@ -56,4 +56,19 @@ describe('interaction creator data', () => {
 
     expect(oversized.success).toBe(false)
   })
+
+  it('accepts a custom target portrait snapshot for published interaction rendering', () => {
+    const result = customHeroSaveSchema.shape.interactions.safeParse([{
+      id: 'interaction-custom',
+      targetHeroId: '507f1f77bcf86cd799439011',
+      targetHeroName: 'Clockmaker',
+      targetHeroPortrait: 'https://example.com/clockmaker.png',
+      title: 'Custom conversation',
+      lines: [],
+      createdAt: '2026-08-12T12:00:00.000Z',
+      updatedAt: '2026-08-12T12:00:00.000Z',
+    }])
+
+    expect(result.success).toBe(true)
+  })
 })

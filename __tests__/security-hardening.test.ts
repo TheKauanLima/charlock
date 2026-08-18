@@ -38,6 +38,16 @@ describe('security hardening', () => {
     expect(csp).toContain('*.uploadthing.com')
     expect(csp).toContain('fonts.googleapis.com')
     expect(csp).toContain('utfs.io')
+    expect(scriptSrc).toContain('https://www.googletagmanager.com')
+    expect(connectSrc).toEqual(expect.arrayContaining([
+      'https://www.google-analytics.com',
+      'https://*.google-analytics.com',
+      'https://www.googletagmanager.com',
+    ]))
+    expect(imgSrc).toEqual(expect.arrayContaining([
+      'https://www.google-analytics.com',
+      'https://*.google-analytics.com',
+    ]))
   })
 
   it('allows production Clerk avatar images through Next image remote patterns', () => {

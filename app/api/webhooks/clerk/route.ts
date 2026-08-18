@@ -23,6 +23,7 @@ interface ClerkUserPayload {
   username?: string | null
   first_name?: string | null
   last_name?: string | null
+  image_url?: string | null
   unsafe_metadata?: Record<string, unknown> | null
 }
 
@@ -131,6 +132,7 @@ export async function POST(request: Request) {
         emailVerified: getPrimaryEmailVerified(evt.data),
         firstName: evt.data.first_name ?? null,
         lastName: evt.data.last_name ?? null,
+        profileImageUrl: evt.data.image_url ?? null,
       })
 
       if (!userDoc) {
