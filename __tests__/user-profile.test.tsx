@@ -30,6 +30,7 @@ vi.mock('@/app/profile/actions', () => ({
   deleteAccount: vi.fn(async () => undefined),
   updateProfileBackground: vi.fn(async (backgroundId: string) => ({ success: true, backgroundId })),
   updateProfileSettings: vi.fn(async () => undefined),
+  updateUsername: vi.fn(async () => undefined),
 }))
 
 vi.mock('@clerk/nextjs', () => ({
@@ -294,6 +295,8 @@ describe('UserProfile', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: /settings/i })).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /save profile/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/profile username/i)).toHaveValue('TRIL')
+    expect(screen.getByRole('button', { name: /update username/i })).toBeInTheDocument()
 
     fetchMock.mockRestore()
   })

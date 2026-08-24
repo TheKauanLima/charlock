@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Bell, Bookmark, Heart, MessageSquare, Settings, UsersRound } from 'lucide-react'
 import type { CSSProperties } from 'react'
 
-import { deleteAccount, updateProfileSettings } from '@/app/profile/actions'
+import { deleteAccount, updateProfileSettings, updateUsername } from '@/app/profile/actions'
 import type { HeroDefinition } from '@/lib/hero-data'
 import type { ProfileUser } from '@/lib/profile'
 
@@ -16,16 +16,27 @@ interface ProfileSettingsProps {
   preferredHero: HeroDefinition
   heroes: HeroDefinition[]
   deleteError?: boolean
+  usernameError?: 'invalid' | 'taken'
+  usernameUpdated?: boolean
 }
 
 interface ProfileSettingsPanelProps {
   user: ProfileUser
   heroes: HeroDefinition[]
   deleteError?: boolean
+  usernameError?: 'invalid' | 'taken'
+  usernameUpdated?: boolean
   embedded?: boolean
 }
 
-export function ProfileSettingsPanel({ user, heroes, deleteError = false, embedded = false }: ProfileSettingsPanelProps) {
+export function ProfileSettingsPanel({
+  user,
+  heroes,
+  deleteError = false,
+  usernameError,
+  usernameUpdated = false,
+  embedded = false,
+}: ProfileSettingsPanelProps) {
   return (
     <section className={`${styles.panel} ${embedded ? styles.embeddedPanel : ''}`} aria-label="Profile settings">
         <header className={styles.header}>
@@ -35,6 +46,27 @@ export function ProfileSettingsPanel({ user, heroes, deleteError = false, embedd
             <p className={styles.identifier}>{user.email}</p>
           </div>
         </header>
+
+        <form className={styles.section} action={updateUsername}>
+          <h2>Username</h2>
+          <label className={styles.field}>
+            <span>Profile Username</span>
+            <input
+              name="username"
+              defaultValue={user.username}
+              minLength={3}
+              maxLength={32}
+              pattern="[A-Za-z0-9_]+"
+              autoComplete="username"
+              required
+            />
+          </label>
+          <p className={styles.helperText}>Use 3-32 letters, numbers, or underscores. Your public profile link changes with it.</p>
+          {usernameError === 'invalid' ? <p className={styles.error} role="alert">Enter a valid, non-reserved username.</p> : null}
+          {usernameError === 'taken' ? <p className={styles.error} role="alert">That username is already in use.</p> : null}
+          {usernameUpdated ? <p className={styles.success} role="status">Username updated.</p> : null}
+          <button className={styles.saveButton} type="submit">Update Username</button>
+        </form>
 
         <form className={styles.form} action={updateProfileSettings}>
           <section className={styles.section}>
@@ -97,7 +129,15 @@ export function ProfileSettingsPanel({ user, heroes, deleteError = false, embedd
   )
 }
 
-export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes, deleteError = false }: ProfileSettingsProps) {
+export default function ProfileSettings({
+  user,
+  avatarUrl,
+  preferredHero,
+  heroes,
+  deleteError = false,
+  usernameError,
+  usernameUpdated = false,
+}: ProfileSettingsProps) {
   return (
     <main
       className={styles.shell}
@@ -161,7 +201,13 @@ export default function ProfileSettings({ user, avatarUrl, preferredHero, heroes
           </div>
         </aside>
 
-        <ProfileSettingsPanel user={user} heroes={heroes} deleteError={deleteError} />
+        <ProfileSettingsPanel
+          user={user}
+          heroes={heroes}
+          deleteError={deleteError}
+          usernameError={usernameError}
+          usernameUpdated={usernameUpdated}
+        />
       </div>
     </main>
   )

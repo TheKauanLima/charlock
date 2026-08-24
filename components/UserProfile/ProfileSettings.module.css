@@ -264,6 +264,7 @@
   text-transform: uppercase;
 }
 
+.field input,
 .field select,
 .textareaField textarea,
 .deleteForm input {
@@ -281,6 +282,7 @@
   line-height: 1.5;
 }
 
+.field input:focus,
 .field select:focus,
 .textareaField textarea:focus,
 .deleteForm input:focus {
@@ -427,6 +429,21 @@
   background: var(--citadel-danger-bg);
   color: #ffd6d7;
   padding: 0 20px;
+}
+
+.helperText {
+  margin: -8px 0 0;
+  color: rgba(255, 239, 214, 0.66);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.success {
+  margin: 0;
+  border: 1px solid var(--citadel-gold);
+  background: var(--citadel-gold-faint);
+  color: var(--citadel-gold);
+  padding: 10px 12px;
 }
 
 .deleteForm button:hover {

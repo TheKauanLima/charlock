@@ -1,6 +1,7 @@
 import type { Types } from 'mongoose'
 
 import User from '@/lib/models/User'
+import { appendUsernameCollisionSuffix, generateProfileUsername } from '@/lib/usernames'
 
 export interface ClerkUserRecordInput {
   clerkId: string
@@ -32,6 +33,7 @@ interface IdentityRecord {
   _id: Types.ObjectId
   clerkId: string
   email: string
+  username?: string | null
 }
 
 function normalizeEmail(email: string) {
@@ -62,23 +64,44 @@ async function resolveUniqueUsername(username: string | null, ownerId: Types.Obj
   return username
 }
 
+async function resolveGeneratedUsername(input: ClerkUserRecordInput) {
+  const generatedUsername = generateProfileUsername(input)
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const candidate = attempt === 0
+      ? generatedUsername
+      : appendUsernameCollisionSuffix(generatedUsername, attempt)
+    const existing = await User.findOne({ username: candidate }).select('_id').lean<Pick<IdentityRecord, '_id'> | null>()
+
+    if (!existing) {
+      return candidate
+    }
+  }
+
+  throw new Error('Unable to reserve an automatic username.')
+}
+
 export async function syncUserRecordFromClerk(input: ClerkUserRecordInput) {
   const email = normalizeEmail(input.email)
   const username = normalizeUsername(input.username)
-  const existingByClerk = await User.findOne({ clerkId: input.clerkId }).select('_id clerkId email').lean<IdentityRecord | null>()
+  const existingByClerk = await User.findOne({ clerkId: input.clerkId }).select('_id clerkId email username').lean<IdentityRecord | null>()
   const existingByEmail = existingByClerk?.email === email
     ? existingByClerk
-    : await User.findOne({ email }).select('_id clerkId email').lean<IdentityRecord | null>()
+    : await User.findOne({ email }).select('_id clerkId email username').lean<IdentityRecord | null>()
   const hasSplitIdentity = Boolean(existingByClerk && existingByEmail && !sameObjectId(existingByClerk._id, existingByEmail._id))
   const targetRecord = existingByClerk ?? existingByEmail
   const targetId = targetRecord?._id ?? null
-  const safeUsername = await resolveUniqueUsername(username, targetId)
   const setFields: Partial<ClerkUserRecordInput> = {
     clerkId: input.clerkId,
-    username: safeUsername,
     emailVerified: input.emailVerified,
     firstName: input.firstName ?? null,
     lastName: input.lastName ?? null,
+  }
+
+  if (!targetRecord) {
+    setFields.username = username
+      ? await resolveUniqueUsername(username, null)
+      : await resolveGeneratedUsername({ ...input, email })
   }
 
   if (input.profileImageUrl !== undefined) {

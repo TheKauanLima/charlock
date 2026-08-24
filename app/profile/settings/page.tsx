@@ -10,6 +10,8 @@ export const dynamic = 'force-dynamic'
 interface ProfileSettingsPageProps {
   searchParams: Promise<{
     error?: string
+    usernameError?: string
+    usernameStatus?: string
   }>
 }
 
@@ -53,6 +55,8 @@ export default async function ProfileSettingsPage({ searchParams }: ProfileSetti
       preferredHero={data.preferredHero}
       heroes={HEROES}
       deleteError={query.error === 'delete-confirmation'}
+      usernameError={query.usernameError === 'invalid' || query.usernameError === 'taken' ? query.usernameError : undefined}
+      usernameUpdated={query.usernameStatus === 'updated'}
     />
   )
 }

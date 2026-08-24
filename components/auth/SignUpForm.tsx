@@ -79,7 +79,6 @@ export default function SignUpForm() {
         strategy: 'oauth_google',
         redirectUrl: '/sso-callback',
         redirectUrlComplete: '/',
-        ...(username.trim() ? { unsafeMetadata: { username: username.trim() } } : {}),
       })
     } catch (caughtError) {
       setError(getAuthErrorMessage(caughtError))
@@ -139,6 +138,7 @@ export default function SignUpForm() {
       <button className={styles.oauthButton} type="button" disabled={!googleSignUp || isGoogleSubmitting || isSubmitting} onClick={handleGoogleSignUp}>
         {isGoogleSubmitting ? 'Opening Google' : 'Continue with Google'}
       </button>
+      <p className={styles.message}>Google sign-up creates a username automatically. You can change it later in Profile Settings.</p>
       <span className={styles.divider}>or</span>
       <label className={styles.field}>
         <span className={styles.label}>Email</span>

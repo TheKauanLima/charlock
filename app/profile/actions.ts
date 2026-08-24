@@ -10,6 +10,7 @@ import dbConnect from '@/lib/dbConnect'
 import CustomHero from '@/lib/models/CustomHero'
 import User from '@/lib/models/User'
 import { getCurrentProfileUser, getProfilePathSegment } from '@/lib/profile'
+import { getProfileUsernameError } from '@/lib/usernames'
 
 function getStringField(formData: FormData, field: string) {
   const value = formData.get(field)
@@ -130,6 +131,62 @@ export async function updateProfileSettings(formData: FormData) {
 
   revalidatePath(`/profile/${getProfilePathSegment(user)}`)
   revalidatePath('/profile/settings')
+}
+
+function isDuplicateKeyError(error: unknown) {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && error.code === 11000
+}
+
+export async function updateUsername(formData: FormData) {
+  const user = await getRequiredProfileUser()
+  const username = getStringField(formData, 'username')
+
+  if (getProfileUsernameError(username)) {
+    redirect('/profile/settings?usernameError=invalid')
+  }
+
+  await dbConnect()
+
+  const existingUser = await User.findOne({
+    username: new RegExp(`^${username}$`, 'i'),
+  }).select('clerkId').lean<{ clerkId: string } | null>()
+
+  if (existingUser && existingUser.clerkId !== user.clerkId) {
+    redirect('/profile/settings?usernameError=taken')
+  }
+
+  const previousProfilePath = `/profile/${getProfilePathSegment(user)}`
+
+  try {
+    await User.updateOne(
+      { clerkId: user.clerkId },
+      { $set: { username } },
+      { runValidators: true },
+    )
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      redirect('/profile/settings?usernameError=taken')
+    }
+
+    throw error
+  }
+
+  try {
+    const client = await clerkClient()
+    await client.users.updateUserMetadata(user.clerkId, {
+      unsafeMetadata: { username },
+    })
+  } catch {
+    // MongoDB is the profile source of truth; Clerk metadata is a compatibility copy.
+  }
+
+  revalidatePath(previousProfilePath)
+  revalidatePath(`/profile/${encodeURIComponent(username)}`)
+  revalidatePath('/profile/settings')
+  redirect('/profile/settings?usernameStatus=updated')
 }
 
 export async function deleteAccount(formData: FormData) {

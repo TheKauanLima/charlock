@@ -81,23 +81,20 @@ describe('SignUpForm', () => {
     })
   })
 
-  it('starts Google OAuth sign-up with optional username metadata', async () => {
+  it('starts Google OAuth sign-up without requiring username metadata', async () => {
     const user = userEvent.setup()
 
     signUpMocks.authenticateWithRedirect.mockResolvedValueOnce(undefined)
 
     render(<SignUpForm />)
 
-    await user.type(screen.getByLabelText('Username'), 'playerone')
     await user.click(screen.getByRole('button', { name: 'Continue with Google' }))
 
     expect(signUpMocks.authenticateWithRedirect).toHaveBeenCalledWith({
       strategy: 'oauth_google',
       redirectUrl: '/sso-callback',
       redirectUrlComplete: '/',
-      unsafeMetadata: {
-        username: 'playerone',
-      },
     })
+    expect(screen.getByText(/creates a username automatically/i)).toBeInTheDocument()
   })
 })
