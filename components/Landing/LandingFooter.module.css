@@ -1,0 +1,131 @@
+.footer {
+  border-top: 1px solid var(--landing-text-faint);
+  background: var(--landing-footer-bg);
+}
+
+.inner {
+  display: grid;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: clamp(40px, 6vw, 64px) var(--landing-gutter);
+  gap: 40px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.brand {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.wordmark {
+  justify-self: start;
+  color: var(--landing-text);
+  font-family: var(--landing-display-font);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 150ms ease-out;
+}
+
+.wordmark:hover {
+  color: var(--landing-accent);
+}
+
+.disclaimer {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--landing-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.releaseNote {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 42ch;
+  margin: 0;
+  color: var(--landing-text-muted);
+  font-size: 0.78rem;
+  gap: 4px 12px;
+  line-height: 1.5;
+}
+
+.releaseNote p {
+  margin: 0;
+}
+
+.column {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.columnHeading {
+  margin: 0;
+  color: var(--landing-accent);
+  font-family: var(--landing-body-font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 10px;
+  list-style: none;
+}
+
+.link {
+  color: var(--landing-text);
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: color 150ms ease-out;
+}
+
+.link:hover {
+  color: var(--landing-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--landing-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.wordmark:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 3px;
+}
+
+.disabledLink {
+  color: var(--landing-text-muted);
+  font-size: 0.95rem;
+  cursor: default;
+}
+
+.soon {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+@media (max-width: 760px) {
+  .inner {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark,
+  .link {
+    transition: none;
+  }
+}

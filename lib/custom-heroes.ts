@@ -543,11 +543,20 @@ function slugify(value: string) {
   return slug || 'custom-hero'
 }
 
-async function getUniqueSlug(name: string) {
+// Official hero slugs are reserved so a new custom hero named "Abrams" gets "abrams-2".
+const RESERVED_HERO_SLUGS = new Set(HEROES.map(hero => hero.slug.toLowerCase()))
+
+/** Exported for tests. Only called for new heroes; existing slugs are never regenerated. */
+export async function getUniqueSlug(name: string) {
   const baseSlug = slugify(name)
 
   for (let index = 0; index < 25; index += 1) {
     const candidate = index === 0 ? baseSlug : `${baseSlug}-${index + 1}`
+
+    if (RESERVED_HERO_SLUGS.has(candidate)) {
+      continue
+    }
+
     const existing = await CustomHero.exists({ slug: candidate })
 
     if (!existing) {
@@ -898,10 +907,14 @@ async function getAbilityStatsMap(heroIds: Types.ObjectId[]) {
   return new Map(abilityStatsRecords.map(abilityStats => [abilityStats.heroId.toString(), abilityStats]))
 }
 
-async function getCreatorAvatarMap(users: CreatorUserRecord[]) {
-  const storedAvatarMap = new Map(users
+function getStoredCreatorAvatarMap(users: CreatorUserRecord[]) {
+  return new Map(users
     .filter(user => Boolean(user.profileImageUrl))
     .map(user => [user.clerkId, user.profileImageUrl as string]))
+}
+
+async function getCreatorAvatarMap(users: CreatorUserRecord[]) {
+  const storedAvatarMap = getStoredCreatorAvatarMap(users)
 
   if (!users.length) return storedAvatarMap
 
@@ -921,7 +934,12 @@ async function getCreatorAvatarMap(users: CreatorUserRecord[]) {
   }
 }
 
-async function getCreatorProfileMap(heroes: HeroRecord[]) {
+/**
+ * includeLiveAvatars: false skips the Clerk API lookup (clerkClient() reads request
+ * headers), so session-independent callers stay free of request-time APIs.
+ */
+async function getCreatorProfileMap(heroes: HeroRecord[], options: { includeLiveAvatars?: boolean } = {}) {
+  const includeLiveAvatars = options.includeLiveAvatars ?? true
   const creatorIds = [...new Set(heroes.map(hero => hero.createdByUserId).filter(Boolean))]
 
   if (!creatorIds.length) return new Map<string, CreatorProfileSummary>()
@@ -948,7 +966,7 @@ async function getCreatorProfileMap(heroes: HeroRecord[]) {
       { $match: { createdByUserId: { $in: ownerAliases } } },
       { $group: { _id: '$createdByUserId', count: { $sum: 1 } } },
     ]),
-    getCreatorAvatarMap(users),
+    includeLiveAvatars ? getCreatorAvatarMap(users) : Promise.resolve(getStoredCreatorAvatarMap(users)),
   ])
   const heroCountMap = new Map(heroCounts.map(item => [item._id, item.count]))
   const heroInfoCountMap = new Map(heroInfoCounts.map(item => [item._id, item.count]))
@@ -1336,6 +1354,97 @@ export async function getPublishedCustomHero(id: string): Promise<CustomHeroDeta
   }
 
   return serializeDetail(await getHeroBundle(hero), actor)
+}
+
+export interface CustomHeroBySlugResult {
+  /** serializeDetail(await getHeroBundle(hero), actor) */
+  detail: CustomHeroDetail
+  /** From getCreatorProfileMap([hero]); read only avatarUrl and level (username may be email-derived). */
+  creatorSummary: CreatorProfileSummary | null
+  creatorAccount: { registeredUsername: string | null; isPublic: boolean } | null
+  /** All false when includeOwner is false. */
+  viewer: { isSignedIn: boolean; isOwner: boolean; bookmarked: boolean }
+}
+
+interface CreatorAccountRecord {
+  username?: string | null
+  isPublic?: boolean | null
+}
+
+async function getCreatorAccount(createdByUserId: string): Promise<CustomHeroBySlugResult['creatorAccount']> {
+  if (typeof createdByUserId !== 'string' || !createdByUserId) {
+    return null
+  }
+
+  const user = await User.findOne({
+    $or: [
+      { clerkId: createdByUserId },
+      ...(Types.ObjectId.isValid(createdByUserId) ? [{ _id: new Types.ObjectId(createdByUserId) }] : []),
+    ],
+  }).select('username isPublic').lean<CreatorAccountRecord | null>()
+
+  if (!user) {
+    return null
+  }
+
+  return {
+    registeredUsername: user.username?.trim() || null,
+    isPublic: user.isPublic !== false,
+  }
+}
+
+/**
+ * Looks a custom hero up by its exact stored slug. With includeOwner false the
+ * query is public-only and session-independent: no auth(), no Clerk API call.
+ * With includeOwner true the signed-in owner can also load their private or
+ * hidden hero. Returns null on a miss; database errors propagate.
+ */
+export async function getCustomHeroBySlug(
+  slug: string,
+  options: { includeOwner: boolean },
+): Promise<CustomHeroBySlugResult | null> {
+  if (typeof slug !== 'string' || !slug) {
+    return null
+  }
+
+  const actor = options.includeOwner ? await getOptionalActor() : null
+
+  await dbConnect()
+
+  const publicPredicate = { status: 'published', moderationStatus: { $ne: 'hidden' } } as const
+  const filter = options.includeOwner
+    ? {
+        slug,
+        $or: [
+          publicPredicate,
+          ...(actor ? [{ createdByUserId: { $in: actor.ownerIds } }] : []),
+        ],
+      }
+    : { slug, ...publicPredicate }
+  const hero = await CustomHero.findOne(filter).lean<HeroRecord | null>()
+
+  if (!hero) {
+    return null
+  }
+
+  const [bundle, creatorProfileMap, creatorAccount, bookmarks] = await Promise.all([
+    getHeroBundle(hero),
+    getCreatorProfileMap([hero], { includeLiveAvatars: options.includeOwner }),
+    getCreatorAccount(hero.createdByUserId),
+    getActorBookmarkSet(actor),
+  ])
+  const heroId = hero._id.toString()
+
+  return {
+    detail: serializeDetail(bundle, actor),
+    creatorSummary: creatorProfileMap.get(hero.createdByUserId) ?? null,
+    creatorAccount,
+    viewer: {
+      isSignedIn: Boolean(actor),
+      isOwner: Boolean(actor?.ownerIds.includes(hero.createdByUserId)),
+      bookmarked: bookmarks?.has(heroId) ?? false,
+    },
+  }
 }
 
 export async function listCustomHeroesForOwner(ownerIds: string[]): Promise<CustomHeroSummary[]> {

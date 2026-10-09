@@ -157,7 +157,8 @@
   font-weight: 800;
 }
 
-.followControl button {
+.followControl button,
+.followControl a {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -176,6 +177,8 @@
 }
 
 .followControl button:hover,
+.followControl a:hover,
+.followControl a:focus-visible,
 .followControl button:focus-visible {
   border-color: var(--citadel-gold);
   color: var(--citadel-gold);

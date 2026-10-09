@@ -13,6 +13,7 @@ import type { IComment } from '@/lib/models/Comment'
 import Follow from '@/lib/models/Follow'
 import User from '@/lib/models/User'
 import { createNotification, resolveRecipientClerkId } from '@/lib/notifications'
+import { UNKNOWN_COMMENTER_NAME, type PublicComment } from '@/lib/public-page-types'
 import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
 import { assertUserNotSuspended } from '@/lib/user-suspension'
 
@@ -151,7 +152,14 @@ async function getPublishedHero(id: string) {
   return hero
 }
 
-export async function listHeroComments(heroId: string): Promise<HeroComment[]> {
+interface VisibleHeroComments {
+  actor: Actor | null
+  comments: CommentRecord[]
+  usersByClerkId: Map<string, UserRecord>
+}
+
+/** Shared query: the hero must be public, hidden comments are excluded, newest 40 first. */
+async function loadVisibleHeroComments(heroId: string): Promise<VisibleHeroComments> {
   const actor = await getOptionalActor()
 
   await dbConnect()
@@ -163,7 +171,35 @@ export async function listHeroComments(heroId: string): Promise<HeroComment[]> {
     .lean<CommentRecord[]>()
   const usersByClerkId = await getUserMap(comments.map(comment => comment.userId))
 
+  return { actor, comments, usersByClerkId }
+}
+
+export async function listHeroComments(heroId: string): Promise<HeroComment[]> {
+  const { actor, comments, usersByClerkId } = await loadVisibleHeroComments(heroId)
+
   return comments.map(comment => serializeComment(comment, usersByClerkId, actor))
+}
+
+function serializePublicComment(comment: CommentRecord, usersByClerkId: Map<string, UserRecord>, actor: Actor | null): PublicComment {
+  return {
+    id: comment._id.toString(),
+    heroId: comment.heroId.toString(),
+    authorName: usersByClerkId.get(comment.userId)?.username?.trim() || UNKNOWN_COMMENTER_NAME,
+    content: comment.content,
+    viewerCanDelete: Boolean(actor && comment.userId === actor.clerkId),
+    createdAt: comment.createdAt.toISOString(),
+    updatedAt: comment.updatedAt.toISOString(),
+  }
+}
+
+/**
+ * Comments for public hero pages: same query as listHeroComments, but without
+ * userId and with no email local-part fallback for the author name.
+ */
+export async function listPublicHeroComments(heroId: string): Promise<PublicComment[]> {
+  const { actor, comments, usersByClerkId } = await loadVisibleHeroComments(heroId)
+
+  return comments.map(comment => serializePublicComment(comment, usersByClerkId, actor))
 }
 
 export async function postHeroComment(heroId: string, content: unknown): Promise<HeroComment> {

@@ -1,0 +1,188 @@
+.page {
+  --landing-bg: #060b10;
+  --landing-panel: #0b1620;
+  --landing-text: #e3f2ef;
+  --landing-text-muted: rgba(227, 242, 239, 0.72);
+  --landing-text-faint: rgba(227, 242, 239, 0.14);
+  --landing-accent: #33debb;
+  --landing-accent-hover: #5fe7cb;
+  --landing-accent-glow: rgba(51, 222, 187, 0.35);
+  --landing-accent-soft: rgba(51, 222, 187, 0.16);
+  --landing-on-accent: #04201a;
+  --landing-header-bg: rgba(6, 11, 16, 0.78);
+  --landing-footer-bg: rgba(6, 11, 16, 0.85);
+  --landing-display-font: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  --landing-body-font: Radiance, Arial, Helvetica, sans-serif;
+  --landing-gutter: clamp(20px, 5vw, 56px);
+
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  overflow-x: clip;
+  background: var(--landing-bg);
+  color: var(--landing-text);
+  font-family: var(--landing-body-font);
+  font-weight: 600;
+}
+
+/* Fixed full-viewport photo layer; position: fixed instead of background-attachment for iOS. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--landing-bg);
+}
+
+.backdrop::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    to bottom,
+    rgba(6, 11, 16, 0.75) 0%,
+    rgba(6, 11, 16, 0.35) 35%,
+    rgba(6, 11, 16, 0.55) 70%,
+    rgba(6, 11, 16, 0.92) 100%
+  );
+}
+
+.backdropImage {
+  object-fit: cover;
+  object-position: 49% 30%;
+}
+
+.skipLink {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 330;
+  padding: 10px 16px;
+  border: 1px solid var(--landing-accent);
+  background: var(--landing-bg);
+  color: var(--landing-text);
+  text-decoration: none;
+  transform: translateY(-200%);
+  transition: transform 150ms ease-out;
+}
+
+.skipLink:focus,
+.skipLink:focus-visible {
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 2px;
+  transform: translateY(0);
+}
+
+.main {
+  flex: 1;
+  outline: none;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(48px, 9vw, 112px) var(--landing-gutter) clamp(40px, 6vw, 72px);
+}
+
+.title {
+  margin: 0;
+  color: var(--landing-text);
+  font-family: var(--landing-display-font);
+  font-size: clamp(4.2rem, 12vw, 11.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+  text-align: center;
+  text-shadow:
+    0 2px 24px rgba(0, 0, 0, 0.6),
+    0 0 60px var(--landing-accent-glow);
+  text-wrap: balance;
+}
+
+.bannerFrame {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  margin-top: clamp(28px, 4vw, 48px);
+}
+
+.banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  -webkit-mask-image:
+    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%),
+    linear-gradient(to bottom, black 75%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%),
+    linear-gradient(to bottom, black 75%, transparent 100%);
+  mask-composite: intersect;
+}
+
+.explanation {
+  width: min(760px, calc(100% - 2 * var(--landing-gutter)));
+  margin: 0 auto clamp(72px, 10vw, 128px);
+  padding: clamp(28px, 5vw, 56px) clamp(20px, 4vw, 48px);
+  border: 1px solid var(--landing-accent-soft);
+  border-top: 3px solid var(--landing-accent);
+  background: var(--landing-panel);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.5),
+    0 0 40px var(--landing-accent-soft);
+  text-align: center;
+}
+
+.rule {
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin: 0 auto 28px;
+  background: var(--landing-accent);
+}
+
+.explanationHeading {
+  margin: 0;
+  color: var(--landing-text);
+  font-family: var(--landing-display-font);
+  font-size: clamp(1.75rem, 3.6vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.explanationBody {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  color: var(--landing-text-muted);
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  line-height: 1.7;
+}
+
+.explanationBody p {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .backdrop::after {
+    background: linear-gradient(
+      to bottom,
+      rgba(6, 11, 16, 0.85) 0%,
+      rgba(6, 11, 16, 0.55) 35%,
+      rgba(6, 11, 16, 0.75) 70%,
+      rgba(6, 11, 16, 0.95) 100%
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skipLink {
+    transition: none;
+  }
+}

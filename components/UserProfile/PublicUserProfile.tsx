@@ -4,13 +4,13 @@ import type { CSSProperties } from 'react'
 
 import heroGridStyles from '@/components/HeroGrid/HeroGrid.module.css'
 import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
-import type { UserProfileData } from '@/lib/profile'
+import type { PublicProfileView } from '@/lib/public-page-types'
 
 import PublicProfileFollowButton from './PublicProfileFollowButton'
 import styles from './PublicUserProfile.module.css'
 
 interface PublicUserProfileProps {
-  data: UserProfileData
+  data: PublicProfileView
 }
 
 function getInitials(username: string) {
@@ -54,27 +54,28 @@ export default function PublicUserProfile({ data }: PublicUserProfileProps) {
               {data.avatarUrl ? (
                 <Image src={data.avatarUrl} alt="" fill unoptimized sizes="112px" className={styles.avatarImage} />
               ) : (
-                <span>{getInitials(data.user.username)}</span>
+                <span>{getInitials(data.username)}</span>
               )}
             </div>
             <div className={styles.identityCopy}>
               <p>Public Creator Profile</p>
-              <h1>{data.user.username}</h1>
+              <h1>{data.username}</h1>
             </div>
             <PublicProfileFollowButton
-              userId={data.user.clerkId}
-              username={data.user.username}
-              initialFollowing={data.viewerFollowsUser}
+              userId={data.followTargetId}
+              username={data.username}
+              initialFollowing={data.viewer.follows}
               initialFollowerCount={data.followerCount}
+              isSignedIn={data.viewer.isSignedIn}
             />
           </div>
         </header>
 
-        <section className={styles.profileSummary} aria-label={`${data.user.username} public profile summary`}>
+        <section className={styles.profileSummary} aria-label={`${data.username} public profile summary`}>
           <article className={styles.bioPanel}>
             <p>Creator Record</p>
             <h2>About</h2>
-            <span>{data.user.customBio}</span>
+            <span>{data.bio}</span>
           </article>
 
           <dl className={styles.statsGrid}>
@@ -89,17 +90,17 @@ export default function PublicUserProfile({ data }: PublicUserProfileProps) {
           <header>
             <div>
               <p>Published Collection</p>
-              <h2 id="public-characters-heading">Characters by {data.user.username}</h2>
+              <h2 id="public-characters-heading">Characters by {data.username}</h2>
             </div>
-            <span>{data.authoredHeroes.length} public</span>
+            <span>{data.heroes.length} public</span>
           </header>
 
-          {data.authoredHeroes.length ? (
+          {data.heroes.length ? (
             <div className={`${heroGridStyles.grid} ${styles.characterGrid}`}>
-              {data.authoredHeroes.map(hero => (
+              {data.heroes.map(hero => (
                 <article key={hero.id} className={`${heroGridStyles.browseCard} ${styles.characterCard}`}>
                   <Link
-                    href={`/?tab=browse&heroId=${encodeURIComponent(hero.id)}`}
+                    href={hero.href}
                     className={heroGridStyles.heroCard}
                     aria-label={`Open character ${hero.name}`}
                   >

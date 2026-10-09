@@ -48,6 +48,7 @@ const profileData: UserProfileData = {
     clerkId: 'clerk_1',
     email: 'tril@example.com',
     username: 'TRIL',
+    registeredUsername: 'TRIL',
     preferredHero: abrams.slug,
     profileBackground: `official:${abrams.slug}`,
     isPublic: true,
@@ -57,6 +58,7 @@ const profileData: UserProfileData = {
     updatedAt: now,
   },
   viewerIsOwner: true,
+  viewerIsSignedIn: true,
   avatarUrl: null,
   preferredHero: abrams,
   profileBackground: {

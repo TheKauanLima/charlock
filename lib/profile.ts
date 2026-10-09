@@ -11,6 +11,8 @@ import Follow from '@/lib/models/Follow'
 import HeroInfo from '@/lib/models/HeroInfo'
 import User from '@/lib/models/User'
 import type { ModerationStatus } from '@/lib/moderation-types'
+import { UNKNOWN_CREATOR_NAME, type PublicProfileHeroCard, type PublicProfileView } from '@/lib/public-page-types'
+import { getHeroPath, getHeroTemplateHref, isValidHeroSlug } from '@/lib/public-page-utils'
 import { syncUserRecordFromClerk } from '@/lib/user-record-sync'
 import { getUserLevel, type UserLevel } from '@/lib/user-level'
 
@@ -22,6 +24,8 @@ export interface ProfileUser {
   clerkId: string
   email: string
   username: string
+  /** Registered username only (never the email local-part); null when unset. */
+  registeredUsername: string | null
   preferredHero: string
   profileBackground: string
   isPublic: boolean
@@ -54,6 +58,7 @@ export interface ProfileBackgroundVisual {
 export interface UserProfileData {
   user: ProfileUser
   viewerIsOwner: boolean
+  viewerIsSignedIn: boolean
   avatarUrl: string | null
   preferredHero: HeroDefinition
   profileBackground: ProfileBackgroundVisual
@@ -151,6 +156,7 @@ function serializeUser(user: UserRecord): ProfileUser {
     clerkId: user.clerkId,
     email: user.email,
     username,
+    registeredUsername: user.username?.trim() || null,
     preferredHero,
     profileBackground: user.profileBackground || `official:${preferredHero}`,
     isPublic: user.isPublic ?? true,
@@ -354,6 +360,7 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
   return {
     user: serializedUser,
     viewerIsOwner,
+    viewerIsSignedIn: Boolean(userId),
     avatarUrl,
     preferredHero,
     profileBackground: getProfileBackgroundVisual(serializedUser.profileBackground, preferredHero, authoredHeroRecords),
@@ -366,5 +373,44 @@ export async function getUserProfile(username: string): Promise<UserProfileData>
     level: getUserLevel(contributionCount),
     charactersCreated,
     userContributions,
+  }
+}
+
+function toPublicProfileHeroCard(hero: ProfileHeroCard): PublicProfileHeroCard {
+  return {
+    id: hero.id,
+    name: hero.name,
+    slug: hero.slug,
+    href: isValidHeroSlug(hero.slug) ? getHeroPath(hero.slug) : getHeroTemplateHref(hero.id),
+    portrait: hero.portrait,
+    render: hero.render,
+    background: hero.background,
+    updatedAt: hero.updatedAt,
+  }
+}
+
+/**
+ * Public DTO for non-owner profile views. Drops email, the Mongo id, anonymousEdits,
+ * isPublic, createdAt, and the saved, bookmarked, and private hero lists. Only
+ * public heroes (published and not hidden) are kept as cards.
+ */
+export function toPublicProfileView(data: UserProfileData): PublicProfileView {
+  return {
+    username: data.user.registeredUsername ?? UNKNOWN_CREATOR_NAME,
+    followTargetId: data.user.clerkId,
+    avatarUrl: data.avatarUrl,
+    bio: data.user.customBio,
+    profileBackground: data.profileBackground,
+    level: data.level,
+    charactersCreated: data.charactersCreated,
+    userContributions: data.userContributions,
+    followerCount: data.followerCount,
+    viewer: {
+      isSignedIn: data.viewerIsSignedIn,
+      follows: data.viewerFollowsUser,
+    },
+    heroes: data.authoredHeroes
+      .filter(hero => hero.status === 'published' && hero.moderationStatus !== 'hidden')
+      .map(toPublicProfileHeroCard),
   }
 }

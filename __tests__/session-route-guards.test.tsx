@@ -55,21 +55,39 @@ describe('live Clerk route guards', () => {
   it('renders the application when the server fallback meets a live signed-in session', () => {
     clerkState.isSignedIn = true
 
-    render(<AuthenticatedHome initialTab="Browse" initialHeroId="hero_123" />)
+    render(
+      <AuthenticatedHome
+        initialTab="Browse"
+        initialHeroId="hero_123"
+        guestContent={<div data-testid="guest-landing" />}
+      />,
+    )
 
     expect(screen.getByTestId('hero-grid')).toBeInTheDocument()
+    expect(screen.queryByTestId('guest-landing')).not.toBeInTheDocument()
     expect(heroGridMock).toHaveBeenCalledWith(
-      expect.objectContaining({ initialTab: 'Browse', initialHeroId: 'hero_123' }),
+      { initialTab: 'Browse', initialHeroId: 'hero_123' },
       undefined,
     )
     expect(replaceMock).not.toHaveBeenCalled()
   })
 
-  it('sends confirmed signed-out visitors to account creation', async () => {
-    render(<AuthenticatedHome initialTab="Select" />)
+  it('shows confirmed signed-out visitors the guest content without redirecting', () => {
+    render(<AuthenticatedHome initialTab="Select" guestContent={<div data-testid="guest-landing" />} />)
 
+    expect(screen.getByTestId('guest-landing')).toBeInTheDocument()
     expect(screen.queryByTestId('hero-grid')).not.toBeInTheDocument()
-    expect(screen.getByText('Opening account creation...')).toBeInTheDocument()
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/sign-up'))
+    expect(replaceMock).not.toHaveBeenCalled()
+  })
+
+  it('shows the guest content while the live Clerk session is still loading', () => {
+    clerkState.isLoaded = false
+
+    render(<AuthenticatedHome initialTab="Select" guestContent={<div data-testid="guest-landing" />} />)
+
+    expect(screen.getByTestId('guest-landing')).toBeInTheDocument()
+    expect(screen.queryByTestId('hero-grid')).not.toBeInTheDocument()
+    expect(heroGridMock).not.toHaveBeenCalled()
+    expect(replaceMock).not.toHaveBeenCalled()
   })
 })

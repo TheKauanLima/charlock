@@ -3,6 +3,8 @@ import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import GoogleAnalytics from '@/components/google-analytics/GoogleAnalytics'
 import GlobalNav from '@/components/GlobalNav/GlobalNav'
+import { SHARED_OPEN_GRAPH, SHARED_TWITTER, SITE_DESCRIPTION, SITE_KEYWORDS, SITE_NAME } from '@/lib/site-metadata'
+import { getSiteUrl } from '@/lib/site-url'
 import './globals.css'
 import '@/components/styles/CitadelBaseStyles.css'
 
@@ -16,9 +18,21 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+// openGraph and twitter intentionally omit title/description: Next fills them from
+// each page's resolved title and description (postProcessMetadata). Pages must not
+// set openGraph or twitter, because a child object replaces this one entirely.
 export const metadata: Metadata = {
-  title: 'Charlock Hero Grid',
-  description: 'Deadlock hero selection grid for Charlock',
+  metadataBase: new URL(getSiteUrl()),
+  title: { default: SITE_NAME, template: `%s | ${SITE_NAME}` },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  keywords: SITE_KEYWORDS,
+  openGraph: {
+    ...SHARED_OPEN_GRAPH,
+  },
+  twitter: {
+    ...SHARED_TWITTER,
+  },
 }
 
 export default function RootLayout({

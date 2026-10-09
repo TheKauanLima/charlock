@@ -14,6 +14,12 @@ vi.mock('@/lib/profile', () => ({
   getUserProfile: profileMocks.getUserProfile,
   isProfilePrivateError: () => false,
   isProfileUnavailableError: () => false,
+  toPublicProfileView: (data: unknown) => data,
+}))
+
+vi.mock('@/lib/public-pages', () => ({
+  buildProfileJsonLd: vi.fn(),
+  getPublicProfileSeo: vi.fn(async () => ({ status: 'noindex' })),
 }))
 
 vi.mock('@/components/UserProfile/PublicUserProfile', () => ({

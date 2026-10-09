@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import ProfileUnavailable from '@/components/UserProfile/ProfileUnavailable'
@@ -6,6 +7,11 @@ import { HEROES } from '@/lib/hero-data'
 import { getCurrentProfileUser, getProfilePathSegment, getUserProfile, isProfileUnavailableError } from '@/lib/profile'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Profile settings',
+  robots: { index: false, follow: false },
+}
 
 interface ProfileSettingsPageProps {
   searchParams: Promise<{

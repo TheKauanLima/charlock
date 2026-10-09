@@ -1,4 +1,5 @@
 import { auth } from '@clerk/nextjs/server'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 
 import AuthShell, { AuthLink } from '@/components/auth/AuthShell'
@@ -6,6 +7,11 @@ import GuestOnlyAuth from '@/components/auth/GuestOnlyAuth'
 import SignInForm from '@/components/auth/SignInForm'
 
 import styles from '@/components/auth/auth-ui.module.css'
+
+export const metadata: Metadata = {
+  title: 'Sign in',
+  robots: { index: false, follow: false },
+}
 
 export default async function SignInPage() {
   const { userId } = await auth()

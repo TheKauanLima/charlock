@@ -1,0 +1,521 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--public-hero-accent, #33debb) 12%, transparent), transparent 420px),
+    #000;
+  color: var(--citadel-text);
+  font-family: Radiance, Arial, sans-serif;
+}
+
+.content {
+  position: relative;
+  display: grid;
+  gap: 24px;
+  width: min(var(--citadel-container), calc(100% - 48px));
+  margin: 0 auto;
+  padding: 48px 0 58px;
+}
+
+.backLink {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 9px;
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.backLink:hover,
+.backLink:focus-visible {
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.visibilityBanner {
+  margin: 0;
+  border: 1px solid var(--citadel-gold);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  background: var(--citadel-gold-soft);
+  padding: 12px 18px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.visibilityBanner[data-visibility='owner-hidden'] {
+  border-color: var(--citadel-danger);
+  background: var(--citadel-danger-bg);
+}
+
+.header,
+.panel {
+  border: 1px solid rgba(255, 239, 214, 0.22);
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  background: rgba(4, 7, 6, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025), 0 22px 52px rgba(0, 0, 0, 0.34);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  min-height: 460px;
+  overflow: hidden;
+}
+
+.stage {
+  position: relative;
+  min-height: 460px;
+  overflow: hidden;
+  background-color: #070908;
+  background-position: center;
+  background-size: cover;
+}
+
+.stageRender {
+  object-fit: contain;
+  object-position: right top;
+}
+
+.identity {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 28px 28px 30px;
+}
+
+.portrait {
+  position: relative;
+  width: 132px;
+  aspect-ratio: 260 / 420;
+  overflow: hidden;
+  border: 2px solid var(--public-hero-accent, var(--citadel-gold));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.portraitImage {
+  object-fit: cover;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--public-hero-name, var(--citadel-gold));
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.heroName {
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: clamp(2.4rem, 5.6vw, 4.6rem);
+  line-height: 0.88;
+  text-transform: uppercase;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tags li {
+  background: var(--public-hero-accent, var(--citadel-gold));
+  color: var(--public-hero-accent-text, #000);
+  padding: 4px 10px;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.creator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.78rem;
+}
+
+.creatorAvatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--citadel-border);
+  border-radius: 50%;
+}
+
+.creatorAvatar img {
+  object-fit: cover;
+}
+
+.creatorLink,
+.creatorName {
+  color: var(--citadel-text);
+  font-weight: 800;
+}
+
+.creatorLink:hover,
+.creatorLink:focus-visible {
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.creatorLevel {
+  border: 1px solid var(--citadel-border);
+  padding: 2px 8px;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.actions {
+  display: grid;
+  gap: 10px;
+}
+
+.likeCount {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.actionButton {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--public-hero-accent, var(--citadel-gold));
+  clip-path: var(--citadel-button-cut);
+  background: rgba(0, 0, 0, 0.58);
+  color: var(--citadel-text);
+  cursor: pointer;
+  padding: 0 16px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.actionButton:hover,
+.actionButton:focus-visible {
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.actionButton[aria-pressed='true'] {
+  background: var(--citadel-gold-soft);
+}
+
+.actionButton:disabled {
+  cursor: wait;
+  opacity: 0.64;
+}
+
+.actionStatus {
+  margin: 0;
+  color: #ff8e83;
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.sectionHeading {
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.abilityRow {
+  justify-content: flex-start;
+}
+
+.abilityList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.abilityEntry {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid rgba(255, 239, 214, 0.13);
+  background: rgba(0, 0, 0, 0.26);
+  padding: 16px;
+}
+
+.abilityEntry h3 {
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 1.15rem;
+  text-transform: uppercase;
+}
+
+.abilitySlot {
+  margin: 0;
+  color: var(--public-hero-name, var(--citadel-gold));
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.abilitySection h4 {
+  margin: 0 0 4px;
+  color: var(--citadel-text-muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.abilitySection p,
+.abilitySection ul,
+.abilityTiers {
+  margin: 0;
+  color: rgba(255, 239, 214, 0.8);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.74rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.abilitySection ul,
+.abilityTiers {
+  display: grid;
+  gap: 3px;
+  padding-left: 18px;
+}
+
+.abilityTiers span {
+  color: var(--public-hero-name, var(--citadel-gold));
+  font-weight: 800;
+}
+
+.backstory {
+  margin: 0;
+  color: rgba(255, 239, 214, 0.82);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
+.statGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 22px;
+  align-items: start;
+}
+
+.statGroup,
+.statVariant {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.statGroup h3,
+.statVariant h4 {
+  margin: 0;
+  color: var(--public-hero-name, var(--citadel-gold));
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.commentCount {
+  color: var(--citadel-text-muted);
+  font-size: 1rem;
+}
+
+.commentList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment {
+  display: grid;
+  gap: 6px;
+  border-left: 2px solid var(--public-hero-accent, var(--citadel-gold));
+  background: rgba(0, 0, 0, 0.26);
+  padding: 12px 14px;
+}
+
+.comment:target {
+  background: var(--citadel-gold-faint);
+}
+
+.commentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  color: var(--citadel-metadata);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+}
+
+.commentAuthor {
+  color: var(--citadel-text);
+  font-weight: 800;
+}
+
+.commentContent {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: rgba(255, 239, 214, 0.84);
+  font-size: 0.86rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.emptyComments {
+  margin: 0;
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.74rem;
+}
+
+.commentGuest {
+  margin: 0;
+}
+
+.commentForm {
+  display: grid;
+  gap: 8px;
+}
+
+.commentForm label {
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.commentForm textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  border: 1px solid var(--citadel-border);
+  background: var(--citadel-bg-muted);
+  color: var(--citadel-text);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.commentForm textarea:focus-visible {
+  border-color: var(--citadel-gold);
+  outline: none;
+}
+
+.commentFormFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--citadel-metadata);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.64rem;
+}
+
+.notFound {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+  padding: 32px;
+}
+
+.notFound h1 {
+  margin: 0;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  text-transform: uppercase;
+}
+
+.notFound p {
+  margin: 0;
+  color: var(--citadel-text-muted);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 860px) {
+  .header {
+    grid-template-columns: 1fr;
+  }
+
+  .stage {
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 560px) {
+  .content {
+    width: min(100% - 24px, var(--citadel-container));
+    padding-top: 24px;
+  }
+
+  .identity,
+  .panel {
+    padding: 18px;
+  }
+
+  .statGroups {
+    grid-template-columns: 1fr;
+  }
+}

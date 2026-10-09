@@ -20,7 +20,11 @@ vi.mock('@/components/auth/AuthenticatedHome', () => ({
   default: authenticatedHomeMock,
 }))
 
-import Home from '@/app/page'
+vi.mock('@/components/Landing/LandingPage', () => ({
+  default: () => <div data-testid="landing-page" />,
+}))
+
+import Home, { metadata } from '@/app/page'
 
 beforeEach(() => {
   authMock.mockReset()
@@ -36,10 +40,25 @@ describe('Home auth gate', () => {
 
     expect(screen.getByTestId('authenticated-home')).toBeInTheDocument()
     expect(authenticatedHomeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ initialTab: 'Select' }),
+      expect.objectContaining({ initialTab: 'Select', guestContent: expect.anything() }),
       undefined,
     )
     expect(heroGridMock).not.toHaveBeenCalled()
+  })
+
+  it('exports Cursed Concepts page metadata', () => {
+    // title is { absolute } (spec 21), so stringify instead of String() to keep this check meaningful
+    expect(JSON.stringify(metadata.title)).toContain('Cursed Concepts')
+    expect(metadata.description).toBeDefined()
+  })
+
+  it('exports SEO metadata for the indexable home page', () => {
+    expect(metadata.title).toEqual({ absolute: 'Cursed Concepts' })
+    expect(metadata.description).toBe('Create, share, and browse fan-made Deadlock hero concepts.')
+    expect(metadata.alternates).toEqual({ canonical: '/' })
+    expect(metadata).not.toHaveProperty('robots')
+    expect(metadata).not.toHaveProperty('openGraph')
+    expect(metadata).not.toHaveProperty('twitter')
   })
 
   it('renders the hero grid for signed-in users', async () => {
