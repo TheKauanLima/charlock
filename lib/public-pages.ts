@@ -1,7 +1,5 @@
 import 'server-only'
 
-import { readFile, realpath, stat } from 'node:fs/promises'
-import path from 'node:path'
 import { Types } from 'mongoose'
 import { cache } from 'react'
 
@@ -31,6 +29,7 @@ import {
   isValidHeroSlug,
   toPublicCreator,
 } from '@/lib/public-page-utils'
+import { getSiteUrl } from '@/lib/site-url'
 import { listPublicHeroComments } from '@/lib/social-engagement'
 
 export * from '@/lib/public-page-utils'
@@ -390,7 +389,7 @@ async function readLimitedBody(response: Response): Promise<Uint8Array | null> {
   return bytes
 }
 
-async function loadRemoteOgImage(url: string): Promise<string | null> {
+async function fetchOgImage(url: string): Promise<string | null> {
   const response = await fetch(url, {
     redirect: 'error',
     cache: 'no-store',
@@ -412,43 +411,42 @@ async function loadRemoteOgImage(url: string): Promise<string | null> {
   return bytes ? toDataUrl(contentType, bytes) : null
 }
 
-async function loadLocalOgImage(sitePath: string): Promise<string | null> {
-  const contentType = OG_IMAGE_LOCAL_TYPES[path.extname(sitePath).toLowerCase()]
+function getLowerCaseExtension(sitePath: string) {
+  const lastSegment = sitePath.slice(sitePath.lastIndexOf('/') + 1)
+  const dotIndex = lastSegment.lastIndexOf('.')
 
-  if (!contentType) return null
+  return dotIndex > 0 ? lastSegment.slice(dotIndex).toLowerCase() : ''
+}
 
-  const publicDir = path.resolve(process.cwd(), 'public')
-  const filePath = path.resolve(path.join(publicDir, sitePath))
+/**
+ * Site-relative images are fetched from getSiteUrl()'s origin over HTTP, never
+ * read from disk: a dynamic public/ path makes output file tracing bundle all of
+ * public/ into the function. The host always comes from getSiteUrl(), never from
+ * the input, and the resolved URL must stay on that origin.
+ */
+async function loadSiteOgImage(sitePath: string): Promise<string | null> {
+  if (!OG_IMAGE_LOCAL_TYPES[getLowerCaseExtension(sitePath)]) return null
 
-  if (!filePath.startsWith(`${publicDir}${path.sep}`)) return null
+  const siteOrigin = getSiteUrl()
+  const imageUrl = new URL(sitePath, `${siteOrigin}/`)
 
-  // Resolve symlinks too, so a link inside public/ cannot point outside it.
-  const [realPublicDir, realFilePath] = await Promise.all([realpath(publicDir), realpath(filePath)])
+  if (imageUrl.origin !== siteOrigin) return null
 
-  if (!realFilePath.startsWith(`${realPublicDir}${path.sep}`)) return null
-
-  const fileStat = await stat(realFilePath)
-
-  if (!fileStat.isFile() || fileStat.size > OG_IMAGE_MAX_BYTES) return null
-
-  const bytes = await readFile(realFilePath)
-
-  if (bytes.byteLength > OG_IMAGE_MAX_BYTES) return null
-
-  return toDataUrl(contentType, bytes)
+  return fetchOgImage(imageUrl.href)
 }
 
 /**
  * Loads an image for OG rendering as a data: URL, or null. Only URLs that pass
- * isSafeOgImageUrl are read: remote ones with redirect: 'error', a 3 s timeout,
- * a 4 MB cap, and a png/jpeg/gif content-type check; site-relative ones only from
- * inside public/ (png, jpg, jpeg, gif; no webp). Any error returns null.
+ * isSafeOgImageUrl are fetched, all with redirect: 'error', no-store, a 3 s
+ * timeout, a 4 MB cap, and a png/jpeg/gif content-type check. Remote URLs are
+ * fetched as given; site-relative paths (png, jpg, jpeg, gif; no webp) are
+ * fetched from getSiteUrl()'s origin. Any error returns null.
  */
 export async function loadOgImageDataUrl(url: string): Promise<string | null> {
   if (!isSafeOgImageUrl(url)) return null
 
   try {
-    return url.startsWith('/') ? await loadLocalOgImage(url) : await loadRemoteOgImage(url)
+    return url.startsWith('/') ? await loadSiteOgImage(url) : await fetchOgImage(url)
   } catch {
     return null
   }

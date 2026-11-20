@@ -19,6 +19,20 @@ const mocks = vi.hoisted(() => ({
   commentFind: vi.fn(),
 }))
 
+const fsMocks = vi.hoisted(() => ({
+  readFile: vi.fn(),
+  realpath: vi.fn(),
+  stat: vi.fn(),
+  open: vi.fn(),
+}))
+
+// Spies only: loadOgImageDataUrl must fetch site-relative images, never read public/ from disk.
+vi.mock('node:fs/promises', async importOriginal => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+
+  return { ...actual, ...fsMocks, default: { ...actual, ...fsMocks } }
+})
+
 vi.mock('server-only', () => ({}))
 vi.mock('@clerk/nextjs/server', () => ({ auth: mocks.auth, currentUser: mocks.currentUser, clerkClient: mocks.clerkClient }))
 vi.mock('@/lib/dbConnect', () => ({ default: mocks.dbConnect, isDatabaseConnectionError: vi.fn(() => false) }))
@@ -195,6 +209,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 function expectNoPrivateData(value: unknown) {
@@ -671,20 +686,97 @@ describe('loadOgImageDataUrl', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('rejects path traversal and non-raster local files', async () => {
-    for (const url of ['/../package.json', '/../../etc/passwd.png', '/icon/../../package.png', '/landing/x.webp', '/landing/x.svg']) {
+  it('rejects path traversal and non-raster local paths without fetching', async () => {
+    const fetchMock = stubFetch(new Response('x'))
+
+    for (const url of [
+      '/../package.json',
+      '/../../etc/passwd.png',
+      '/icon/../../package.png',
+      '/icon/%2e%2e/a.png',
+      `/icon${String.fromCharCode(92)}a.png`,
+      '/icon/a b.png',
+      '/landing/x.webp',
+      '/landing/x.svg',
+    ]) {
       await expect(loadOgImageDataUrl(url)).resolves.toBeNull()
     }
+
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('reads a local png from public/ as a data URL', async () => {
-    const dataUrl = await loadOgImageDataUrl('/icon/boon_scaling.png')
+  it('fetches a site-relative path from the site origin with redirect: error, no-store, and a timeout signal', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://site.example/ignored/path?q=1')
+    const fetchMock = stubFetch(new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/png' } }))
 
-    expect(dataUrl).toMatch(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/)
+    await expect(loadOgImageDataUrl('/icon/boon_scaling.png')).resolves.toBe('data:image/png;base64,AQID')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith('https://site.example/icon/boon_scaling.png', expect.objectContaining({
+      redirect: 'error',
+      cache: 'no-store',
+      signal: expect.any(AbortSignal),
+    }))
   })
 
-  it('returns null for a missing local file', async () => {
+  it('never takes the fetch host from the path', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://site.example')
+    const fetchMock = stubFetch(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/jpeg' } }))
+
+    await expect(loadOgImageDataUrl('/evil.com/a.jpg')).resolves.toBe('data:image/jpeg;base64,AQ==')
+    expect(fetchMock).toHaveBeenCalledWith('https://site.example/evil.com/a.jpg', expect.anything())
+  })
+
+  it('falls back to the default site origin when NEXT_PUBLIC_SITE_URL is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', '')
+    const fetchMock = stubFetch(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/gif' } }))
+
+    await expect(loadOgImageDataUrl('/landing/a.gif')).resolves.toBe('data:image/gif;base64,AQ==')
+    expect(fetchMock).toHaveBeenCalledWith('https://cursedconcepts.xyz/landing/a.gif', expect.anything())
+  })
+
+  it('returns null for site-relative fetch failures, wrong content types, and oversize images', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://site.example')
+
+    stubFetch(new Response('nope', { status: 404, headers: { 'content-type': 'image/png' } }))
     await expect(loadOgImageDataUrl('/icon/does-not-exist.png')).resolves.toBeNull()
+
+    stubFetch(new TypeError('fetch failed: redirect mode is set to error'))
+    await expect(loadOgImageDataUrl('/icon/a.png')).resolves.toBeNull()
+
+    for (const contentType of ['text/html', 'image/svg+xml', 'image/webp']) {
+      stubFetch(new Response('<svg/>', { headers: { 'content-type': contentType } }))
+      await expect(loadOgImageDataUrl('/icon/a.png')).resolves.toBeNull()
+    }
+
+    stubFetch(new Response('x', { headers: { 'content-type': 'image/png', 'content-length': String(4 * 1024 * 1024 + 1) } }))
+    await expect(loadOgImageDataUrl('/icon/a.png')).resolves.toBeNull()
+
+    const chunk = new Uint8Array(1024 * 1024)
+    let sent = 0
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += 1
+        controller.enqueue(chunk)
+
+        if (sent > 5) controller.close()
+      },
+    })
+
+    stubFetch(new Response(body, { headers: { 'content-type': 'image/png' } }))
+    await expect(loadOgImageDataUrl('/icon/a.png')).resolves.toBeNull()
+  })
+
+  it('never reads the filesystem for site-relative paths', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://site.example')
+    stubFetch(new Response(new Uint8Array([1]), { headers: { 'content-type': 'image/png' } }))
+
+    await loadOgImageDataUrl('/icon/boon_scaling.png')
+    await loadOgImageDataUrl('/../package.json')
+
+    expect(fsMocks.readFile).not.toHaveBeenCalled()
+    expect(fsMocks.realpath).not.toHaveBeenCalled()
+    expect(fsMocks.stat).not.toHaveBeenCalled()
+    expect(fsMocks.open).not.toHaveBeenCalled()
   })
 
   it('fetches allowlisted images with redirect: error, no-store, and a timeout signal', async () => {

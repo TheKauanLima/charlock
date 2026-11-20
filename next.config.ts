@@ -14,6 +14,13 @@ const contentSecurityPolicy = [
 ].join('; ')
 
 const nextConfig: NextConfig = {
+  // Hero OG images fetch site-relative portraits over HTTP, so no server function
+  // needs public/ on disk. Keep the art out of the traces (Vercel 250 MB limit).
+  // Keys are picomatch route globs; values are globs from the project root.
+  outputFileTracingExcludes: {
+    '/characters/*/opengraph-image': ['./public/**/*'],
+    '/opengraph-image': ['./public/**/*'],
+  },
   images: {
     remotePatterns: [
       {

@@ -27,6 +27,36 @@ type ProxyHandler = (auth: ProxyAuth, request: ProxyRequest) => Promise<void>
 
 vi.mock('@clerk/nextjs/server', () => clerkServerMocks)
 
+// Byte-exact copy of the Clerk matcher. In the source it is written as a
+// normal string with a double backslash before the dot, so the runtime value
+// contains one backslash (an escaped regex dot). Losing it makes any path that
+// contains js, ico, css, ... skip clerkMiddleware, and auth() then throws.
+const EXPECTED_PAGE_MATCHER = String.raw`/((?!_next|[^?]*\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|otf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)`
+
+describe('proxy matcher', () => {
+  it('keeps the escaped dot in the page matcher', async () => {
+    const { config } = await import('../proxy')
+
+    expect(config.matcher[0]).toBe(EXPECTED_PAGE_MATCHER)
+    expect(config.matcher[0]).toContain('[^?]*' + String.fromCharCode(92) + '.(?:')
+  })
+
+  it.each(['/characters/nicolas-hero', '/profile/jsmith', '/characters/css-hero/opengraph-image', '/api/icons'])(
+    'runs the middleware on %s',
+    async pathname => {
+      const { config } = await import('../proxy')
+
+      expect(new RegExp(`^${config.matcher[0]}$`).test(pathname)).toBe(true)
+    },
+  )
+
+  it.each(['/foo.js', '/x.png', '/favicon.ico', '/styles/site.css'])('skips static asset %s', async pathname => {
+    const { config } = await import('../proxy')
+
+    expect(new RegExp(`^${config.matcher[0]}$`).test(pathname)).toBe(false)
+  })
+})
+
 describe('auth proxy', () => {
   it('allows the Clerk OAuth callback to complete before protecting signed-out routes', async () => {
     const { default: proxyHandler, publicRoutes } = await import('../proxy')
