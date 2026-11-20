@@ -12,12 +12,14 @@ import type { ICustomHero } from '@/lib/models/CustomHero'
 import Like from '@/lib/models/Like'
 import User from '@/lib/models/User'
 import type { ProfileCommentItem, ProfileCommentsLedger, ProfileLikeItem } from '@/lib/profile-ledger-types'
+import { UNKNOWN_COMMENTER_NAME, UNKNOWN_CREATOR_NAME } from '@/lib/public-page-types'
 
 interface UserRecord {
   _id: Types.ObjectId
   clerkId: string
   email: string
   username?: string | null
+  isPublic?: boolean
 }
 
 interface HeroRecord extends ICustomHero {
@@ -39,12 +41,14 @@ function getObjectIdQuery(id: string) {
   return Types.ObjectId.isValid(id) ? [{ _id: new Types.ObjectId(id) }] : []
 }
 
-function getDisplayName(user: UserRecord | undefined, fallbackId: string) {
-  if (!user) {
-    return fallbackId
-  }
+const PUBLIC_HERO_FILTER = { status: 'published', moderationStatus: { $ne: 'hidden' } } as const
 
-  return user.username?.trim() || user.email.split('@')[0] || user.clerkId
+/**
+ * Third-party display name: registered username or a placeholder.
+ * Never falls back to the email local-part or a raw ID.
+ */
+function getDisplayName(user: UserRecord | undefined, placeholder: string) {
+  return user?.username?.trim() || placeholder
 }
 
 async function getProfileUser(userId: string) {
@@ -61,6 +65,22 @@ async function getProfileUser(userId: string) {
   }
 
   return user
+}
+
+/**
+ * Loads the profile user and enforces User.isPublic. Private profiles are
+ * indistinguishable from missing ones for everyone except the owner.
+ */
+async function resolveProfileAccess(userId: string) {
+  const profileUser = await getProfileUser(userId)
+  const { userId: viewerId } = await auth()
+  const viewerIsOwner = Boolean(viewerId) && viewerId === profileUser.clerkId
+
+  if (profileUser.isPublic === false && !viewerIsOwner) {
+    throw new ApiRequestError('User not found', 404)
+  }
+
+  return { profileUser, viewerIsOwner }
 }
 
 async function getUserMap(userIds: string[]) {
@@ -96,7 +116,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
     throw error
   }
 
-  const profileUser = await getProfileUser(userId)
+  const { profileUser } = await resolveProfileAccess(userId)
   const ownerIds = getOwnerIds(profileUser)
   const storedLikes = await Like.find({ userId: { $in: ownerIds } })
     .sort({ createdAt: -1 })
@@ -104,8 +124,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
     .lean<LikeRecord[]>()
   const storedHeroIds = storedLikes.map(like => like.heroId)
   const legacyLikedHeroes = await CustomHero.find({
-    status: 'published',
-    moderationStatus: { $ne: 'hidden' },
+    ...PUBLIC_HERO_FILTER,
     likedBy: { $in: ownerIds },
   })
     .sort({ 'likeEvents.createdAt': -1, updatedAt: -1 })
@@ -120,7 +139,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
     return []
   }
 
-  const heroes = await CustomHero.find({ _id: { $in: heroIds }, status: 'published', moderationStatus: { $ne: 'hidden' } }).lean<HeroRecord[]>()
+  const heroes = await CustomHero.find({ _id: { $in: heroIds }, ...PUBLIC_HERO_FILTER }).lean<HeroRecord[]>()
   const heroesById = new Map(heroes.map(hero => [hero._id.toString(), hero]))
   const likesByHeroId = new Map(storedLikes.map(like => [like.heroId.toString(), like]))
   const usersByClerkId = await getUserMap(heroes.map(hero => hero.createdByUserId))
@@ -139,7 +158,7 @@ export async function listProfileLikes(userId: string, limit = 40): Promise<Prof
       heroId,
       heroName: hero.name,
       creatorId: hero.createdByUserId,
-      creatorName: getDisplayName(usersByClerkId.get(hero.createdByUserId), hero.createdByUserId),
+      creatorName: getDisplayName(usersByClerkId.get(hero.createdByUserId), UNKNOWN_CREATOR_NAME),
       likedAt: likedAt.toISOString(),
       href: `/?tab=browse&heroId=${encodeURIComponent(heroId)}`,
     }]
@@ -163,12 +182,43 @@ function serializeComment(
     heroId,
     heroName: hero?.name ?? 'Unknown Character',
     authorId: comment.userId,
-    authorName: getDisplayName(usersByClerkId.get(comment.userId), comment.userId),
+    authorName: getDisplayName(usersByClerkId.get(comment.userId), UNKNOWN_COMMENTER_NAME),
     content: comment.content,
     createdAt: comment.createdAt.toISOString(),
     href: `/?tab=browse&heroId=${encodeURIComponent(heroId)}`,
     viewerCanDelete,
   }
+}
+
+async function listMadeComments(clerkId: string, viewerIsOwner: boolean, limit: number): Promise<CommentRecord[]> {
+  const baseFilter = { userId: clerkId, moderationStatus: { $ne: 'hidden' } } as const
+
+  if (viewerIsOwner) {
+    return Comment.find(baseFilter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean<CommentRecord[]>()
+  }
+
+  // Restrict to public heroes before limiting so `limit` stays accurate.
+  const commentedHeroIds = await Comment.distinct('heroId', baseFilter) as Types.ObjectId[]
+
+  if (!commentedHeroIds.length) {
+    return []
+  }
+
+  const visibleHeroes = await CustomHero.find({ _id: { $in: commentedHeroIds }, ...PUBLIC_HERO_FILTER })
+    .select('_id')
+    .lean<Array<{ _id: Types.ObjectId }>>()
+
+  if (!visibleHeroes.length) {
+    return []
+  }
+
+  return Comment.find({ ...baseFilter, heroId: { $in: visibleHeroes.map(hero => hero._id) } })
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean<CommentRecord[]>()
 }
 
 export async function listProfileComments(userId: string, limit = 40): Promise<ProfileCommentsLedger> {
@@ -182,19 +232,16 @@ export async function listProfileComments(userId: string, limit = 40): Promise<P
     throw error
   }
 
-  const profileUser = await getProfileUser(userId)
+  const { profileUser, viewerIsOwner } = await resolveProfileAccess(userId)
   const ownerIds = getOwnerIds(profileUser)
-  const { userId: viewerId } = await auth()
-  const viewerIsOwner = viewerId === profileUser.clerkId
-  const authoredHeroes = await CustomHero.find({ createdByUserId: { $in: ownerIds } })
+  // Owners see everything; everyone else only sees comments on public heroes.
+  const heroVisibilityFilter = viewerIsOwner ? {} : PUBLIC_HERO_FILTER
+  const authoredHeroes = await CustomHero.find({ createdByUserId: { $in: ownerIds }, ...heroVisibilityFilter })
     .select('_id name createdByUserId')
     .lean<HeroRecord[]>()
   const authoredHeroIds = authoredHeroes.map(hero => hero._id)
   const [made, received] = await Promise.all([
-    Comment.find({ userId: profileUser.clerkId, moderationStatus: { $ne: 'hidden' } })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean<CommentRecord[]>(),
+    listMadeComments(profileUser.clerkId, viewerIsOwner, limit),
     authoredHeroIds.length
       ? Comment.find({ heroId: { $in: authoredHeroIds }, userId: { $ne: profileUser.clerkId }, moderationStatus: { $ne: 'hidden' } })
           .sort({ createdAt: -1 })
@@ -208,7 +255,7 @@ export async function listProfileComments(userId: string, limit = 40): Promise<P
     ...received.map(comment => comment.heroId.toString()),
   ]))
   const commentHeroes = heroIds.length
-    ? await CustomHero.find({ _id: { $in: heroIds.map(heroId => new Types.ObjectId(heroId)) } })
+    ? await CustomHero.find({ _id: { $in: heroIds.map(heroId => new Types.ObjectId(heroId)) }, ...heroVisibilityFilter })
         .select('_id name createdByUserId')
         .lean<HeroRecord[]>()
     : []
@@ -218,9 +265,18 @@ export async function listProfileComments(userId: string, limit = 40): Promise<P
     ...made.map(comment => comment.userId),
     ...received.map(comment => comment.userId),
   ])
+  const serializeAll = (comments: CommentRecord[]) => comments.flatMap(comment => {
+    const hero = heroesById.get(comment.heroId.toString())
+
+    if (!hero && !viewerIsOwner) {
+      return []
+    }
+
+    return [serializeComment(comment, hero, usersByClerkId, viewerIsOwner)]
+  })
 
   return {
-    made: made.map(comment => serializeComment(comment, heroesById.get(comment.heroId.toString()), usersByClerkId, viewerIsOwner)),
-    received: received.map(comment => serializeComment(comment, heroesById.get(comment.heroId.toString()), usersByClerkId, viewerIsOwner)),
+    made: serializeAll(made),
+    received: serializeAll(received),
   }
 }

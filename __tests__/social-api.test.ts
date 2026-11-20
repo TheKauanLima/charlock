@@ -48,6 +48,7 @@ vi.mock('@/lib/profile-ledger', () => ({
   listProfileLikes: serviceMocks.listProfileLikes,
 }))
 
+import { ApiRequestError } from '@/lib/api-errors'
 import { DELETE, GET as GET_COMMENTS, POST as POST_COMMENT } from '@/app/api/heroes/[slug]/comments/route'
 import { POST as POST_BOOKMARK } from '@/app/api/heroes/[slug]/bookmark/route'
 import { GET as GET_FEED } from '@/app/api/feed/route'
@@ -174,5 +175,27 @@ describe('social engagement API routes', () => {
     })
     expect(serviceMocks.listProfileLikes).toHaveBeenCalledWith('user_1', 7)
     expect(serviceMocks.listProfileComments).toHaveBeenCalledWith('user_1', 40)
+  })
+
+  it('returns 404 from the profile likes route for private or missing users', async () => {
+    serviceMocks.listProfileLikes.mockRejectedValueOnce(new ApiRequestError('User not found', 404))
+
+    const response = await GET_PROFILE_LIKES({ nextUrl: new URL('http://localhost/api/users/private_user/likes') } as unknown as NextRequest, {
+      params: Promise.resolve({ id: 'private_user' }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'User not found', code: 'NOT_FOUND', retryable: false })
+  })
+
+  it('returns 404 from the profile comments route for private or missing users', async () => {
+    serviceMocks.listProfileComments.mockRejectedValueOnce(new ApiRequestError('User not found', 404))
+
+    const response = await GET_PROFILE_COMMENTS({ nextUrl: new URL('http://localhost/api/users/private_user/comments') } as unknown as NextRequest, {
+      params: Promise.resolve({ id: 'private_user' }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toEqual({ error: 'User not found', code: 'NOT_FOUND', retryable: false })
   })
 })
