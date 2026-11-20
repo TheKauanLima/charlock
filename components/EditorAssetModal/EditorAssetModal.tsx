@@ -1,10 +1,12 @@
 'use client'
 
 import { X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { OurFileRouter } from '@/app/api/uploadthing/core'
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
 import type { EditorAssetGroup } from '@/lib/editor-assets'
 import { UploadButton } from '@/lib/uploadthing'
 import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
@@ -59,9 +61,28 @@ export default function EditorAssetModal({ title, description, uploadLabel, uplo
   const [uploadError, setUploadError] = useState<string | null>(null)
   const canUpload = Boolean(uploadLabel && uploadEndpoint && onUpload)
   const uploadPolicy = uploadEndpoint ? UPLOAD_POLICIES[uploadEndpoint] : null
+  const backdropDismiss = useHeroGridBackdropDismiss(onClose)
 
-  return (
-    <div className={cn(styles.backdrop, 'pointer-events-auto')} role="dialog" aria-modal="true" aria-label={`${title} selector`} data-testid={testId}>
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  // Portaled (spec 23, A1): the editor root is a z-indexed section, which would trap this backdrop.
+  const modal = (
+    <div
+      className={cn(styles.backdrop, 'pointer-events-auto')}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${title} selector`}
+      data-testid={testId}
+      data-modal-backdrop="true"
+      {...backdropDismiss}
+    >
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
@@ -154,4 +175,6 @@ export default function EditorAssetModal({ title, description, uploadLabel, uplo
       </div>
     </div>
   )
+
+  return typeof document === 'undefined' ? null : createPortal(modal, document.body)
 }

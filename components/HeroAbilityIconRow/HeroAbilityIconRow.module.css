@@ -170,3 +170,25 @@ button.secondaryAbility:focus-visible {
   width: 62%;
   height: 62%;
 }
+
+/* Touch targets (spec 23, D2): the editor-only swap control grows to the 40px floor. */
+@media (max-width: 760px), (pointer: coarse) {
+  .wrapWithSecondary {
+    margin-bottom: 50px;
+  }
+
+  .swapAbility {
+    min-width: 40px;
+  }
+}
+
+/* No sticky hover scale after a tap on touch screens. */
+@media (hover: none) {
+  button.ability:hover {
+    transform: none;
+  }
+
+  .swapAbility:hover {
+    transform: translateX(-50%);
+  }
+}

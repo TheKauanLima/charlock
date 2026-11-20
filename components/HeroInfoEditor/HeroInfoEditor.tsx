@@ -45,7 +45,9 @@ import { UPLOAD_POLICIES, validateUploadFiles } from '@/lib/upload-validation'
 import { buildCharacterExportPayload } from '@/lib/character-export'
 import cn from '@/lib/utilsd'
 
+import EditorModalPortal from './EditorModalPortal'
 import styles from './HeroInfoEditor.module.css'
+import TagTransformControls from './TagTransformControls'
 
 interface HeroInfoEditorProps {
   hero: HeroDefinition
@@ -2106,6 +2108,7 @@ export default function HeroInfoEditor({
                         />
                         <input
                           type="number"
+                          inputMode="decimal"
                           min={NAME_SIZE_MIN}
                           max={NAME_SIZE_MAX}
                           step="1"
@@ -2147,8 +2150,9 @@ export default function HeroInfoEditor({
 
               <div className={styles.editorHint}>
                 <strong>Tags</strong>
-                <span>Edit tag text directly on the character preview. Drag tag corners to rotate and edges to move vertically.</span>
+                <span>Edit tag text directly on the character preview. Drag tag corners to rotate and edges to move vertically, or use the step buttons below.</span>
               </div>
+              <TagTransformControls tags={tagPreview} onTiltChange={updateTagTilt} onOffsetChange={updateTagOffset} onReset={tag => updateDraft({ [tag.tiltKey]: 0, [tag.offsetKey]: 0 })} />
             </section>
 
             <section
@@ -2357,6 +2361,7 @@ export default function HeroInfoEditor({
                     <input
                       id="draft-autosave-amount"
                       type="number"
+                      inputMode="decimal"
                       min={DRAFT_AUTOSAVE_AMOUNT_MIN}
                       max={DRAFT_AUTOSAVE_AMOUNT_MAX}
                       step={1}
@@ -2413,7 +2418,8 @@ export default function HeroInfoEditor({
       </div>
 
       {isUnpublishConfirmOpen ? (
-        <div className={styles.secondSetModalBackdrop} role="presentation">
+        <EditorModalPortal>
+        <div className={styles.secondSetModalBackdrop} role="presentation" data-modal-backdrop="true">
           <section
             className={styles.secondSetModal}
             role="dialog"
@@ -2447,10 +2453,12 @@ export default function HeroInfoEditor({
             </div>
           </section>
         </div>
+        </EditorModalPortal>
       ) : null}
 
       {isExitConfirmOpen ? (
-        <div className={styles.exitConfirmBackdrop} role="presentation">
+        <EditorModalPortal>
+        <div className={styles.exitConfirmBackdrop} role="presentation" data-modal-backdrop="true">
           <section className={styles.exitConfirmDialog} role="dialog" aria-modal="true" aria-labelledby="hero-editor-exit-title">
             <p className={styles.exitConfirmEyebrow}>Leave hero editor?</p>
             <h2 id="hero-editor-exit-title">Go back to the main pages?</h2>
@@ -2467,10 +2475,12 @@ export default function HeroInfoEditor({
             </div>
           </section>
         </div>
+        </EditorModalPortal>
       ) : null}
 
       {secondAbilitySetModal ? (
-        <div className={styles.secondSetModalBackdrop} role="presentation">
+        <EditorModalPortal>
+        <div className={styles.secondSetModalBackdrop} role="presentation" data-modal-backdrop="true">
           <section
             className={styles.secondSetModal}
             role="dialog"
@@ -2535,6 +2545,7 @@ export default function HeroInfoEditor({
             )}
           </section>
         </div>
+        </EditorModalPortal>
       ) : null}
 
       {isBackgroundAssetModalOpen ? (

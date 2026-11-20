@@ -233,3 +233,15 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Mobile readiness (spec 23, step 5). */
+@media (max-width: 760px), (pointer: coarse) {
+  .cell {
+    min-height: 40px;
+  }
+
+  /* Inputs compute to max(16px, 1em) of this parent; keep values at 18px. */
+  .content {
+    font-size: 18px;
+  }
+}

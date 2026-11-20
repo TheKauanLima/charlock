@@ -1,5 +1,6 @@
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   padding: clamp(20px, 4vw, 54px);
   background:
     linear-gradient(180deg, rgba(113, 38, 35, 0.12), transparent 32%),
@@ -308,6 +309,92 @@
   }
 
   .sidebar button {
-    flex: 1;
+    flex: 1 0 auto;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  /* Queue tabs scroll horizontally inside their own wrapper instead of widening the page. */
+  .sidebar {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    padding: 10px;
+  }
+
+  .shell {
+    padding: calc(56px + var(--safe-top, 0px)) 12px calc(24px + var(--safe-bottom, 0px));
+  }
+
+  .header {
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .header h1 {
+    overflow-wrap: anywhere;
+    font-size: clamp(1.8rem, 9vw, 2.6rem);
+    letter-spacing: 0.06em;
+  }
+
+  .workspace {
+    min-height: 0;
+  }
+
+  .queue {
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .queueHeader {
+    flex-wrap: wrap;
+  }
+
+  .heroGrid {
+    grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr));
+  }
+
+  .item {
+    min-width: 0;
+  }
+
+  .itemHeading {
+    flex-wrap: wrap;
+  }
+
+  .itemHeading > div {
+    min-width: 0;
+  }
+
+  .itemHeading p,
+  .item blockquote,
+  .reportDetails span,
+  .reasons span {
+    overflow-wrap: anywhere;
+  }
+
+  .item footer button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .header a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-target, 44px);
+  }
+
+  /* Keep the native disclosure marker (display: list-item) and grow the hit area with padding. */
+  .item summary {
+    min-height: var(--touch-target, 44px);
+    padding: 12px 0;
+    line-height: 20px;
+    cursor: pointer;
+  }
+
+  .item footer button {
+    min-height: var(--touch-target, 44px);
   }
 }

@@ -77,3 +77,34 @@
 .tabButtonInactive:hover .icon {
   color: #000;
 }
+
+/* Phone layout (spec 23, 4.3): a static, wrapping row at the top of its container
+   (HeroInfoCluster or HeroInfoEditor) instead of a fixed column on the right edge. */
+@media (max-width: 760px) {
+  .tabs {
+    position: static;
+    top: auto;
+    right: auto;
+    transform: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .tabButton {
+    width: auto;
+    min-width: 56px;
+    height: var(--touch-target, 44px);
+    padding: 6px 14px;
+    border-radius: 999px;
+    justify-content: center;
+  }
+}
+
+@media (hover: none) {
+  .tabButtonInactive:hover {
+    transform: none;
+  }
+}

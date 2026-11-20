@@ -103,6 +103,7 @@ function VitalityStatCell({ label, value, unit = '', icon = 'dot', scaling = 'no
         {isEditable ? (
           <input
             type="text"
+            inputMode="text"
             className={styles.input}
             value={value}
             onChange={handleValueChange}

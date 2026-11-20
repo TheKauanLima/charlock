@@ -38,7 +38,9 @@ import { getRecentCustomColors, normalizeCustomHexColor, saveRecentCustomColor }
 import { getCharacterLimitMessage, getItemLimitMessage, notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 import cn from '@/lib/utilsd'
 
+import AbilitySectionReorderControls from './AbilitySectionReorderControls'
 import styles from './AbilityEditor.module.css'
+import { getSelectionPreservingPressProps, useSelectionChangeListener } from './useToolbarSelectionGuard'
 
 type AbilityEditorMode = 'edit' | 'preview'
 
@@ -1895,7 +1897,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
               </section>
 
               <section className={styles.sections} aria-label="Ability sections">
-              {activeAbility.sections.map(section => (
+              {activeAbility.sections.map((section, sectionIndex) => (
                 <article
                   key={section.id}
                   className={styles.section}
@@ -1918,6 +1920,7 @@ export default function AbilityEditor({ ability, propertyIconGroups, mode = 'edi
                       >
                         <GripVertical aria-hidden="true" />
                       </button>
+                      <AbilitySectionReorderControls sectionId={section.id} sectionLabel={getSectionActionLabel(section)} previousSectionId={activeAbility.sections[sectionIndex - 1]?.id ?? null} nextSectionId={activeAbility.sections[sectionIndex + 1]?.id ?? null} onReorder={reorderSection} />
                       <button type="button" className={styles.removeSectionButton} aria-label={`Remove ${getSectionActionLabel(section)} section`} onClick={() => removeSection(section.id)}>
                         <X aria-hidden="true" />
                       </button>
@@ -2422,6 +2425,9 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
   const [customColorValue, setCustomColorValue] = useState('#ffffff')
   const [recentCustomColors, setRecentCustomColors] = useState<string[]>(getRecentCustomColors)
   const [swatchPanelPosition, setSwatchPanelPosition] = useState({ left: 8, top: 8 })
+  const toolbarPressProps = getSelectionPreservingPressProps(() => rememberSelection({ allowCollapsed: false }))
+
+  useSelectionChangeListener(() => rememberSelection({ allowCollapsed: false }))
 
   useEffect(() => {
     if (!editorRef.current || document.activeElement === editorRef.current || lastTextRef.current === section.text) {
@@ -2765,11 +2771,6 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     syncEditorText()
   }
 
-  function handleToolbarMouseDown(event: MouseEvent<HTMLButtonElement>) {
-    event.preventDefault()
-    rememberSelection({ allowCollapsed: false })
-  }
-
   function handleCustomColorMouseDown() {
     rememberSelection({ allowCollapsed: false })
   }
@@ -2967,15 +2968,15 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
     <div className={styles.richTextEditor}>
       {!readOnly ? (
         <div className={styles.richToolbar}>
-        <button type="button" aria-label="Bold selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('strong', {}, '', { toggleEffect: { type: 'bold' } })}><Bold aria-hidden="true" /></button>
-        <button type="button" aria-label="Italicize selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('em', {}, '', { toggleEffect: { type: 'italic' } })}><Italic aria-hidden="true" /></button>
-        <button type="button" aria-label="Darken selected text" onMouseDown={handleToolbarMouseDown} onClick={() => applyInlineElement('span', { 'data-rich-dark': 'true' }, styles.darkenText, { toggleEffect: { type: 'dark' } })}><Moon aria-hidden="true" /></button>
+        <button type="button" aria-label="Bold selected text" {...toolbarPressProps} onClick={() => applyInlineElement('strong', {}, '', { toggleEffect: { type: 'bold' } })}><Bold aria-hidden="true" /></button>
+        <button type="button" aria-label="Italicize selected text" {...toolbarPressProps} onClick={() => applyInlineElement('em', {}, '', { toggleEffect: { type: 'italic' } })}><Italic aria-hidden="true" /></button>
+        <button type="button" aria-label="Darken selected text" {...toolbarPressProps} onClick={() => applyInlineElement('span', { 'data-rich-dark': 'true' }, styles.darkenText, { toggleEffect: { type: 'dark' } })}><Moon aria-hidden="true" /></button>
         <div className={styles.swatchMenu} ref={swatchMenuRef}>
           <button
             ref={swatchButtonRef}
             type="button"
             aria-label="Open text color swatches"
-            onMouseDown={handleToolbarMouseDown}
+            {...toolbarPressProps}
             onClick={() => {
               setRecentCustomColors(getRecentCustomColors())
               setSwatchPanelPosition(getSwatchPanelPosition())
@@ -2998,7 +2999,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
                   type="button"
                   className={styles.swatchDefault}
                   aria-label="Apply Default color"
-                  onMouseDown={handleToolbarMouseDown}
+                  {...toolbarPressProps}
                   onClick={() => {
                     clearInlineColoring()
                     setIsSwatchOpen(false)
@@ -3012,7 +3013,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
                     type="button"
                     aria-label={`Apply ${color.label} color`}
                     className={styles[`swatch${color.id.charAt(0).toUpperCase()}${color.id.slice(1)}`]}
-                    onMouseDown={handleToolbarMouseDown}
+                    {...toolbarPressProps}
                     onClick={() => {
                       applyInlineElement('span', { 'data-rich-color': color.token }, styles[`richColor${color.token.charAt(0).toUpperCase()}${color.token.slice(1)}`], { clearColoring: true })
                       setIsSwatchOpen(false)
@@ -3025,7 +3026,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
                 <CommittedColorInput
                   value={customColorValue}
                   ariaLabel="Custom text color"
-                  onMouseDown={handleCustomColorMouseDown}
+                  onPointerDown={handleCustomColorMouseDown}
                   onCommit={applyCustomTextColor}
                 />
               </label>
@@ -3040,7 +3041,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
                         className={styles.customColorSwatch}
                         style={{ backgroundColor: color }}
                         aria-label={`Apply recently made ${color} color`}
-                        onMouseDown={handleToolbarMouseDown}
+                        {...toolbarPressProps}
                         onClick={() => applyCustomTextColor(color)}
                       />
                     ))}
@@ -3051,7 +3052,7 @@ function RichTextSection({ section, readOnly = false, onTextChange, onInlineIcon
             document.body,
           ) : null}
         </div>
-        <button type="button" onMouseDown={handleToolbarMouseDown} onClick={handleIconInsert}>Inline Icon</button>
+        <button type="button" {...toolbarPressProps} onClick={handleIconInsert}>Inline Icon</button>
         </div>
       ) : null}
       <div

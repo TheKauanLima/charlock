@@ -93,6 +93,12 @@
   --citadel-button-cut: polygon(0 0, 92% 0, 100% 25%, 100% 100%, 8% 100%, 0 75%);
   --citadel-container: 1200px;
   --citadel-editor-container: 1600px;
+  --touch-target: 44px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --mobile-gutter: 12px;
 }
 
 @theme inline {
@@ -110,6 +116,8 @@
 }
 
 body {
+  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--background);
   color: var(--foreground);
   font-family: Radiance, Arial, Helvetica, sans-serif;
@@ -225,4 +233,20 @@ body {
   box-shadow:
     0 28px 90px rgba(0, 0, 0, 0.72),
     inset 0 0 0 1px var(--citadel-panel-inner-border);
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .citadel-button-primary,
+  .citadel-button-secondary,
+  .citadel-button-danger {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
 }

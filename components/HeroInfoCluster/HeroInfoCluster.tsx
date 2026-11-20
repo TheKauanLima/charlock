@@ -1,8 +1,9 @@
 'use client'
 
 import { Bookmark, MessageSquare, Send, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 
 import AbilityEditor from '@/components/AbilityEditor/AbilityEditor'
 import BackstoryModule from '@/components/backstory/BackstoryModule'
@@ -17,6 +18,8 @@ import WeaponPanel from '@/components/panels/weapon-panel'
 import PanelVariantTabs, { BASE_PANEL_ID } from '@/components/PanelVariantTabs/PanelVariantTabs'
 import SidebarTabs from '@/components/SidebarTabs/SidebarTabs'
 import type { SidebarTabId } from '@/components/SidebarTabs/SidebarTabs'
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
+import { useHeroGridDismiss } from '@/hooks/use-hero-grid-dismiss'
 import { buildEmptyHeroStats, buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildDefaultAbilityStats, getSecondaryAbilitySlots } from '@/lib/ability-editor-types'
 import type { AbilityStatsPayload } from '@/lib/ability-editor-types'
@@ -50,6 +53,10 @@ interface HeroStatsState {
 interface HeroStatsWithAbilityPayload extends HeroStatsPayload {
   abilityStats?: AbilityStatsPayload
 }
+
+// Presses on the preview itself or on the icon row are handled there: the row toggles the
+// same ability closed on a second tap, or switches to another ability.
+const ABILITY_PREVIEW_DISMISS_IGNORE = '[data-ability-preview-panel="true"], [data-ability-icon-row="true"]'
 
 interface CommentItem {
   id: string
@@ -328,25 +335,10 @@ export default function HeroInfoCluster({
       ? previewAbilityStats.abilities[selectedAbilityTarget.index] ?? null
       : null
 
-  useEffect(() => {
-    if (!selectedAbilityTarget) {
-      return
-    }
+  const closeAbilityPreview = useCallback(() => setSelectedAbilityTarget(null), [])
+  const commentsBackdropDismissProps = useHeroGridBackdropDismiss(() => setIsCommentsOpen(false))
 
-    function handlePreviewClickAway(event: globalThis.PointerEvent) {
-      if (event.target instanceof Element && event.target.closest('[data-ability-preview-panel="true"]')) {
-        return
-      }
-
-      setSelectedAbilityTarget(null)
-    }
-
-    document.addEventListener('pointerdown', handlePreviewClickAway)
-
-    return () => {
-      document.removeEventListener('pointerdown', handlePreviewClickAway)
-    }
-  }, [selectedAbilityTarget])
+  useHeroGridDismiss(Boolean(selectedAbilityTarget), closeAbilityPreview, ABILITY_PREVIEW_DISMISS_IGNORE)
 
   return (
     <>
@@ -496,15 +488,12 @@ export default function HeroInfoCluster({
               </div>
             </section>
 
-            {isCommentsOpen ? (
+            {isCommentsOpen && typeof document !== 'undefined' ? createPortal(
               <div
                 className={styles.commentsModalBackdrop}
+                data-modal-backdrop="true"
                 role="presentation"
-                onPointerDown={event => {
-                  if (event.target === event.currentTarget) {
-                    setIsCommentsOpen(false)
-                  }
-                }}
+                {...commentsBackdropDismissProps}
               >
                 <section className={styles.commentsModal} role="dialog" aria-modal="true" aria-labelledby={`${heroId}-comments-title`}>
                   <header className={styles.commentsModalHeader}>
@@ -527,6 +516,8 @@ export default function HeroInfoCluster({
                   <label className="sr-only" htmlFor={`${heroId}-comment`}>Comment</label>
                   <textarea
                     id={`${heroId}-comment`}
+                    inputMode="text"
+                    autoCapitalize="sentences"
                     maxLength={500}
                     value={commentDraft}
                     onChange={event => setCommentDraft(event.target.value)}
@@ -570,7 +561,8 @@ export default function HeroInfoCluster({
                 ) : null}
               </div>
                 </section>
-              </div>
+              </div>,
+              document.body,
             ) : null}
           </>
         ) : null}

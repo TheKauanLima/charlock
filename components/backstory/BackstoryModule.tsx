@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties, MouseEvent } from 'react'
+import type { CSSProperties } from 'react'
 import { Plus } from 'lucide-react'
 
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
 import type { HeroDefinition } from '@/lib/hero-data'
 import { notifyIfLimitedTextKeyDown, notifyIfLimitedTextPaste } from '@/lib/input-limit-feedback'
 
@@ -246,11 +247,7 @@ export default function BackstoryModule({ hero, accentImageSrc, isEditable = fal
     }
   }, [isEditable, isOpen])
 
-  function handleBackdropMouseDown(event: MouseEvent<HTMLDivElement>) {
-    if (event.target === event.currentTarget) {
-      setIsOpen(false)
-    }
-  }
+  const backdropDismissProps = useHeroGridBackdropDismiss(() => setIsOpen(false))
 
   return (
     <>
@@ -300,7 +297,7 @@ export default function BackstoryModule({ hero, accentImageSrc, isEditable = fal
       </div>
 
       {isOpen ? (
-        <div className={styles.backdrop} onMouseDown={handleBackdropMouseDown}>
+        <div className={styles.backdrop} data-modal-backdrop="true" data-testid="backstory-backdrop" {...backdropDismissProps}>
           <section
             ref={modalRef}
             className={styles.modal}

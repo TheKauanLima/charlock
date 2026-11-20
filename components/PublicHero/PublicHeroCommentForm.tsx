@@ -81,6 +81,8 @@ export default function PublicHeroCommentForm({ heroId, isSignedIn }: PublicHero
         value={content}
         maxLength={COMMENT_MAX_LENGTH}
         rows={3}
+        autoCapitalize="sentences"
+        spellCheck
         onChange={event => setContent(event.target.value)}
         placeholder="Share feedback on this hero concept"
       />

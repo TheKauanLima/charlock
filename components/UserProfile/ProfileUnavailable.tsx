@@ -62,7 +62,7 @@ export default function ProfileUnavailable({ reason = 'temporary' }: { reason?: 
           <label htmlFor="creator-profile-search">Find another creator</label>
           <span>
             <Search aria-hidden="true" />
-            <input id="creator-profile-search" type="search" value={creatorSearch} onChange={event => setCreatorSearch(event.target.value)} placeholder="Creator username" />
+            <input id="creator-profile-search" type="search" value={creatorSearch} onChange={event => setCreatorSearch(event.target.value)} placeholder="Creator username" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="search" />
             <button type="submit">Search</button>
           </span>
         </form>

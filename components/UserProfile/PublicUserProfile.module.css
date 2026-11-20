@@ -1,6 +1,7 @@
 .shell {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background: #000;
   color: #ffefd6;
@@ -369,5 +370,52 @@
   .charactersPanel > header {
     align-items: start;
     flex-direction: column;
+  }
+}
+
+/* Mobile readiness (spec 23, step 6). One block per query, appended last (A2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .backLink,
+  .followControl button,
+  .followControl a {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+@media (max-width: 760px) {
+  .content {
+    gap: 16px;
+    width: min(100% - 24px, var(--citadel-container));
+    padding: calc(56px + var(--safe-top, 0px)) 0 calc(40px + var(--safe-bottom, 0px));
+  }
+
+  .profileHeader,
+  .charactersPanel {
+    gap: 16px;
+    padding: 18px;
+  }
+
+  .identity {
+    gap: 16px;
+  }
+
+  .followControl {
+    justify-items: start;
+  }
+
+  .followControl small {
+    text-align: left;
+  }
+
+  .bioPanel {
+    padding: 18px;
+  }
+
+  .bioPanel > span {
+    overflow-wrap: anywhere;
+  }
+
+  .emptyState {
+    padding: 20px 16px;
   }
 }

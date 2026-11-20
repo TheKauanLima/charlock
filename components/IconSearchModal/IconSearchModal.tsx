@@ -178,12 +178,12 @@ export default function IconSearchModal({ groups, statGroups = [], search, selec
   )
 
   const modal = (
-    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId} onPointerDown={handleBackdropPointerDown}>
+    <div className={styles.iconBackdrop} role="dialog" aria-modal="true" aria-label={title} data-testid={testId} data-modal-backdrop="true" onPointerDown={handleBackdropPointerDown}>
       <div className={cn(styles.iconModal, isAbilityPicker && styles.iconModalAbility)}>
         <div className={styles.iconHeader}>
           <label>
             <Search aria-hidden="true" />
-            <input value={search} onChange={event => onSearch(event.target.value)} placeholder={searchPlaceholder} />
+            <input type="search" value={search} onChange={event => onSearch(event.target.value)} placeholder={searchPlaceholder} inputMode="search" enterKeyHint="search" autoComplete="off" autoCapitalize="none" spellCheck={false} />
           </label>
           <button type="button" aria-label={closeLabel} onClick={onClose}><X aria-hidden="true" /></button>
         </div>

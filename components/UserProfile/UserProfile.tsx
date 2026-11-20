@@ -15,6 +15,8 @@ import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
 import type { ProfileCommentsLedger, ProfileCommentItem, ProfileLikeItem } from '@/lib/profile-ledger-types'
 import type { ProfileBackgroundVisual, UserProfileData } from '@/lib/profile'
 
+import ProfileBackgroundModal, { type BackgroundPickerTab, type ProfileBackgroundOption } from './ProfileBackgroundModal'
+import { BulkDeleteHeroConfirmation, DeleteHeroConfirmation } from './ProfileDeleteConfirmations'
 import { ProfileSettingsPanel } from './ProfileSettings'
 import styles from './UserProfile.module.css'
 
@@ -28,11 +30,6 @@ interface ProfileStyle extends CSSProperties {
   '--profile-name': string
 }
 
-interface BackgroundOptionStyle extends CSSProperties {
-  '--option-accent': string
-  '--option-name': string
-}
-
 interface ProfileGridHero {
   id: string
   name: string
@@ -44,11 +41,6 @@ interface ProfileGridHero {
   creatorType: 'Official' | 'Community'
   roleTags: string[]
   restricted?: boolean
-}
-
-interface ProfileBackgroundOption extends ProfileBackgroundVisual {
-  portrait: string
-  source: 'Official' | 'Created'
 }
 
 interface ProfileNotificationItem {
@@ -71,7 +63,6 @@ interface ProfileNotificationItem {
 type ProfilePanel = 'saved' | 'bookmarks' | 'likes' | 'comments' | 'notifications' | 'settings'
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error'
 type CommentsView = 'made' | 'received'
-type BackgroundPickerTab = ProfileBackgroundOption['source']
 type BookmarkSort = 'newest' | 'oldest' | 'rating' | 'name'
 type BookmarkRoleFilter = 'all' | 'weapon' | 'vitality' | 'spirit'
 type BookmarkCreatorFilter = 'all' | 'official' | 'community'
@@ -348,88 +339,6 @@ function ProfileHeroGrid({
           </article>
         )
       })}
-    </div>
-  )
-}
-
-function DeleteHeroConfirmation({ hero, isPending, error, onCancel, onConfirm }: {
-  hero: ProfileGridHero
-  isPending: boolean
-  error: string | null
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <div className={styles.modalBackdrop} role="presentation" onClick={() => { if (!isPending) onCancel() }}>
-      <section
-        className={styles.deleteHeroModal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-hero-title"
-        onClick={event => event.stopPropagation()}
-      >
-        <div className={styles.backgroundModalHeader}>
-          <div>
-            <p id="delete-hero-title">Delete {hero.name}?</p>
-            <span>Permanent database deletion</span>
-          </div>
-          <button type="button" className={styles.modalCloseButton} onClick={onCancel} aria-label="Close hero deletion confirmation" disabled={isPending}>
-            <X aria-hidden="true" size={16} />
-          </button>
-        </div>
-        <p className={styles.deleteHeroWarning}>
-          This permanently removes the character, its stats, abilities, comments, likes, and bookmarks. This action cannot be undone.
-        </p>
-        {error ? <p className={styles.deleteHeroError} role="alert">{error}</p> : null}
-        <div className={styles.backgroundModalActions}>
-          <button type="button" className={styles.backgroundCancelButton} onClick={onCancel} disabled={isPending}>Cancel</button>
-          <button type="button" className={styles.deleteHeroConfirmButton} onClick={onConfirm} disabled={isPending}>
-            <Trash2 aria-hidden="true" size={15} />
-            {isPending ? 'Deleting Character...' : 'Permanently Delete'}
-          </button>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function BulkDeleteHeroConfirmation({ count, isPending, error, onCancel, onConfirm }: {
-  count: number
-  isPending: boolean
-  error: string | null
-  onCancel: () => void
-  onConfirm: () => void
-}) {
-  return (
-    <div className={styles.modalBackdrop} role="presentation" onClick={() => { if (!isPending) onCancel() }}>
-      <section
-        className={styles.deleteHeroModal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bulk-delete-heroes-title"
-        onClick={event => event.stopPropagation()}
-      >
-        <div className={styles.backgroundModalHeader}>
-          <div>
-            <p id="bulk-delete-heroes-title">Delete {count} characters?</p>
-            <span>Permanent bulk database deletion</span>
-          </div>
-          <button type="button" className={styles.modalCloseButton} onClick={onCancel} aria-label="Close bulk hero deletion confirmation" disabled={isPending}>
-            <X aria-hidden="true" size={16} />
-          </button>
-        </div>
-        <p className={styles.deleteHeroWarning}>
-          This permanently removes every selected character and all associated stats, abilities, comments, likes, and bookmarks. This action cannot be undone.
-        </p>
-        {error ? <p className={styles.deleteHeroError} role="alert">{error}</p> : null}
-        <div className={styles.backgroundModalActions}>
-          <button type="button" className={styles.backgroundCancelButton} onClick={onCancel} disabled={isPending}>Cancel</button>
-          <button type="button" className={styles.deleteHeroConfirmButton} onClick={onConfirm} disabled={isPending}>
-            <Trash2 aria-hidden="true" size={15} />
-            {isPending ? `Deleting ${count} Characters...` : `Permanently Delete ${count} Characters`}
-          </button>
-        </div>
-      </section>
     </div>
   )
 }
@@ -715,128 +624,6 @@ function NotificationPanelContent({
           ) : null}
         </article>
       ))}
-    </div>
-  )
-}
-
-function ProfileBackgroundModal({
-  options,
-  activeId,
-  draftId,
-  activeTab,
-  isPending,
-  error,
-  onClose,
-  onConfirm,
-  onPreview,
-  onPreviewEnd,
-  onSelectDraft,
-  onTabChange,
-}: {
-  options: ProfileBackgroundOption[]
-  activeId: string
-  draftId: string
-  activeTab: BackgroundPickerTab
-  isPending: boolean
-  error: string | null
-  onClose: () => void
-  onConfirm: () => void
-  onPreview: (option: ProfileBackgroundOption) => void
-  onPreviewEnd: () => void
-  onSelectDraft: (option: ProfileBackgroundOption) => void
-  onTabChange: (tab: BackgroundPickerTab) => void
-}) {
-  const officialOptions = options.filter(option => option.source === 'Official')
-  const createdOptions = options.filter(option => option.source === 'Created')
-  const visibleOptions = activeTab === 'Official' ? officialOptions : createdOptions
-
-  return (
-    <div className={styles.modalBackdrop} role="presentation" onClick={onClose}>
-      <section
-        className={styles.backgroundModal}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="profile-background-title"
-        onClick={event => event.stopPropagation()}
-      >
-        <div className={styles.backgroundModalHeader}>
-          <div>
-            <p id="profile-background-title">Profile Background</p>
-            <span>{isPending ? 'Saving selection' : 'Choose a character render'}</span>
-          </div>
-          <button type="button" className={styles.modalCloseButton} onClick={onClose} aria-label="Close background picker">
-            <X aria-hidden="true" size={16} />
-          </button>
-        </div>
-
-        <div className={styles.backgroundTabs} role="tablist" aria-label="Background source">
-          <button type="button" role="tab" aria-selected={activeTab === 'Official'} onClick={() => onTabChange('Official')} disabled={isPending}>
-            Official Characters
-          </button>
-          <button type="button" role="tab" aria-selected={activeTab === 'Created'} onClick={() => onTabChange('Created')} disabled={isPending}>
-            My Custom Characters
-          </button>
-        </div>
-
-        {visibleOptions.length ? (
-          <div className={styles.backgroundOptions}>
-            {visibleOptions.map(option => {
-              const optionStyle: BackgroundOptionStyle = {
-                '--option-accent': option.accent,
-                '--option-name': option.nameColor,
-              }
-
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className={`${styles.backgroundOption} ${draftId === option.id ? styles.backgroundOptionDraft : ''} ${activeId === option.id ? styles.backgroundOptionActive : ''}`}
-                  style={optionStyle}
-                  onClick={() => onSelectDraft(option)}
-                  onFocus={() => onPreview(option)}
-                  onBlur={onPreviewEnd}
-                  onMouseEnter={() => onPreview(option)}
-                  onMouseLeave={onPreviewEnd}
-                  aria-pressed={draftId === option.id}
-                  disabled={isPending}
-                >
-                  <span className={styles.backgroundOptionRender}>
-                    <Image src={option.render} alt="" fill sizes="(max-width: 760px) 84vw, 280px" className={styles.backgroundOptionRenderImage} />
-                    <span className={styles.backgroundOptionWash} aria-hidden="true" />
-                  </span>
-                  <span className={styles.backgroundOptionPortrait}>
-                    <Image src={getThumbnailUrl(option.portrait, 152, 246)} alt="" fill sizes="76px" className={styles.backgroundOptionPortraitImage} placeholder="blur" blurDataURL={IMAGE_BLUR_DATA_URL} />
-                  </span>
-                  <span className={styles.backgroundOptionLabel}>{option.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        ) : (
-          <p className={styles.backgroundEmpty}>No created characters yet.</p>
-        )}
-
-        {error ? <p className={styles.backgroundError} role="alert">{error}</p> : null}
-
-        <div className={styles.backgroundModalActions}>
-          <button type="button" className={styles.backgroundCancelButton} onClick={onClose} disabled={isPending}>
-            Cancel
-          </button>
-          <button type="button" className={styles.backgroundConfirmButton} onClick={onConfirm} disabled={isPending}>
-            {isPending ? (
-              <>
-                <Cog aria-hidden="true" size={15} className={styles.syncGear} />
-                COMMITTING MEMORY CORE...
-              </>
-            ) : (
-              <>
-                <Check aria-hidden="true" size={15} />
-                Confirm Background
-              </>
-            )}
-          </button>
-        </div>
-      </section>
     </div>
   )
 }

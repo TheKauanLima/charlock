@@ -1,5 +1,6 @@
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -198,4 +199,38 @@
 
 .link:hover {
   color: #ffefd7;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding:
+      max(16px, var(--safe-top, 0px))
+      max(var(--mobile-gutter, 12px), var(--safe-right, 0px))
+      max(16px, var(--safe-bottom, 0px))
+      max(var(--mobile-gutter, 12px), var(--safe-left, 0px));
+  }
+
+  .header {
+    padding: 22px 20px 16px;
+  }
+
+  .title {
+    overflow-wrap: anywhere;
+  }
+
+  .form,
+  .sessionStatus {
+    padding: 20px 20px 24px;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .button,
+  .oauthButton {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .input {
+    min-height: var(--touch-target, 44px);
+  }
 }

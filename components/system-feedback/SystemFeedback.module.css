@@ -56,13 +56,13 @@
 .dismissButton { position: absolute; top: 10px; right: 10px; display: grid; width: 34px; height: 34px; place-items: center; border: 0; color: #fff0d8; background: transparent; }
 .dismissButton svg { width: 18px; }
 
-.connectionWarning { position: fixed; z-index: 410; top: 14px; left: 50%; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 28px); transform: translateX(-50%); padding: 9px 12px; border: 1px solid #e5b847; color: #ffe7b0; background: rgb(24 18 7 / 94%); font: 700 0.68rem var(--font-geist-mono), monospace; }
+.connectionWarning { position: fixed; z-index: 410; top: calc(14px + var(--safe-top, 0px)); left: 50%; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 28px); transform: translateX(-50%); padding: 9px 12px; border: 1px solid #e5b847; color: #ffe7b0; background: rgb(24 18 7 / 94%); font: 700 0.68rem var(--font-geist-mono), monospace; }
 .connectionWarning svg { width: 16px; height: 16px; }
-.toast { position: fixed; z-index: 1000; bottom: 24px; left: 50%; max-width: min(420px, calc(100% - 48px)); margin: 0; transform: translateX(-50%); padding: 11px 14px; border-left: 3px solid var(--citadel-gold); color: var(--citadel-gold); background: rgb(15 14 16 / 94%); box-shadow: 0 12px 38px #000; font: 0.7rem/1.4 var(--font-geist-mono), monospace; pointer-events: none; }
-.toastTop { top: 24px; bottom: auto; }
+.toast { position: fixed; z-index: 1000; bottom: calc(24px + var(--safe-bottom, 0px)); left: 50%; max-width: min(420px, calc(100% - 48px)); margin: 0; transform: translateX(-50%); padding: 11px 14px; border-left: 3px solid var(--citadel-gold); color: var(--citadel-gold); background: rgb(15 14 16 / 94%); box-shadow: 0 12px 38px #000; font: 0.7rem/1.4 var(--font-geist-mono), monospace; pointer-events: none; }
+.toastTop { top: calc(24px + var(--safe-top, 0px)); bottom: auto; }
 .toastError { border-left-color: #ff4d4d; color: #ffd1d1; background: rgb(58 10 14 / 96%); box-shadow: 0 12px 38px #000, 0 0 0 1px rgb(255 77 77 / 30%); }
 
-.profileLoading { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; min-height: 100vh; padding: 88px max(24px, calc((100vw - 1200px) / 2)); color: #ffefd6; background: #050506; }
+.profileLoading { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; min-height: 100vh; min-height: 100dvh; padding: 88px max(24px, calc((100vw - 1200px) / 2)); color: #ffefd6; background: #050506; }
 .profileLoading aside, .profileLoading section { display: grid; align-content: start; gap: 14px; }
 .profileLoading span, .profileLoading i { display: block; min-height: 42px; background: #ffefd6; animation: pulseGlow 1.5s ease-in-out infinite; }
 .profileLoading .profileHeroSkeleton { width: 104px; height: 104px; border-radius: 999px; }
@@ -70,7 +70,7 @@
 .profileLoading section > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 30px; }
 .profileLoading i { aspect-ratio: 130 / 210; }
 
-.routeError { display: grid; min-height: 100vh; place-content: center; justify-items: start; gap: 12px; padding: 32px; color: #ffefd6; background: #080709; }
+.routeError { display: grid; min-height: 100vh; min-height: 100dvh; place-content: center; justify-items: start; gap: 12px; padding: 32px; color: #ffefd6; background: #080709; }
 .routeError > svg { width: 34px; height: 34px; color: #e5b847; }
 .routeError p, .routeError h1, .routeError span { margin: 0; }
 .routeError p { color: #e5b847; font: 800 0.68rem var(--font-geist-mono), monospace; text-transform: uppercase; }
@@ -84,4 +84,65 @@
   .profileLoading { grid-template-columns: 1fr; padding: 70px 20px; }
   .profileLoading aside { display: none; }
   .profileLoading section > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .loadingOverlay {
+    padding: max(16px, var(--safe-top, 0px)) max(var(--mobile-gutter, 12px), var(--safe-right, 0px)) max(16px, var(--safe-bottom, 0px)) max(var(--mobile-gutter, 12px), var(--safe-left, 0px));
+    text-align: center;
+  }
+
+  .loadingOverlay span { max-width: 100%; overflow-wrap: anywhere; }
+
+  .sessionBackdrop {
+    padding: max(12px, var(--safe-top, 0px)) max(12px, var(--safe-right, 0px)) max(12px, var(--safe-bottom, 0px)) max(12px, var(--safe-left, 0px));
+  }
+
+  .sessionModal {
+    width: min(100%, 560px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 20px;
+  }
+
+  .sessionModal h2 { max-width: none; font-size: 1.6rem; overflow-wrap: anywhere; }
+
+  /* Sticky so the close control stays visible when the surface scrolls (short landscape screens). */
+  .dismissButton {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    justify-self: end;
+    margin: -12px -12px -30px 0;
+    background: var(--citadel-panel);
+  }
+
+  .connectionWarning {
+    max-width: calc(100% - 24px - var(--safe-left, 0px) - var(--safe-right, 0px));
+  }
+
+  .toast {
+    max-width: calc(100% - 24px - var(--safe-left, 0px) - var(--safe-right, 0px));
+  }
+
+  .profileLoading {
+    padding-top: max(70px, calc(56px + var(--safe-top, 0px)));
+    padding-right: max(var(--mobile-gutter, 12px), var(--safe-right, 0px));
+    padding-bottom: max(24px, var(--safe-bottom, 0px));
+    padding-left: max(var(--mobile-gutter, 12px), var(--safe-left, 0px));
+  }
+
+  /* A6: keep the GlobalNav avatar clear of the error heading. */
+  .routeError {
+    padding: calc(56px + var(--safe-top, 0px)) max(20px, var(--safe-right, 0px)) max(24px, var(--safe-bottom, 0px)) max(20px, var(--safe-left, 0px));
+  }
+
+  .routeError h1 { max-width: 100%; overflow-wrap: anywhere; }
+  .routeError code { overflow-wrap: anywhere; }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .dismissButton { width: var(--touch-target, 44px); height: var(--touch-target, 44px); }
+  .failureBanner button, .signInButton, .routeError button { min-height: var(--touch-target, 44px); padding: 0 14px; }
 }

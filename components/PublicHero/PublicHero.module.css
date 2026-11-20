@@ -1,6 +1,7 @@
 .shell {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--public-hero-accent, #33debb) 12%, transparent), transparent 420px),
@@ -517,5 +518,101 @@
 
   .statGroups {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile readiness (spec 23, step 6). One block per query, appended last (A2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .backLink,
+  .actionButton {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+@media (max-width: 760px) {
+  .content {
+    gap: 16px;
+    width: min(100% - 24px, var(--citadel-container));
+    padding: calc(56px + var(--safe-top, 0px)) 0 calc(40px + var(--safe-bottom, 0px));
+  }
+
+  .visibilityBanner {
+    overflow-wrap: anywhere;
+    padding: 10px 14px;
+  }
+
+  .header {
+    min-height: 0;
+  }
+
+  .stage {
+    min-height: min(320px, 80vw);
+  }
+
+  .identity,
+  .panel,
+  .notFound {
+    padding: 18px;
+  }
+
+  .portrait {
+    width: 104px;
+  }
+
+  .heroName {
+    font-size: clamp(2rem, 11vw, 3rem);
+  }
+
+  .actionRow > .actionButton {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .sectionHeading {
+    font-size: 1.4rem;
+  }
+
+  .abilityList {
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+  }
+
+  .abilityEntry {
+    min-width: 0;
+    padding: 14px;
+  }
+
+  .abilitySection p,
+  .abilitySection ul,
+  .abilityTiers,
+  .backstory {
+    overflow-wrap: anywhere;
+  }
+
+  .statGroups {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .statGroup,
+  .statVariant {
+    max-width: 100%;
+  }
+
+  .commentForm textarea {
+    min-height: 96px;
+    font-size: 16px;
+  }
+
+  .commentFormFooter {
+    flex-wrap: wrap;
+  }
+
+  .commentFormFooter > .actionButton {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .commentGuest > .actionButton {
+    width: 100%;
+    justify-content: center;
   }
 }

@@ -71,7 +71,7 @@ export default function HeroAbilityIconRow({
     : []
 
   return (
-    <div className={cn(styles.row, className)} aria-label={editable ? 'Editable hero ability icons' : 'Hero abilities'}>
+    <div className={cn(styles.row, className)} data-ability-icon-row="true" aria-label={editable ? 'Editable hero ability icons' : 'Hero abilities'}>
       {ABILITY_ICON_KEYS.map((iconKey, index) => {
         const slot = index + 1
         const primaryTarget: AbilityIconTarget = { set: 'primary', index }

@@ -2,7 +2,9 @@
 
 import { Flag, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
 import { REPORT_REASONS } from '@/lib/moderation-types'
 import type { ModerationStatus, ReportReason } from '@/lib/moderation-types'
 import cn from '@/lib/utilsd'
@@ -32,6 +34,7 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
   const [details, setDetails] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const backdropDismissProps = useHeroGridBackdropDismiss(() => setIsOpen(false))
 
   useEffect(() => {
     if (!isOpen) {
@@ -80,6 +83,10 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
     }
   }
 
+  // The trigger sits inside positioned, z-indexed containers (hero cluster, comment rows), so the
+  // dialog and toast render on document.body to clear the GlobalNav (spec 23, A1).
+  const portalTarget = typeof document === 'undefined' ? null : document.body
+
   return (
     <>
       <button
@@ -95,17 +102,14 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
         {compact ? null : 'Report Content'}
       </button>
 
-      {feedback ? <div className={styles.toast} role="status">{feedback}</div> : null}
+      {feedback && portalTarget ? createPortal(<div className={styles.toast} role="status">{feedback}</div>, portalTarget) : null}
 
-      {isOpen ? (
+      {isOpen && portalTarget ? createPortal(
         <div
           className={styles.backdrop}
+          data-modal-backdrop="true"
           role="presentation"
-          onPointerDown={event => {
-            if (event.target === event.currentTarget) {
-              setIsOpen(false)
-            }
-          }}
+          {...backdropDismissProps}
         >
           <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="report-dialog-title">
             <header>
@@ -138,6 +142,8 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
               Additional explanation <span>Optional</span>
               <textarea
                 value={details}
+                inputMode="text"
+                autoCapitalize="sentences"
                 maxLength={1000}
                 placeholder="Add context that may help the moderation review."
                 onChange={event => setDetails(event.target.value)}
@@ -153,7 +159,8 @@ export default function ReportDialog({ endpoint, contentLabel, compact = false, 
               </button>
             </footer>
           </section>
-        </div>
+        </div>,
+        portalTarget,
       ) : null}
     </>
   )

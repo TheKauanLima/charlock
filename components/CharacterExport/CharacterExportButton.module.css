@@ -32,7 +32,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 400;
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, 0.8);
@@ -345,5 +345,45 @@
   .modalActions button {
     flex: 1 1 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .trigger,
+  .modalActions button {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .closeButton {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+}
+
+/* Spec 23 D8: the modal is the only scroller; the header (with the close button) stays pinned. */
+@media (max-width: 760px) {
+  .backdrop {
+    padding: calc(12px + var(--safe-top, 0px)) 12px calc(12px + var(--safe-bottom, 0px));
+  }
+
+  .modal {
+    width: min(100%, 980px);
+    max-height: calc(100vh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overscroll-behavior: contain;
+  }
+
+  .modalHeader {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: -12px -12px 0;
+    background: var(--citadel-panel);
+    padding: 12px;
+  }
+
+  .modalHeader h2 {
+    font-size: clamp(1.3rem, 7vw, 1.7rem);
+    overflow-wrap: anywhere;
   }
 }

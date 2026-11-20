@@ -658,3 +658,60 @@
     width: 100%;
   }
 }
+
+/* Mobile readiness (spec 23, step 5). */
+@media (max-width: 760px) {
+  .header {
+    height: auto;
+  }
+
+  /* Leave room for the absolutely positioned falloff box at the bottom right. */
+  .header:has(.falloff) .headerContent {
+    padding-bottom: 48px;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .statCell {
+    min-height: 40px;
+  }
+
+  /* Inputs compute to max(16px, 1em) of their parent; keep the intended sizes. */
+  .statContent {
+    font-size: 18px;
+  }
+
+  .headerContent {
+    font-size: 22px;
+  }
+
+  .falloffInput {
+    width: 44px;
+  }
+
+  .damageTypeButton {
+    position: relative;
+  }
+
+  .damageTypeButton::before {
+    position: absolute;
+    inset: -8px;
+    content: "";
+  }
+
+  .weaponImageAction,
+  .weaponImageUpload :global(button) {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  .shotgunToggle {
+    min-height: 40px;
+    align-items: center;
+  }
+
+  .saveButton,
+  .cancelButton {
+    min-height: var(--touch-target, 44px);
+  }
+}

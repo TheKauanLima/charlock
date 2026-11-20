@@ -182,3 +182,57 @@
   color: var(--citadel-gold);
   font: 800 0.72rem var(--font-geist-mono), monospace;
 }
+
+/* Phone sizing (spec 23, modal pattern). */
+@media (max-width: 760px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .dialog {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .dialog footer button {
+    flex: 1 1 0;
+  }
+
+  .toast {
+    right: calc(12px + var(--safe-right, 0px));
+    bottom: calc(12px + var(--safe-bottom, 0px));
+    left: calc(12px + var(--safe-left, 0px));
+    max-width: none;
+  }
+}
+
+/* Touch targets (D2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .trigger {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .triggerCompact {
+    width: var(--touch-target, 44px);
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .dialog header button,
+  .dialog footer button {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .dialog header button {
+    width: var(--touch-target, 44px);
+    flex: 0 0 auto;
+  }
+
+  .dialog fieldset label {
+    min-height: var(--touch-target, 44px);
+  }
+}

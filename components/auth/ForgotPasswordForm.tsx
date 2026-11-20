@@ -114,7 +114,7 @@ export default function ForgotPasswordForm() {
       <p className={styles.message}>Enter the email or username for your account. Clerk will send the reset code to the account email.</p>
       <label className={styles.field}>
         <span className={styles.label}>Email or Username</span>
-        <input className={styles.input} value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" />
+        <input className={styles.input} value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" autoCapitalize="none" spellCheck={false} />
       </label>
       <button className={styles.button} type="submit" disabled={!signIn || isSubmitting}>
         {isSubmitting ? 'Sending' : 'Send Reset Code'}

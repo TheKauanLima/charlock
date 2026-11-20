@@ -250,6 +250,7 @@ function CompactStatElement({ label, value, unit = '', icon = 'dot', scaling = '
         {isEditable ? (
           <input
             type="text"
+            inputMode="text"
             className={cn(styles.statInput, theme.valueClassName)}
             value={value}
             onChange={handleValueChange}
@@ -534,6 +535,7 @@ export default function WeaponPanel({
                     {isEditable && onWeaponMinRangeChange ? (
                       <input
                         type="text"
+                        inputMode="text"
                         className={styles.falloffInput}
                         value={weaponMinRange}
                         onChange={event => onWeaponMinRangeChange(event.target.value)}
@@ -554,6 +556,7 @@ export default function WeaponPanel({
                     {isEditable && onWeaponMaxRangeChange ? (
                       <input
                         type="text"
+                        inputMode="text"
                         className={styles.falloffInput}
                         value={weaponMaxRange}
                         onChange={event => onWeaponMaxRangeChange(event.target.value)}

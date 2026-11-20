@@ -93,3 +93,23 @@
 .valueWrap:focus-within {
   opacity: 1;
 }
+
+/* Mobile readiness (spec 23, step 5). */
+@media (max-width: 760px), (pointer: coarse) {
+  /* The global input rule forces 16px text; widen the box instead of clipping. */
+  .input {
+    width: 64px;
+  }
+}
+
+@media (hover: none) {
+  /* The invisible hover bridge would swallow taps meant for neighbouring cells. */
+  .root::after {
+    display: none;
+  }
+
+  /* D9: editable values cannot wait for a hover that never happens. */
+  .valueWrap:has(.input) {
+    opacity: 1;
+  }
+}

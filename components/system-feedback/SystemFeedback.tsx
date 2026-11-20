@@ -36,8 +36,9 @@ export function SessionExpiredModal({ open, onDismiss }: { open: boolean; onDism
     window.location.assign(`/sign-in?redirect_url=${encodeURIComponent(returnUrl)}`)
   }
 
-  return (
-    <div className={styles.sessionBackdrop} role="presentation">
+  // Portaled (spec 23 A1) so no ancestor stacking context can trap the z-index or the fixed position.
+  const modal = (
+    <div className={styles.sessionBackdrop} role="presentation" data-modal-backdrop="true">
       <section className={styles.sessionModal} role="dialog" aria-modal="true" aria-labelledby="session-expired-title">
         <button type="button" className={styles.dismissButton} aria-label="Close session expiry dialog" onClick={onDismiss}><X aria-hidden="true" /></button>
         <p>Security Link</p>
@@ -47,6 +48,8 @@ export function SessionExpiredModal({ open, onDismiss }: { open: boolean; onDism
       </section>
     </div>
   )
+
+  return typeof document === 'undefined' ? null : createPortal(modal, document.body)
 }
 
 export function ConnectionStatus() {

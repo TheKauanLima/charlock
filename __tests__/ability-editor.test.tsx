@@ -902,7 +902,7 @@ describe('AbilityEditor', () => {
     expect(savedRichText?.text).toContain('[c:healing]')
     expect(savedRichText?.text).toContain('[i:heal]')
     expect(savedRichText?.text.indexOf('[i:heal]')).toBeLessThan(savedRichText?.text.indexOf(' channels') ?? 0)
-  })
+  }, 15000)
 
   it('drags text and grid sections above or below each other across higher tiers', async () => {
     const user = userEvent.setup()

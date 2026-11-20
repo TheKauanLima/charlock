@@ -91,6 +91,7 @@ function SpiritStatCell({ label, value, unit = '', icon = 'dot', scaling = 'none
         {isEditable ? (
           <input
             type="text"
+            inputMode="text"
             className={styles.input}
             value={value}
             onChange={handleValueChange}

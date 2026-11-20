@@ -1,7 +1,7 @@
 .nav {
   position: fixed;
-  top: 6px;
-  right: 18px;
+  top: calc(6px + var(--safe-top, 0px));
+  right: calc(18px + var(--safe-right, 0px));
   z-index: 340;
   font-family: Radiance, Arial, sans-serif;
 }
@@ -81,6 +81,7 @@
   right: 0;
   display: grid;
   min-width: 220px;
+  max-width: calc(100vw - 16px);
   padding: 8px;
   border: 1px solid var(--citadel-border);
   background: var(--citadel-panel);
@@ -105,7 +106,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 42px;
+  min-height: 44px;
   border: 0;
   background: transparent;
   color: rgba(255, 239, 215, 0.84);
@@ -149,7 +150,32 @@
 
 @media (max-width: 700px) {
   .nav {
-    top: 2px;
-    right: 8px;
+    top: calc(2px + var(--safe-top, 0px));
+    right: calc(8px + var(--safe-right, 0px));
+  }
+}
+
+/* Phone: sit centered in the 56px HeroGrid tab bar (spec 23 A #4, D12). */
+@media (max-width: 760px) {
+  .nav {
+    top: calc(7px + var(--safe-top, 0px));
+    right: calc(8px + var(--safe-right, 0px));
+  }
+
+  .menu {
+    max-height: calc(100dvh - 72px - var(--safe-top, 0px) - var(--safe-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .avatarButton {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .menuItem {
+    min-height: var(--touch-target, 44px);
   }
 }

@@ -302,6 +302,7 @@
   display: grid;
   width: min(560px, calc(100vw - 40px));
   max-height: min(680px, calc(100vh - 40px));
+  max-height: min(680px, calc(100dvh - 40px));
   gap: 14px;
   overflow: hidden;
   border: 1px solid var(--citadel-border);
@@ -514,5 +515,77 @@
 
   .abilityViewerDock {
     width: auto;
+  }
+}
+
+/* Phone layout (spec 23, D12 cluster side): the cluster joins the page flow under the stage. */
+@media (max-width: 760px) {
+  .cluster {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: auto;
+    margin: 12px var(--mobile-gutter, 12px) 16px;
+    pointer-events: auto;
+  }
+
+  .tags {
+    flex-wrap: wrap;
+  }
+
+  .tabPanelVisible {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .commentsModalBackdrop {
+    padding: 12px;
+  }
+
+  .commentsModal {
+    width: min(100%, 560px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 14px;
+  }
+
+  .commentsList {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* Touch targets (D2) for phones and coarse pointers. */
+@media (max-width: 760px), (pointer: coarse) {
+  .actionIconButton,
+  .createFromHeroButton,
+  .commentsModalClose {
+    width: var(--touch-target, 44px);
+    min-width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .commentForm {
+    grid-template-columns: minmax(0, 1fr) var(--touch-target, 44px);
+  }
+
+  .commentItem {
+    padding-right: 10px;
+  }
+
+  .commentActions {
+    position: static;
+    justify-content: flex-end;
+  }
+
+  .commentDeleteButton,
+  .commentIconButton {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    min-height: 40px;
   }
 }

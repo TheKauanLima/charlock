@@ -1,6 +1,7 @@
 .shell {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   background: #050505;
   color: #ffefd6;
@@ -483,5 +484,61 @@
 @media (max-width: 560px) {
   .sidePanelList {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Mobile readiness (spec 23, step 6). One block per query, appended last (A2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .railTopline {
+    grid-template-columns: var(--touch-target, 44px) minmax(0, 1fr);
+  }
+
+  .backButton {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .sidePanelItem,
+  .toggle {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+@media (max-width: 760px) {
+  .content {
+    gap: 16px;
+    width: min(100% - 24px, var(--citadel-container));
+    padding: calc(76px + var(--safe-top, 0px)) 0 calc(40px + var(--safe-bottom, 0px));
+  }
+
+  .panel {
+    gap: 16px;
+  }
+
+  .header {
+    padding: 18px;
+  }
+
+  .header h1 {
+    font-size: clamp(2.2rem, 12vw, 3rem);
+    letter-spacing: 0.06em;
+  }
+
+  .identifier {
+    overflow-wrap: anywhere;
+  }
+
+  .section,
+  .dangerZone {
+    padding: 16px;
+  }
+
+  .section h2,
+  .dangerZone h2 {
+    font-size: 1.4rem;
+  }
+
+  .actionRow > * {
+    flex: 1 1 auto;
   }
 }

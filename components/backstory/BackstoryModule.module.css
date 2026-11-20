@@ -296,3 +296,60 @@
     padding-right: 16px;
   }
 }
+
+/* Phone layout (spec 23, B #17 and modal pattern). The tooltips stay hidden here (640 rule):
+   they only repeat each button's accessible name (documented D9 exemption). */
+@media (max-width: 760px) {
+  .toggleWrap {
+    right: calc(14px + var(--safe-right, 0px));
+    bottom: calc(14px + var(--safe-bottom, 0px));
+  }
+
+  .tooltip {
+    display: none;
+  }
+
+  .backdrop {
+    padding: 12px;
+  }
+
+  .modal {
+    width: min(100%, 660px);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 14px;
+    padding: 20px 18px;
+  }
+
+  .body {
+    height: min(330px, calc(100vh - 200px));
+    height: min(330px, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 200px));
+    min-height: 120px;
+    max-height: none;
+    padding-right: 10px;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Touch targets (D2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .toggleButton,
+  .createButton {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .closeButton {
+    min-height: var(--touch-target, 44px);
+    min-width: 96px;
+  }
+}
+
+/* Without hover the faded FAB would stay at 40% opacity and read as disabled. */
+@media (hover: none) {
+  .toggleButton {
+    opacity: 0.78;
+  }
+}

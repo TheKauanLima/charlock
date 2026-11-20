@@ -23,6 +23,7 @@ export default function GlobalNav() {
   const [isOpen, setIsOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(0)
   const menuRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -33,6 +34,11 @@ export default function GlobalNav() {
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
+        // Keep keyboard users on the trigger instead of dropping focus to <body>.
+        if (menuRef.current?.contains(document.activeElement)) {
+          triggerRef.current?.focus()
+        }
+
         setIsOpen(false)
       }
     }
@@ -84,6 +90,7 @@ export default function GlobalNav() {
   return (
     <div className={styles.nav} ref={menuRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.avatarButton}
         aria-label="Open profile navigation"

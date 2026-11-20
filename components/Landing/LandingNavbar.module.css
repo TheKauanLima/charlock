@@ -203,3 +203,10 @@
     transition: none;
   }
 }
+
+/* Safe areas (spec 23 D3): keep the sticky bar clear of the notch with viewport-fit=cover. 0px off-device. */
+.header {
+  padding-top: var(--safe-top, 0px);
+  padding-right: var(--safe-right, 0px);
+  padding-left: var(--safe-left, 0px);
+}

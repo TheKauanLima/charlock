@@ -1,10 +1,9 @@
 'use client'
 
 import { useUser } from '@clerk/nextjs'
-import { Heart } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Heart, RotateCcw } from 'lucide-react'
 import Image from 'next/image'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import BackstoryModule from '@/components/backstory/BackstoryModule'
 import HeroInfoCluster from '@/components/HeroInfoCluster/HeroInfoCluster'
@@ -21,7 +20,9 @@ import { HEROES } from '@/lib/hero-data'
 import type { HeroDefinition, HeroInfoDefinition } from '@/lib/hero-data'
 import { buildHeroStatsSeed, type HeroStatsPayload } from '@/lib/hero-stats-shared'
 import { buildCustomInteractionHeroes } from '@/lib/interaction-heroes'
+import { useHeroGridStageScroll } from '@/hooks/use-hero-grid-stage-scroll'
 import { useInfiniteScroll } from '@/hooks/use-infinite-scroll'
+import { useRenderDrag } from '@/hooks/use-render-drag'
 import { getThumbnailUrl, IMAGE_BLUR_DATA_URL } from '@/lib/image-optimization'
 import { HERO_TEMPLATES, type HeroTemplateDefinition } from '@/templates'
 
@@ -47,13 +48,6 @@ interface GridHeroItem {
   createdAt?: string
 }
 
-interface RenderDragState {
-  pointerId: number
-  startClientX: number
-  startClientY: number
-  startPosition: RenderPosition
-}
-
 interface SaveHeroOptions {
   mode?: 'manual' | 'draft' | 'exit'
 }
@@ -70,6 +64,7 @@ const NEXT_BROWSE_PAGE_SIZE = 12
 const FALLBACK_EDITOR_BACKGROUND = HERO_BACKGROUND_OPTIONS.find(option => option.path.includes('/generic_bg_psd.png'))?.path ?? HERO_BACKGROUND_OPTIONS[0]?.path ?? ''
 const SHOW_DETAILS_STORAGE_KEY = 'charlock_show_details'
 const RENDER_POSITION_LIMIT = 2000
+const RENDER_NUDGE_STEP = 24
 const HERO_BACKGROUND_SLUG_OVERRIDES: Record<string, string> = {
   ladygeist: 'geist',
 }
@@ -211,7 +206,7 @@ function shouldIgnoreRenderDragTarget(target: EventTarget | null) {
       ? target.parentElement
       : null
 
-  return Boolean(element?.closest('button, a, input, textarea, select, [contenteditable="true"], [role="dialog"], [role="textbox"], [data-hero-stat-panel="true"], [data-testid="ability-editor"], [data-testid="primary-top-bar"]'))
+  return Boolean(element?.closest('button, a, input, textarea, select, [contenteditable="true"], [role="dialog"], [role="textbox"], [data-hero-stat-panel="true"], [data-testid="ability-editor"], [data-testid="primary-top-bar"], [data-modal-backdrop]'))
 }
 
 function getSavedRenderSelection(renderPath: string, renderPosition?: RenderPosition): { background: string; renderSelection: EditorRenderSelection } {
@@ -260,7 +255,6 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   const { isLoaded: isAuthLoaded, isSignedIn, user } = useUser()
   const authUserId = user?.id ?? null
   const recoveryOwnerId = authUserId ?? ANONYMOUS_RECOVERY_OWNER_ID
-  const renderDragStateRef = useRef<RenderDragState | null>(null)
   const latestEditorRenderSelectionRef = useRef<EditorRenderSelection>({ mode: 'background', src: null })
   const startsInCreate = initialTab === 'Create'
   const startsInCreateForExistingHero = startsInCreate && Boolean(initialHeroId)
@@ -601,65 +595,46 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
     return () => window.clearTimeout(timeoutId)
   }, [pendingRenderHeroSlug, renderPhase])
 
-  useEffect(() => {
-    function handleRenderDragPointerMove(event: PointerEvent) {
-      const dragState = renderDragStateRef.current
-
-      if (!dragState || event.pointerId !== dragState.pointerId) {
-        return
+  const updateEditorRenderPosition = useCallback((getNextPosition: (currentPosition: RenderPosition) => RenderPosition) => {
+    setEditorRenderSelectionState(currentSelection => {
+      if (currentSelection.mode === 'background') {
+        return currentSelection
       }
 
-      const nextPosition = {
-        x: clampRenderOffset(dragState.startPosition.x + event.clientX - dragState.startClientX),
-        y: clampRenderOffset(dragState.startPosition.y + event.clientY - dragState.startClientY),
-      }
-
-      setEditorRenderSelectionState(currentSelection => {
-        if (currentSelection.mode === 'background') {
-          return currentSelection
-        }
-
-        const nextSelection = normalizeRenderSelection({
-          ...currentSelection,
-          position: nextPosition,
-        })
-
-        latestEditorRenderSelectionRef.current = nextSelection
-
-        return nextSelection
+      const nextSelection = normalizeRenderSelection({
+        ...currentSelection,
+        position: getNextPosition(normalizeRenderPosition(currentSelection.position)),
       })
-    }
 
-    function handleRenderDragPointerUp(event: PointerEvent) {
-      if (renderDragStateRef.current?.pointerId === event.pointerId) {
-        renderDragStateRef.current = null
-      }
-    }
+      latestEditorRenderSelectionRef.current = nextSelection
 
-    window.addEventListener('pointermove', handleRenderDragPointerMove)
-    window.addEventListener('pointerup', handleRenderDragPointerUp)
-    window.addEventListener('pointercancel', handleRenderDragPointerUp)
-
-    return () => {
-      window.removeEventListener('pointermove', handleRenderDragPointerMove)
-      window.removeEventListener('pointerup', handleRenderDragPointerUp)
-      window.removeEventListener('pointercancel', handleRenderDragPointerUp)
-    }
+      return nextSelection
+    })
   }, [])
 
-  function handleRenderDragPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
-    if (!isEditorRenderMovable || event.button !== 0 || shouldIgnoreRenderDragTarget(event.target)) {
-      return
-    }
+  const handleRenderDragPosition = useCallback((position: RenderPosition) => {
+    updateEditorRenderPosition(() => position)
+  }, [updateEditorRenderPosition])
 
-    renderDragStateRef.current = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startPosition: normalizeRenderPosition(editorRenderSelection.position),
-    }
-    event.preventDefault()
+  const { handleFramePointerDown: handleRenderFramePointerDown, handleShellPointerDown: handleRenderShellPointerDown } = useRenderDrag({
+    enabled: isEditorRenderMovable,
+    getStartPosition: () => normalizeRenderPosition(editorRenderSelection.position),
+    onDragPosition: handleRenderDragPosition,
+    shouldIgnoreTarget: shouldIgnoreRenderDragTarget,
+  })
+
+  function nudgeEditorRender(deltaX: number, deltaY: number) {
+    updateEditorRenderPosition(currentPosition => ({
+      x: currentPosition.x + deltaX,
+      y: currentPosition.y + deltaY,
+    }))
   }
+
+  function resetEditorRenderPosition() {
+    updateEditorRenderPosition(() => ({ x: 0, y: 0 }))
+  }
+
+  const { stageRef: renderLayerRef, requestStageScroll } = useHeroGridStageScroll<HTMLDivElement>()
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -889,6 +864,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   function handleHeroSelect(heroSlug: string) {
     setHasSelectedHero(true)
     setSelectedSelectCustomHeroId(null)
+    requestStageScroll()
 
     if (heroSlug === activeHeroSlug) {
       return
@@ -916,6 +892,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
 
   function handleSelectCustomHero(heroId: string) {
     setHasSelectedHero(true)
+    requestStageScroll()
     setSelectedSelectCustomHeroId(heroId)
     setPendingRenderHeroSlug(null)
     setRenderPhase('idle')
@@ -1278,44 +1255,10 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
   }
 
   return (
-    <div className={`${styles.shell} ${isEditorRenderMovable ? styles.renderDragEnabled : ''}`} onPointerDown={isEditorRenderMovable ? handleRenderDragPointerDown : undefined} data-testid="hero-grid-shell">
+    <div className={`${styles.shell} ${isEditorRenderMovable ? styles.renderDragEnabled : ''}`} onPointerDown={isEditorRenderMovable ? handleRenderShellPointerDown : undefined} data-testid="hero-grid-shell">
       <div className={styles.backgroundLayer} />
       <div className={styles.smokeLayer} />
       <div className={styles.washLayer} />
-
-      <div className={styles.renderLayer}>
-        <div className={styles.renderFade} />
-        {shouldShowRender ? (
-          <div
-            key={isCreateMode ? `${editorRenderSelection.mode}:${baseRenderImage}` : selectedCustomStageHero ? `custom:${selectedCustomStageHero.id}` : renderHero.slug}
-            className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
-            role="img"
-            aria-label={baseRenderLabel}
-            aria-hidden={renderPhase === 'fade-out'}
-            data-testid="hero-render-layer"
-            style={{
-              backgroundImage: `url('${baseRenderImage}')`,
-            }}
-          />
-        ) : null}
-        {customRenderImage ? (
-          <div
-            className={`${styles.renderFrame} ${isEditorRenderMovable ? styles.renderDraggableFrame : ''}`}
-            role="img"
-            aria-label={customRenderLabel}
-            data-testid="editor-custom-render-layer"
-            onPointerDown={isEditorRenderMovable ? handleRenderDragPointerDown : undefined}
-            style={{
-              backgroundImage: `url('${customRenderImage}')`,
-              backgroundPosition: getRenderBackgroundPosition(customRenderPosition),
-            }}
-          />
-        ) : null}
-      </div>
-
-      {activeTab === 'Select' && !hasVisibleSelectedHero ? (
-        <h1 className={styles.landingTitle} data-testid="landing-title">CURSED CONCEPTS</h1>
-      ) : null}
 
       <div className={styles.content}>
         <nav aria-label="Primary sections" className={styles.tabs} data-testid="primary-top-bar">
@@ -1345,6 +1288,9 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
               <input
                 id="browse-hero-search"
                 type="search"
+                inputMode="search"
+                enterKeyHint="search"
+                autoComplete="off"
                 value={browseSearch}
                 onChange={event => setBrowseSearch(event.target.value)}
                 placeholder="Find characters"
@@ -1491,6 +1437,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
                           } else {
                             setSelectedBookmarkedHeroId(hero.id)
                           }
+                          requestStageScroll()
                         }}
                         className={`${styles.heroCard} ${isSelected ? styles.heroCardActive : ''}`}
                       >
@@ -1622,6 +1569,64 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         ) : null}
       </div>
 
+      {/* The stage renders after .content so phones read grid, stage, then cluster/editor (spec 23, D12). */}
+      {activeTab === 'Select' && !hasVisibleSelectedHero ? (
+        <h1 className={styles.landingTitle} data-testid="landing-title">CURSED CONCEPTS</h1>
+      ) : null}
+
+      <div
+        ref={renderLayerRef}
+        className={`${styles.renderLayer} ${!shouldShowRender && !customRenderImage ? styles.renderLayerEmpty : ''}`}
+        data-testid="hero-render-stage"
+      >
+        <div className={styles.renderFade} />
+        {shouldShowRender ? (
+          <div
+            key={isCreateMode ? `${editorRenderSelection.mode}:${baseRenderImage}` : selectedCustomStageHero ? `custom:${selectedCustomStageHero.id}` : renderHero.slug}
+            className={`${styles.renderFrame} ${renderPhase === 'fade-out' ? styles.renderFrameOutgoing : renderPhase === 'fade-in' ? styles.renderFrameIncoming : ''}`}
+            role="img"
+            aria-label={baseRenderLabel}
+            aria-hidden={renderPhase === 'fade-out'}
+            data-testid="hero-render-layer"
+            style={{
+              backgroundImage: `url('${baseRenderImage}')`,
+            }}
+          />
+        ) : null}
+        {customRenderImage ? (
+          <div
+            className={`${styles.renderFrame} ${isEditorRenderMovable ? styles.renderDraggableFrame : ''}`}
+            role="img"
+            aria-label={customRenderLabel}
+            data-testid="editor-custom-render-layer"
+            onPointerDown={isEditorRenderMovable ? handleRenderFramePointerDown : undefined}
+            style={{
+              backgroundImage: `url('${customRenderImage}')`,
+              backgroundPosition: getRenderBackgroundPosition(customRenderPosition),
+            }}
+          />
+        ) : null}
+        {isEditorRenderMovable ? (
+          <div className={styles.renderNudge} role="group" aria-label="Move hero render" data-testid="render-nudge-controls">
+            <button type="button" aria-label="Move render left" onClick={() => nudgeEditorRender(-RENDER_NUDGE_STEP, 0)}>
+              <ChevronLeft aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Move render right" onClick={() => nudgeEditorRender(RENDER_NUDGE_STEP, 0)}>
+              <ChevronRight aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Move render up" onClick={() => nudgeEditorRender(0, -RENDER_NUDGE_STEP)}>
+              <ChevronUp aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Move render down" onClick={() => nudgeEditorRender(0, RENDER_NUDGE_STEP)}>
+              <ChevronDown aria-hidden="true" />
+            </button>
+            <button type="button" aria-label="Reset render position" onClick={resetEditorRenderPosition}>
+              <RotateCcw aria-hidden="true" />
+            </button>
+          </div>
+        ) : null}
+      </div>
+
       {isCreateMode ? (
         <HeroInfoEditor
           key={`editor:${recoveryOwnerId}:${editorRevision}`}
@@ -1679,7 +1684,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
       {blockedActionToast ? <SystemToast key={blockedActionToast.id} message={blockedActionToast.message} variant="error" position="top" /> : null}
 
       {isTemplateModalOpen ? (
-        <div className={styles.templateModalBackdrop}>
+        <div className={styles.templateModalBackdrop} data-modal-backdrop="true">
           <section
             className={styles.templateModal}
             role="dialog"
@@ -1739,6 +1744,7 @@ export default function HeroGrid({ initialTab = 'Select', initialHeroId }: HeroG
         <div
           className={styles.interactionModalBackdrop}
           data-testid="interaction-viewer-modal"
+          data-modal-backdrop="true"
           role="presentation"
           onMouseDown={event => {
             if (event.target === event.currentTarget) setInteractionViewerHero(null)

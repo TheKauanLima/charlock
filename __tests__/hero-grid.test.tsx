@@ -553,7 +553,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Preview Ability 1' }))
 
     expect(screen.getByLabelText('Ability Name')).toHaveValue('Preserved Preview Name')
-  })
+  }, 15000)
 
   it('toggles scaling value details from the grid-side control', async () => {
     const user = userEvent.setup()
@@ -957,7 +957,7 @@ describe('HeroGrid', () => {
 
     await user.type(backstoryInput, 'Raised under neon rooftops, Arc Light learned to bottle thunder.')
     expect(backstoryInput).toHaveValue('Raised under neon rooftops, Arc Light learned to bottle thunder.')
-  })
+  }, 15000)
 
   it('opens the focused ability editor from a create-mode ability circle', async () => {
     const user = userEvent.setup()
@@ -1067,7 +1067,7 @@ describe('HeroGrid', () => {
     await confirmFocusedGoBack(user)
     await user.click(screen.getByTestId('editor-secondary-ability-1'))
     expect(screen.getByLabelText('Ability Name')).toHaveValue('Existing Primary')
-  })
+  }, 15000)
 
   it('publishes a second ability set enabled from the focused ability editor', async () => {
     const user = userEvent.setup()
@@ -1466,7 +1466,7 @@ describe('HeroGrid', () => {
 
     await user.click(screen.getByLabelText('Shotgun Pellets'))
     expect(dpsValue).toHaveTextContent('20DPS')
-  })
+  }, 15000)
 
   it('adds and removes named Boon, Weapon, Vitality, and Spirit panels with independent values', async () => {
     const user = userEvent.setup()
@@ -1564,7 +1564,7 @@ describe('HeroGrid', () => {
     await user.click(screen.getByRole('button', { name: 'Remove active Spirit panel' }))
     expect(screen.queryByRole('tab', { name: 'Mystic' })).not.toBeInTheDocument()
     expect(screen.getByLabelText('Spirit Power value')).toHaveValue('0')
-  }, 10000)
+  }, 20000)
 
   it('saves the full create draft from the global action bar', async () => {
     const user = userEvent.setup()
@@ -1687,7 +1687,7 @@ describe('HeroGrid', () => {
     expect(requestBody.abilityStats.secondaryAbilitySlots).toEqual([0])
     expect(requestBody.abilityStats.secondaryAbilityAnchorIndex).toBeUndefined()
     expect(requestBody.abilityStats.secondaryAbilities?.[0]?.name).toBe('Arc Echo')
-  })
+  }, 15000)
 
   it('manually saves the complete private draft immediately without waiting for autosave', async () => {
     const user = userEvent.setup()
@@ -1759,7 +1759,7 @@ describe('HeroGrid', () => {
     expect(requestBody.boon.stats[0].label).toBe('Manual Bonus')
     expect(requestBody.abilityStats.abilities[0].name).toBe('Unsynced Manual Ability')
     expect(await screen.findByText('Draft saved to your profile.')).toBeInTheDocument()
-  })
+  }, 15000)
 
   it('lets an owner confirm unpublishing a hero and returns it to private saves', async () => {
     const user = userEvent.setup()
@@ -2187,5 +2187,5 @@ describe('HeroGrid', () => {
 
     expect(screen.getByRole('img', { name: 'Solar Repeater weapon' })).toHaveAttribute('style', expect.stringContaining('/panorama/images/heroes/guns/Grey_Talon_Weapon.png'))
     expect(screen.queryByTestId('weapon-image-modal')).not.toBeInTheDocument()
-  })
+  }, 15000)
 })

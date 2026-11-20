@@ -1622,3 +1622,216 @@
     width: 48px;
   }
 }
+
+/* Spec 23 D2 exemption: tag transform handles keep their small visual but get a
+   larger transparent hit area on touch (28px corners, 20px edges). */
+@media (pointer: coarse) {
+  .tagDragHandle::before {
+    content: "";
+    position: absolute;
+  }
+
+  .tagCornerHandle::before {
+    inset: -7px;
+  }
+
+  .tagEdgeHandle::before {
+    inset: -4px 0;
+  }
+
+  .tagSideEdgeHandle::before {
+    inset: 0 -4px;
+  }
+
+  .tagDragHandle::after {
+    border-color: rgba(255, 239, 214, 0.28);
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .previewModeButton,
+  .segmentedButton,
+  .assetButton,
+  .uploadButton,
+  .cloudUploadButton,
+  .resetPortraitButton,
+  .input,
+  .select,
+  .copyToggle,
+  .saveActionButton,
+  .publishActionButton,
+  .unpublishActionButton,
+  .exportActionButton,
+  .draftAutosaveControls input,
+  .draftAutosaveControls select,
+  .secondSetCancelButton,
+  .secondSetDeleteButton,
+  .exitStayButton,
+  .exitConfirmButton {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .secondSetModalClose {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .sizeRange {
+    height: var(--touch-target, 44px);
+  }
+}
+
+/* Spec 23 section 4.4: the editor side of the HeroGrid phone layout contract.
+   section.editor flows directly below the render stage. Order: sidebar tabs,
+   interaction creator or preview stage, stats aside, then the settings rail. */
+@media (max-width: 760px) {
+  /* z-index: auto (not 30) so the editor is not a stacking context on phone:
+     the fixed ability sheet (z 400, step 5) must paint above the tab bar (320)
+     and the GlobalNav (340). The rail (60) and stats aside (30) stay below them. */
+  .editor {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: auto;
+    padding: 12px calc(var(--mobile-gutter, 12px) + var(--safe-right, 0px)) 16px calc(var(--mobile-gutter, 12px) + var(--safe-left, 0px));
+  }
+
+  .previewStage,
+  .previewStageRailCollapsed {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: auto;
+    min-height: 0;
+    padding: 0;
+  }
+
+  .tagsRow {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 22px 18px;
+    padding: 10px 14px;
+  }
+
+  .statsAside {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: auto;
+  }
+
+  .controlRail,
+  .controlRailCollapsed {
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+    min-width: 0;
+    overflow: visible;
+    border: 1px solid var(--citadel-border);
+  }
+
+  .controlRailToggle {
+    position: relative;
+    top: auto;
+    right: auto;
+    order: -1;
+    flex-direction: row;
+    width: 100%;
+    min-height: var(--touch-target, 44px);
+    gap: 10px;
+    border-width: 0 0 1px;
+    padding: 6px 14px;
+  }
+
+  .controlRailToggle span {
+    transform: rotate(90deg);
+  }
+
+  .controlRailToggle strong {
+    max-height: none;
+    font-size: 0.62rem;
+    writing-mode: horizontal-tb;
+  }
+
+  /* Wraps instead of scrolling sideways so every rail button stays visible. */
+  .controlTabRail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 239, 214, 0.12);
+    padding: 8px;
+  }
+
+  .controlTabList {
+    flex-direction: row;
+  }
+
+  .controlTabButton,
+  .editorBackButton,
+  .editorProfileButton {
+    min-width: 56px;
+    min-height: var(--touch-target, 44px);
+    margin-top: 0;
+  }
+
+  .controlTabButton {
+    min-height: 48px;
+  }
+
+  .controlPane {
+    overflow: visible;
+  }
+
+  .controlRailCollapsed .controlPane {
+    display: none;
+  }
+
+  .railContent {
+    overflow: visible;
+  }
+
+  .sizeControl {
+    grid-template-columns: minmax(0, 1fr) 72px;
+  }
+
+  .secondSetModalBackdrop,
+  .exitConfirmBackdrop {
+    padding: 12px;
+  }
+
+  .secondSetModal {
+    width: min(100%, 620px);
+  }
+
+  .exitConfirmDialog {
+    width: min(100%, 440px);
+  }
+
+  .secondSetModal,
+  .exitConfirmDialog {
+    max-height: calc(100vh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+
+  .secondaryAbilityChoices {
+    padding: 14px 8px;
+  }
+
+  .secondSetConfirmActions {
+    flex-wrap: wrap;
+  }
+}

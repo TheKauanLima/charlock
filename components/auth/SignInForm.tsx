@@ -83,7 +83,7 @@ export default function SignInForm() {
       <span className={styles.divider}>or</span>
       <label className={styles.field}>
         <span className={styles.label}>Email or Username</span>
-        <input className={styles.input} value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" />
+        <input className={styles.input} value={identifier} onChange={event => setIdentifier(event.target.value)} required autoComplete="username" autoCapitalize="none" spellCheck={false} />
       </label>
       <label className={styles.field}>
         <span className={styles.label}>Password</span>

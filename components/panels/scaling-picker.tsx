@@ -12,6 +12,7 @@ import {
   SCALING_TYPES,
 } from '@/components/panels/scaling-utils'
 import type { CustomScalingDefinition, ScalingState, ScalingType } from '@/components/panels/scaling-utils'
+import { useViewportClampedPopover } from '@/components/panels/useViewportClampedPopover'
 import { ABILITY_ICON_GROUPS, PROPERTY_ICON_GROUPS } from '@/lib/editor-assets'
 import { getSquareIconStyle, isSquareIcon } from '@/lib/square-icon'
 import cn from '@/lib/utilsd'
@@ -68,10 +69,13 @@ export default function ScalingPicker({ label, scaling, scalingValue, customScal
   const pickerId = useId()
   const pickerRef = useRef<HTMLSpanElement | null>(null)
   const buttonRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLSpanElement | null>(null)
   const [menuSide, setMenuSide] = useState<'left' | 'right'>('left')
   const [iconSearch, setIconSearch] = useState('')
   const [isIconModalOpen, setIsIconModalOpen] = useState(false)
   const isOpen = openPickerId === pickerId
+
+  useViewportClampedPopover(menuRef, isOpen)
   const normalizedCustomScaling = normalizeCustomScaling(customScaling)
   const customScalingDraft = {
     ...normalizedCustomScaling,
@@ -218,7 +222,7 @@ export default function ScalingPicker({ label, scaling, scalingValue, customScal
         )}
       </button>
       {isOpen ? (
-        <span className={styles.menu} data-scaling-picker-menu="true" role="dialog" aria-label={`${label} scaling controls`}>
+        <span ref={menuRef} className={styles.menu} data-scaling-picker-menu="true" role="dialog" aria-label={`${label} scaling controls`}>
           <span className={styles.typeRow}>
             {allowedScalingTypes.map(nextScaling => {
               const scalingIconStyle = getScalingButtonIconStyle(nextScaling, normalizedCustomScaling)
@@ -244,7 +248,7 @@ export default function ScalingPicker({ label, scaling, scalingValue, customScal
           </span>
           <label className={styles.valueRow}>
             <span className={styles.srOnly}>{label} scaling value</span>
-            <input type="text" value={scalingValue} placeholder="0" aria-label={`${label} scaling value`} onChange={updateScalingValue} />
+            <input type="text" inputMode="text" value={scalingValue} placeholder="0" aria-label={`${label} scaling value`} onChange={updateScalingValue} />
           </label>
           {scaling === 'custom' ? (
             <span className={styles.customFields} id={customFieldsId}>

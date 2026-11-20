@@ -142,11 +142,11 @@ export default function SignUpForm() {
       <span className={styles.divider}>or</span>
       <label className={styles.field}>
         <span className={styles.label}>Email</span>
-        <input className={styles.input} value={email} onChange={event => setEmail(event.target.value)} required type="email" autoComplete="email" />
+        <input className={styles.input} value={email} onChange={event => setEmail(event.target.value)} required type="email" autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} />
       </label>
       <label className={styles.field}>
         <span className={styles.label}>Username</span>
-        <input className={styles.input} value={username} onChange={event => setUsername(event.target.value)} required autoComplete="username" />
+        <input className={styles.input} value={username} onChange={event => setUsername(event.target.value)} required autoComplete="username" autoCapitalize="none" spellCheck={false} />
       </label>
       <label className={styles.field}>
         <span className={styles.label}>Password</span>

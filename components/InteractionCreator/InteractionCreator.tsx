@@ -3,7 +3,10 @@
 import Image from 'next/image'
 import { ArrowDown, ArrowUp, Copy, MessageSquareText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
 import type { DialogueLine, DialogueSpeakerSide, HeroInteraction } from '@/lib/custom-hero-types'
 import { getInteractionTargetHero, INTERACTION_ROSTER_HEROES, type InteractionRosterHero } from '@/lib/interaction-heroes'
 import cn from '@/lib/utilsd'
@@ -99,6 +102,9 @@ export default function InteractionCreator({
   const [targetSearch, setTargetSearch] = useState('')
   const [renamingInteractionId, setRenamingInteractionId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const targetPickerDismiss = useHeroGridBackdropDismiss(() => setIsTargetPickerOpen(false))
+  const conversationPickerDismiss = useHeroGridBackdropDismiss(() => setIsConversationPickerOpen(false))
+  const accentStyle = { '--interaction-accent': accentColor } as CSSProperties
 
   const activeInteraction = orderedInteractions.find(interaction => interaction.id === activeInteractionId) ?? orderedInteractions[0] ?? null
   const activeInteractionLines = activeInteraction
@@ -140,6 +146,26 @@ export default function InteractionCreator({
 
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose, readOnly])
+
+  useEffect(() => {
+    if (!isTargetPickerOpen && !isConversationPickerOpen) return undefined
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      setIsTargetPickerOpen(false)
+      setIsConversationPickerOpen(false)
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isConversationPickerOpen, isTargetPickerOpen])
+
+  // Pickers mount on document.body (spec 23, A1): .creator uses isolation: isolate, which would trap
+  // their fixed backdrops. The accent variable is re-applied because the portal leaves .creator.
+  function renderPicker(picker: ReactNode) {
+    return typeof document === 'undefined' ? null : createPortal(picker, document.body)
+  }
 
   function replaceInteraction(interactionId: string, update: (interaction: HeroInteraction) => HeroInteraction) {
     const updatedAt = new Date().toISOString()
@@ -317,7 +343,7 @@ export default function InteractionCreator({
       role={readOnly ? 'dialog' : undefined}
       aria-modal={readOnly ? true : undefined}
       aria-label={readOnly ? `${customHeroName} Interactions` : 'Interaction creator'}
-      style={{ '--interaction-accent': accentColor } as React.CSSProperties}
+      style={accentStyle}
     >
       <header className={styles.stageHeader}>
         <div>
@@ -497,8 +523,8 @@ export default function InteractionCreator({
         </main>
       </div>
 
-      {isTargetPickerOpen ? (
-        <div className={styles.modalBackdrop} role="presentation">
+      {isTargetPickerOpen ? renderPicker(
+        <div className={styles.modalBackdrop} role="presentation" data-modal-backdrop="true" style={accentStyle} {...targetPickerDismiss}>
           <section className={styles.modal} role="dialog" aria-modal="true" aria-labelledby="target-hero-picker-title">
             <header className={styles.modalHeader}>
               <div>
@@ -512,7 +538,7 @@ export default function InteractionCreator({
             <label className={styles.searchField}>
               <Search aria-hidden="true" />
               <span className="sr-only">Search official and custom heroes</span>
-              <input value={targetSearch} placeholder="Search heroes" onChange={event => setTargetSearch(event.target.value)} />
+              <input value={targetSearch} inputMode="search" enterKeyHint="search" placeholder="Search heroes" onChange={event => setTargetSearch(event.target.value)} />
             </label>
             <div className={styles.targetGrid}>
               {filteredTargets.map(hero => (
@@ -533,8 +559,8 @@ export default function InteractionCreator({
         </div>
       ) : null}
 
-      {isConversationPickerOpen ? (
-        <div className={styles.modalBackdrop} role="presentation">
+      {isConversationPickerOpen ? renderPicker(
+        <div className={styles.modalBackdrop} role="presentation" data-modal-backdrop="true" style={accentStyle} {...conversationPickerDismiss}>
           <section className={cn(styles.modal, styles.conversationModal)} role="dialog" aria-modal="true" aria-labelledby="conversation-picker-title">
             <header className={styles.modalHeader}>
               <div>
@@ -549,7 +575,7 @@ export default function InteractionCreator({
               <label className={styles.searchField}>
                 <Search aria-hidden="true" />
                 <span className="sr-only">Search conversations</span>
-                <input value={conversationSearch} placeholder="Filter conversations" onChange={event => setConversationSearch(event.target.value)} />
+                <input value={conversationSearch} inputMode="search" enterKeyHint="search" placeholder="Filter conversations" onChange={event => setConversationSearch(event.target.value)} />
               </label>
               <button type="button" className={styles.primaryButton} onClick={() => {
                 setIsConversationPickerOpen(false)

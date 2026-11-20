@@ -129,3 +129,10 @@
     transition: none;
   }
 }
+
+/* Safe areas (spec 23 D3): keep footer links above the home indicator. 0px off-device. */
+.footer {
+  padding-right: var(--safe-right, 0px);
+  padding-bottom: var(--safe-bottom, 0px);
+  padding-left: var(--safe-left, 0px);
+}

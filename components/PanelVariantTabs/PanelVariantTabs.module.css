@@ -126,3 +126,40 @@
 .namingRow button:disabled {
   opacity: 0.45;
 }
+
+/* Touch targets (spec 23, D2): the tab strip keeps scrolling sideways inside its own container. */
+@media (max-width: 760px), (pointer: coarse) {
+  .tab,
+  .addButton,
+  .renameButton,
+  .namingRow button,
+  .namingRow input {
+    min-height: var(--touch-target, 44px);
+    padding: 6px 12px;
+  }
+
+  .removableTab {
+    padding-left: 40px;
+  }
+
+  .removeButton {
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 40px;
+    height: auto;
+  }
+
+  .namingRow {
+    flex-wrap: wrap;
+  }
+
+  .namingRow input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .namingRow button {
+    flex: 1 1 0;
+  }
+}

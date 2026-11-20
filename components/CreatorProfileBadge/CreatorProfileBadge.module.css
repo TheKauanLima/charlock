@@ -151,3 +151,23 @@
   border-color: rgba(255, 239, 214, 0.2);
   color: rgba(255, 239, 214, 0.72);
 }
+
+/* Touch targets (spec 23, D2). */
+@media (max-width: 760px), (pointer: coarse) {
+  .badge {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .iconBadge {
+    width: var(--touch-target, 44px);
+    min-width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+@media (hover: none) {
+  .badge:hover {
+    transform: none;
+  }
+}

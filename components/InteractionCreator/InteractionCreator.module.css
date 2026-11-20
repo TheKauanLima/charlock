@@ -30,6 +30,7 @@
   width: min(1180px, 100%);
   height: min(84vh, 820px);
   min-height: min(560px, calc(100vh - 24px));
+  min-height: min(560px, calc(100dvh - 24px));
   border: 1px solid rgba(255, 239, 214, 0.24);
   background: #0b0e11;
   box-shadow: 0 32px 100px rgba(0, 0, 0, 0.78), inset 0 0 0 1px rgba(255, 239, 214, 0.04);
@@ -451,7 +452,7 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 2300;
   display: grid;
   place-items: center;
   padding: 22px;
@@ -743,6 +744,7 @@
   .creatorViewer {
     width: 100%;
     height: calc(100vh - 20px);
+    height: calc(100dvh - 20px);
     min-height: 0;
   }
 }
@@ -757,5 +759,156 @@
     width: 48px;
     height: 48px;
     flex-basis: 48px;
+  }
+}
+
+/* The pickers are portaled out of .creator, so they need their own focus ring rule. */
+.modalBackdrop button:focus-visible,
+.modalBackdrop input:focus-visible {
+  outline: 2px solid var(--interaction-accent, #ffefd6);
+  outline-offset: 2px;
+}
+
+/* Spec 23 D9: line actions are hover-revealed on desktop; touch devices always see them. */
+@media (hover: none) {
+  .lineActions {
+    position: static;
+    opacity: 1;
+  }
+
+  .rightLine .lineActions {
+    justify-content: flex-end;
+  }
+
+  .lineActions button {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .primaryButton,
+  .secondaryButton,
+  .addLineButton,
+  .renameRow button,
+  .renameRow input,
+  .searchField input {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .iconButton,
+  .conversationActions button {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .startLinePlus {
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+}
+
+/* Spec 23 section 4.4: the creator flows inside the phone editor column. */
+@media (max-width: 760px) {
+  .creator,
+  .creatorPaneCollapsed {
+    position: relative;
+    inset: auto;
+    left: auto;
+    min-height: 0;
+    overflow: visible;
+    border: 1px solid rgba(255, 239, 214, 0.14);
+  }
+
+  .creatorViewer {
+    width: 100%;
+    height: calc(100vh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .stageHeader {
+    min-height: 0;
+    gap: 12px;
+    padding: 14px 12px;
+  }
+
+  .creatorViewer .stageHeader {
+    padding-right: 12px;
+  }
+
+  .headerActions .primaryButton,
+  .headerActions .secondaryButton {
+    flex: 1 1 auto;
+  }
+
+  .stageBody {
+    padding: 12px;
+  }
+
+  .dialogueCanvas {
+    height: auto;
+    padding: 2px 0 16px;
+  }
+
+  .creatorViewer .dialogueCanvas {
+    height: 100%;
+  }
+
+  .emptyConversation {
+    min-height: 220px;
+    padding: 20px;
+  }
+
+  .lineBody {
+    max-width: calc(100% - 57px);
+  }
+
+  .lineActions {
+    position: static;
+    opacity: 1;
+  }
+
+  .rightLine .lineActions {
+    justify-content: flex-end;
+  }
+
+  .lineActions button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .modalBackdrop {
+    padding: calc(12px + var(--safe-top, 0px)) 12px calc(12px + var(--safe-bottom, 0px));
+  }
+
+  .modal,
+  .conversationModal {
+    width: min(100%, 900px);
+    max-height: calc(100vh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+  }
+
+  .modalHeader {
+    padding: 12px;
+  }
+
+  .searchField {
+    margin: 12px 12px 0;
+  }
+
+  .targetGrid,
+  .conversationList {
+    overscroll-behavior: contain;
+    padding: 12px;
+  }
+
+  .conversationToolbar {
+    padding-right: 12px;
+  }
+
+  .renameRow {
+    min-width: 0;
   }
 }

@@ -2,7 +2,7 @@
   pointer-events: auto;
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 400;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,4 +216,40 @@
   -webkit-mask-position: center;
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-size: contain;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .closeButton {
+    flex: 0 0 auto;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+}
+
+/* Spec 23 D8: the surface keeps its inner scroller (.assetList), so only the height is capped. */
+@media (max-width: 760px) {
+  .backdrop {
+    padding: calc(12px + var(--safe-top, 0px)) 12px calc(12px + var(--safe-bottom, 0px));
+  }
+
+  .modal {
+    width: min(100%, 760px);
+    max-height: calc(100vh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+  }
+
+  .header {
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .uploadArea {
+    padding: 12px;
+  }
+
+  .assetList {
+    min-height: 0;
+    overscroll-behavior: contain;
+    padding: 12px;
+  }
 }

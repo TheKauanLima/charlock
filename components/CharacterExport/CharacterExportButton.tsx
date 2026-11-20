@@ -3,8 +3,10 @@
 import { Download, X } from 'lucide-react'
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { toPng } from 'html-to-image'
 
+import { useHeroGridBackdropDismiss } from '@/hooks/use-hero-grid-backdrop-dismiss'
 import {
   CHARACTER_CARD_HEIGHT,
   CHARACTER_CARD_WIDTH,
@@ -46,6 +48,25 @@ export default function CharacterExportButton({ payload, className }: CharacterE
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [status, setStatus] = useState<ExportStatus>('idle')
   const [message, setMessage] = useState<string | null>(null)
+  const backdropDismiss = useHeroGridBackdropDismiss(closeModal)
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+
+      setIsOpen(false)
+      setPreviewUrl(null)
+      setStatus('idle')
+      setMessage(null)
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) {
@@ -127,8 +148,17 @@ export default function CharacterExportButton({ payload, className }: CharacterE
         Export Character
       </button>
 
-      {isOpen ? (
-        <div className={styles.backdrop} role="dialog" aria-modal="true" aria-label="Export character card">
+      {isOpen && typeof document !== 'undefined' ? createPortal(
+        // Portaled (spec 23, A1): the trigger sits in the editor rail, whose backdrop-filter would
+        // otherwise become the containing block of this fixed backdrop and box it into the rail.
+        <div
+          className={styles.backdrop}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Export character card"
+          data-modal-backdrop="true"
+          {...backdropDismiss}
+        >
           <div className={styles.modal}>
             <div className={styles.modalHeader}>
               <div>
@@ -163,7 +193,8 @@ export default function CharacterExportButton({ payload, className }: CharacterE
 
             {message ? <p className={styles.status} role="status">{message}</p> : null}
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   )

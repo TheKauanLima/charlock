@@ -1,6 +1,7 @@
 .shell {
   position: relative;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: #000;
   color: #00ff95;
@@ -17,6 +18,7 @@
 .renderDraggableFrame {
   cursor: grab;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .renderDraggableFrame:active {
@@ -74,6 +76,14 @@
   width: 100vw;
   pointer-events: none;
   z-index: 1;
+}
+
+.renderLayerEmpty {
+  pointer-events: none;
+}
+
+.renderNudge {
+  display: none;
 }
 
 .renderFade {
@@ -1033,5 +1043,244 @@
 
   .templateGrid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Phone layout (spec 23, D12 HeroGrid side). Keep this the last block in the file. */
+@media (max-width: 760px) {
+  .shell {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
+    padding-bottom: calc(72px + var(--safe-bottom, 0px));
+  }
+
+  .backgroundLayer,
+  .smokeLayer,
+  .washLayer {
+    position: fixed;
+    inset: 0;
+  }
+
+  .content {
+    position: relative;
+    inset: auto;
+    height: auto;
+    z-index: auto;
+    padding: calc(64px + var(--safe-top, 0px)) var(--mobile-gutter, 12px) 12px;
+  }
+
+  .tabs {
+    min-height: 52px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 6px;
+    padding: calc(6px + var(--safe-top, 0px)) calc(56px + var(--safe-right, 0px)) 6px calc(var(--mobile-gutter, 12px) + var(--safe-left, 0px));
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabsButton {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--touch-target, 44px);
+    padding: 7px 14px;
+    font-size: 0.7rem;
+  }
+
+  .browseTools {
+    align-items: stretch;
+  }
+
+  .searchField {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .searchField input {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .browseNav {
+    width: 100%;
+  }
+
+  .browseNav,
+  .browseHeroActions {
+    gap: 6px;
+  }
+
+  .main,
+  .activityMain {
+    width: 100%;
+    margin: 12px 0 0;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .detailsToggle {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    margin-bottom: 8px;
+  }
+
+  .browseStatus {
+    position: static;
+    margin: 0 0 8px;
+  }
+
+  .selectHeroActions {
+    position: static;
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-top: 10px;
+  }
+
+  .browseHeroActions button,
+  .browseNavButton,
+  .loadMoreButton {
+    min-height: var(--touch-target, 44px);
+  }
+
+  .loadMoreButton {
+    min-width: 160px;
+  }
+
+  .gridViewport {
+    max-height: none;
+    overflow-x: clip;
+    overflow-y: visible;
+    padding: 8px 0 16px;
+    scrollbar-gutter: auto;
+  }
+
+  .grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .emptySlot {
+    display: none;
+  }
+
+  .heroNameBadge {
+    display: none;
+  }
+
+  .likeButton::before {
+    position: absolute;
+    inset: -9px -6px;
+    content: "";
+  }
+
+  .activityFeed {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .activityItem {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .landingTitle {
+    position: relative;
+    top: auto;
+    right: auto;
+    transform: none;
+    max-width: none;
+    margin: 8px var(--mobile-gutter, 12px) 16px;
+    text-align: center;
+    font-size: clamp(2.6rem, 14vw, 4.5rem);
+  }
+
+  .renderLayer {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: min(60vh, 520px);
+    height: min(60dvh, 520px);
+    overflow: hidden;
+    z-index: 1;
+    scroll-margin-top: calc(64px + var(--safe-top, 0px));
+  }
+
+  .renderLayerEmpty {
+    display: none;
+  }
+
+  .renderFrame {
+    width: 100%;
+    background-position: center top;
+  }
+
+  .renderNudge {
+    display: flex;
+    position: absolute;
+    left: var(--mobile-gutter, 12px);
+    bottom: 8px;
+    z-index: 3;
+    gap: 6px;
+    pointer-events: auto;
+  }
+
+  .renderNudge button {
+    display: inline-grid;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--citadel-border);
+    background: rgba(15, 14, 16, 0.82);
+    clip-path: var(--citadel-button-cut);
+    color: #ffefd6;
+    backdrop-filter: blur(8px);
+  }
+
+  .renderNudge button:active,
+  .renderNudge button:focus-visible {
+    border-color: var(--citadel-gold);
+    color: var(--citadel-gold);
+    outline: none;
+  }
+
+  .renderNudge svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .templateModalBackdrop {
+    padding: 12px;
+  }
+
+  .templateModal {
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+
+  .templateModalClose {
+    flex: 0 0 auto;
+    width: var(--touch-target, 44px);
+    height: var(--touch-target, 44px);
+  }
+
+  .recoveryCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .recoveryCard > span:last-child {
+    max-width: none;
+    text-align: left;
   }
 }

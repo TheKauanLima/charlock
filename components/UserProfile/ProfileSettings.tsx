@@ -58,6 +58,9 @@ export function ProfileSettingsPanel({
               maxLength={32}
               pattern="[A-Za-z0-9_]+"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
             />
           </label>
@@ -121,7 +124,7 @@ export function ProfileSettingsPanel({
           <p>Type <strong>{user.username}</strong> to confirm permanent account deletion.</p>
           {deleteError ? <p className={styles.error} role="alert">Confirmation string did not match.</p> : null}
           <form className={styles.deleteForm} action={deleteAccount}>
-            <input name="confirmation" required autoComplete="off" aria-label="Delete account confirmation" />
+            <input name="confirmation" required autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label="Delete account confirmation" />
             <button type="submit">Delete Account</button>
           </form>
         </section>

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Geist, Geist_Mono } from 'next/font/google'
 import GoogleAnalytics from '@/components/google-analytics/GoogleAnalytics'
@@ -35,6 +35,14 @@ export const metadata: Metadata = {
   },
 }
 
+// No maximumScale or userScalable: pinch zoom must stay available (accessibility).
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#000000',
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-black antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} bg-black antialiased`}>
         <ClerkProvider>
           <GlobalNav />
           {children}

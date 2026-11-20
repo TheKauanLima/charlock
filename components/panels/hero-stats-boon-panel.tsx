@@ -207,7 +207,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
   }
 
   const iconPickerModal = iconTargetIndex !== null ? (
-    <div className={styles.iconPickerBackdrop} role="dialog" aria-modal="true" aria-label="Boon stat icon selector" data-testid="boon-stat-icon-modal" onPointerDown={handleIconPickerBackdropPointerDown}>
+    <div className={styles.iconPickerBackdrop} role="dialog" aria-modal="true" aria-label="Boon stat icon selector" data-testid="boon-stat-icon-modal" data-modal-backdrop="true" onPointerDown={handleIconPickerBackdropPointerDown}>
       <div className={styles.iconPicker} data-testid="boon-stat-icon-picker">
         <header className={styles.iconPickerHeader}>
           <div>
@@ -345,7 +345,7 @@ export default function HeroStatsBoonPanel({ heroName, panelName = 'Boon Rewards
                 )}
                 <span aria-hidden="true">+</span>
                 {isEditable ? (
-                  <input aria-label={`${stat.label} value`} value={stat.value} onChange={event => handleChange(index, event)} />
+                  <input inputMode="text" aria-label={`${stat.label} value`} value={stat.value} onChange={event => handleChange(index, event)} />
                 ) : (
                   <strong>{formatPanelValue(stat.value)}</strong>
                 )}

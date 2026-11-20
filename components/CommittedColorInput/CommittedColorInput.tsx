@@ -1,14 +1,16 @@
 import { useEffect, useRef } from 'react'
-import type { MouseEventHandler } from 'react'
+import type { MouseEventHandler, PointerEventHandler } from 'react'
 
 interface CommittedColorInputProps {
   value: string
   ariaLabel: string
   onCommit: (color: string) => void
   onMouseDown?: MouseEventHandler<HTMLInputElement>
+  // Fires at touchstart on touch screens, before the native picker takes focus.
+  onPointerDown?: PointerEventHandler<HTMLInputElement>
 }
 
-export default function CommittedColorInput({ value, ariaLabel, onCommit, onMouseDown }: CommittedColorInputProps) {
+export default function CommittedColorInput({ value, ariaLabel, onCommit, onMouseDown, onPointerDown }: CommittedColorInputProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const onCommitRef = useRef(onCommit)
 
@@ -47,6 +49,7 @@ export default function CommittedColorInput({ value, ariaLabel, onCommit, onMous
       defaultValue={value}
       aria-label={ariaLabel}
       onMouseDown={onMouseDown}
+      onPointerDown={onPointerDown}
     />
   )
 }

@@ -1,0 +1,111 @@
+.root {
+  display: grid;
+  gap: 8px;
+}
+
+.title {
+  color: rgba(255, 239, 214, 0.75);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 44px repeat(2, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 239, 214, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px;
+}
+
+.label {
+  color: rgba(255, 239, 214, 0.72);
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.value {
+  min-width: 0;
+  color: rgba(255, 239, 214, 0.82);
+  font-family: var(--font-geist-mono), "Roboto Mono", monospace;
+  font-size: 0.64rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.stepButton,
+.resetButton {
+  display: inline-grid;
+  min-width: 30px;
+  min-height: 30px;
+  place-items: center;
+  border: 1px solid var(--citadel-border);
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 239, 214, 0.72);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.resetButton {
+  padding: 0 8px;
+  font-family: VALVEPulp, "Valve Pulp", Arial, sans-serif;
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stepButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+.stepButton:hover,
+.stepButton:focus-visible,
+.resetButton:hover:not(:disabled),
+.resetButton:focus-visible {
+  border-color: var(--citadel-gold);
+  color: var(--citadel-gold);
+  outline: none;
+}
+
+.resetButton:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .label {
+    grid-column: 1 / -1;
+  }
+
+  .stepButton,
+  .resetButton {
+    min-width: var(--touch-target, 44px);
+    min-height: var(--touch-target, 44px);
+  }
+
+  .resetButton {
+    grid-column: 1 / -1;
+  }
+}
